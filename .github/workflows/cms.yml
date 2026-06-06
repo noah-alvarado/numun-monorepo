@@ -19,6 +19,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: nalvarado
     env:
       AWS_REGION: us-east-2
       BUCKET: numun-org-cms
