@@ -503,63 +503,21 @@ Resources:
                 "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${AssetsDistribution}"
 
   # ── Route 53 alias records ──────────────────────────────────────────────────
-  # Z2FDTNDATAQYW2 is CloudFront's hosted-zone id (constant; not the customer's).
-  ApexRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt SiteDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-        EvaluateTargetHealth: false
-
-  WwwRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: www.numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt SiteDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-        EvaluateTargetHealth: false
-
-  PortalRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: portal.numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt PortalDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-        EvaluateTargetHealth: false
-
-  CmsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: cms.numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt CmsDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-        EvaluateTargetHealth: false
-
-  AssetsRecord:
-    Type: AWS::Route53::RecordSet
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: assets.numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt AssetsDistribution.DomainName
-        HostedZoneId: Z2FDTNDATAQYW2
-        EvaluateTargetHealth: false
-
-  # api.numun.org alias is managed by the api stack (depends on API GW custom domain).
+  #
+  # apex/www/portal/cms/assets records are NOT created here. They are pre-
+  # mirrored from the legacy GoDaddy setup at cutover time and stay pointed
+  # at legacy infra during the migration. Each one gets re-pointed at its
+  # CloudFront distribution when the corresponding milestone ships content:
+  #
+  #   - portal.numun.org → PortalDistribution at M4 (portal shell)
+  #   - numun.org + www.numun.org → SiteDistribution at M5 (CMS-driven site)
+  #   - cms.numun.org → CmsDistribution at M5 (Decap admin)
+  #   - assets.numun.org → AssetsDistribution at M5+ (when first asset ships)
+  #
+  # api.numun.org is created by the api stack via the HttpApi custom domain.
+  #
+  # The CloudFront DomainNames are exported below so the cutover updates
+  # can read them without re-deploying base.
 
   # ── Cognito user pool ───────────────────────────────────────────────────────
   # AUTH.md §6: 12-char min, length-first (lower + digits, no upper, no symbol).
@@ -717,12 +675,20 @@ Outputs:
     Value: !Ref AlarmsTopic
   SiteDistributionId:
     Value: !Ref SiteDistribution
+  SiteDistributionDomain:
+    Value: !GetAtt SiteDistribution.DomainName
   PortalDistributionId:
     Value: !Ref PortalDistribution
+  PortalDistributionDomain:
+    Value: !GetAtt PortalDistribution.DomainName
   CmsDistributionId:
     Value: !Ref CmsDistribution
+  CmsDistributionDomain:
+    Value: !GetAtt CmsDistribution.DomainName
   AssetsDistributionId:
     Value: !Ref AssetsDistribution
+  AssetsDistributionDomain:
+    Value: !GetAtt AssetsDistribution.DomainName
   ApiCertificateArn:
     Value: !Ref ApiCertificateArn
     Export:
