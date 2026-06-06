@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package numun.v1;
+
+// HealthService is an unauthenticated liveness probe.
+// See API.md §10.1.
+service HealthService {
+  rpc Check(CheckRequest) returns (CheckResponse) {}
+}
+
+message CheckRequest {}
+
+message CheckResponse {
+  // Server build commit (set at build time via -ldflags).
+  string commit = 1;
+  // Server version string.
+  string version = 2;
+}

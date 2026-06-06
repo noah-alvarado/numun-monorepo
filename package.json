@@ -1,0 +1,22 @@
+{
+  "name": "numun",
+  "private": true,
+  "version": "0.0.0",
+  "description": "NUMUN landing site + conference portal monorepo",
+  "packageManager": "pnpm@9.0.0",
+  "engines": {
+    "node": ">=24.16.0"
+  },
+  "scripts": {
+    "lint": "pnpm -r --if-present run lint",
+    "typecheck": "pnpm -r --if-present run typecheck",
+    "test": "pnpm -r --if-present run test",
+    "build": "pnpm -r --if-present run build",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\""
+  },
+  "devDependencies": {
+    "prettier": "^3.3.3",
+    "prettier-plugin-astro": "^0.14.1"
+  }
+}

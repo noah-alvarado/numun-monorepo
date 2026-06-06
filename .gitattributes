@@ -1,0 +1,21 @@
+* text=auto eol=lf
+
+# Generated code — committed per APPLICATION.md §2, but mark as such so
+# GitHub collapses diffs in PRs and linguist excludes from stats.
+api/internal/gen/**       linguist-generated=true
+portal/src/gen/**         linguist-generated=true
+pnpm-lock.yaml            linguist-generated=true
+
+# Make Go and Markdown diff blocks render with the right language hints.
+*.go     text diff=golang
+*.md     text diff=markdown
+
+# Common binary types
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary

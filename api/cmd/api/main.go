@@ -1,0 +1,83 @@
+// Command api is the NUMUN portal Lambdalith.
+//
+// In production it runs as a single AWS Lambda function fronted by API Gateway
+// HTTP API. Locally it is invoked by `sam local start-api` or — when the
+// LOCAL_HTTP env var is set — runs as a plain net/http server on port 3000
+// for quick iteration outside of Docker.
+//
+// See APPLICATION.md §4 and API.md §1.
+package main
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"log/slog"
+	"net/http"
+	"os"
+	"time"
+
+	"connectrpc.com/connect"
+	"github.com/aws/aws-lambda-go/lambda"
+	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
+
+	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
+	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
+)
+
+// Build metadata stamped in at link time via -ldflags.
+var (
+	commit  = "dev"
+	version = "0.0.0"
+)
+
+func main() {
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	slog.SetDefault(logger)
+
+	mux := newMux()
+
+	if os.Getenv("LOCAL_HTTP") == "true" {
+		addr := ":3000"
+		logger.Info("starting local HTTP server", "addr", addr)
+		if err := http.ListenAndServe(addr, mux); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("server exited", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
+
+	lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
+}
+
+func newMux() *http.ServeMux {
+	mux := http.NewServeMux()
+
+	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
+	mux.HandleFunc("GET /v1/health", handleHealthHTTP)
+
+	// Connect-wired HealthService RPC at /numun.v1.HealthService/Check.
+	path, handler := numunv1connect.NewHealthServiceHandler(&healthServer{})
+	mux.Handle(path, handler)
+
+	return mux
+}
+
+type healthServer struct{}
+
+func (h *healthServer) Check(_ context.Context, _ *connect.Request[healthv1.CheckRequest]) (*connect.Response[healthv1.CheckResponse], error) {
+	return connect.NewResponse(&healthv1.CheckResponse{
+		Commit:  commit,
+		Version: version,
+	}), nil
+}
+
+func handleHealthHTTP(w http.ResponseWriter, _ *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	_ = json.NewEncoder(w).Encode(map[string]any{
+		"status":  "ok",
+		"commit":  commit,
+		"version": version,
+		"time":    time.Now().UTC().Format(time.RFC3339),
+	})
+}

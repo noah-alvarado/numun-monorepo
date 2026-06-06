@@ -1,0 +1,5 @@
+packages:
+  - "site"
+  - "portal"
+  - "cms"
+  - "packages/*"

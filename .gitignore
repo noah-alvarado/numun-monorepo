@@ -1,0 +1,43 @@
+# Node / pnpm
+node_modules/
+.pnpm-store/
+*.log
+npm-debug.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+.output/
+.astro/
+.vite/
+
+# Go
+/api/bin/
+/api/coverage.out
+*.test
+
+# AWS SAM
+.aws-sam/
+samconfig.toml
+
+# Local env
+.env
+.env.local
+.env.*.local
+!.env.local.example
+
+# Editor / OS
+.DS_Store
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.swp
+
+# Localstack / docker volumes
+.localstack/
+.dynamodb-local/
+
+# Coverage / test artifacts
+coverage/
+*.lcov

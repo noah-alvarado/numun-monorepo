@@ -1,0 +1,10 @@
+node_modules/
+dist/
+build/
+.output/
+.astro/
+.vite/
+.aws-sam/
+api/internal/gen/
+portal/src/gen/
+pnpm-lock.yaml

@@ -1,0 +1,24 @@
+version: v2
+managed:
+  enabled: true
+  override:
+    - file_option: go_package_prefix
+      value: github.com/numun/numun/api/internal/gen
+plugins:
+  # Go server stubs
+  - remote: buf.build/protocolbuffers/go
+    out: ../internal/gen
+    opt: paths=source_relative
+  - remote: buf.build/connectrpc/go
+    out: ../internal/gen
+    opt: paths=source_relative
+
+  # TypeScript client stubs
+  - remote: buf.build/bufbuild/es
+    out: ../../portal/src/gen
+    opt:
+      - target=ts
+  - remote: buf.build/connectrpc/es
+    out: ../../portal/src/gen
+    opt:
+      - target=ts
