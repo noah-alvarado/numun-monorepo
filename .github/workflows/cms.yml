@@ -1,0 +1,43 @@
+name: deploy cms
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "cms/**"
+      - ".github/workflows/cms.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-cms
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-2
+      BUCKET: numun-org-cms
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_CMS_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: sync to S3
+        # cms is just a Decap-CDN bootstrap + config.yml — static; no build.
+        run: |
+          aws s3 sync cms/ "s3://$BUCKET/" \
+            --delete \
+            --exclude "package.json" \
+            --exclude "node_modules/*" \
+            --cache-control "public, max-age=60, must-revalidate"
+      - name: CloudFront invalidation
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.CMS_DISTRIBUTION_ID }}" \
+            --paths "/*"

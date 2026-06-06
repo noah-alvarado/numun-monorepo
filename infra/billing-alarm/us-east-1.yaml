@@ -1,0 +1,54 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  NUMUN — $10/mo billing alarm.
+
+  AWS only publishes billing metrics in us-east-1, so this lives in its own
+  stack separate from the us-east-2 base. Deploy once.
+
+  Reference: INFRASTRUCTURE.md §3.9, SECURITY.md §6.5.
+
+Parameters:
+  AlarmEmail:
+    Type: String
+    Description: Email subscribed to the billing-alarm SNS topic.
+  ThresholdUsd:
+    Type: Number
+    Default: 10
+    Description: USD threshold above which the alarm fires (one-month estimate).
+
+Resources:
+  BillingAlarmsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: numun-prod-billing-alarms
+      DisplayName: NUMUN Billing Alarm
+
+  BillingAlarmsSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref BillingAlarmsTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  EstimatedChargesAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: numun-prod-estimated-monthly-charges
+      AlarmDescription: !Sub "Estimated monthly AWS charges exceeded $${ThresholdUsd}."
+      Namespace: AWS/Billing
+      MetricName: EstimatedCharges
+      Dimensions:
+        - Name: Currency
+          Value: USD
+      Statistic: Maximum
+      Period: 21600       # 6 hours — billing metrics update slowly
+      EvaluationPeriods: 1
+      Threshold: !Ref ThresholdUsd
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref BillingAlarmsTopic
+
+Outputs:
+  TopicArn:
+    Value: !Ref BillingAlarmsTopic

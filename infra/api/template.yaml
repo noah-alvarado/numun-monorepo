@@ -1,0 +1,177 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  NUMUN — api stack (fast-changing).
+
+  HTTP API + Lambdalith at api.numun.org. Code lives in /api/cmd/api; SAM
+  build cross-compiles a linux/arm64 `bootstrap` binary via /api/Makefile.
+
+  Region: us-east-2.
+  References: APPLICATION.md §4, API.md, SECURITY.md §3.2.
+
+Parameters:
+  CommitSha:
+    Type: String
+    Default: dev
+    Description: Git commit stamped into the binary via ldflags (set by CI).
+  ReleaseVersion:
+    Type: String
+    Default: 0.0.0
+    Description: Release version stamped into the binary via ldflags.
+
+Globals:
+  Function:
+    Runtime: provided.al2023
+    Architectures: [arm64]
+    Timeout: 29                # API Gateway HTTP API hard ceiling.
+    MemorySize: 512
+    Tracing: Active
+    LoggingConfig:
+      LogFormat: JSON
+
+Resources:
+  # ── Lambda execution role ──────────────────────────────────────────────────
+  # Minimal for M1 (health endpoint only). Subsequent milestones expand:
+  # DDB R/W on numun-prod, SES SendEmail, SSM GetParameter, S3 R/W on uploads
+  # + artifacts, Cognito admin actions. See SECURITY.md §3.2.
+  ApiFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-api-execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: numun-api-base
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # DDB single-table access — covers base table + GSIs.
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:DeleteItem
+                  - dynamodb:Query
+                  - dynamodb:BatchGetItem
+                  - dynamodb:BatchWriteItem
+                  - dynamodb:TransactGetItems
+                  - dynamodb:TransactWriteItems
+                  - dynamodb:ConditionCheckItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod/index/*"
+              # SSM secrets read at cold start.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParametersByPath
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/prod/*"
+
+  # ── HTTP API ────────────────────────────────────────────────────────────────
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: numun-prod-api
+      CodeUri: ../../api
+      Handler: bootstrap
+      Role: !GetAtt ApiFunctionRole.Arn
+      Environment:
+        Variables:
+          AWS_REGION_NAME: !Ref AWS::Region
+          DDB_TABLE_NAME: numun-prod
+          COMMIT_SHA: !Ref CommitSha
+          RELEASE_VERSION: !Ref ReleaseVersion
+      Events:
+        AnyHttp:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /{proxy+}
+            Method: ANY
+        HealthHttp:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref HttpApi
+            Path: /
+            Method: ANY
+
+  ApiFunctionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${ApiFunction}"
+      RetentionInDays: 30
+
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: $default
+      CorsConfiguration:
+        AllowOrigins:
+          - https://portal.numun.org
+        AllowMethods:
+          - GET
+          - POST
+          - PUT
+          - DELETE
+          - PATCH
+          - OPTIONS
+        AllowHeaders:
+          - Content-Type
+          - Authorization
+          - X-CSRF-Token
+          - Idempotency-Key
+          - Connect-Protocol-Version
+          - Connect-Timeout-Ms
+        AllowCredentials: true
+        MaxAge: 600
+      Domain:
+        DomainName: api.numun.org
+        CertificateArn:
+          Fn::ImportValue: numun-prod-base-ApiCertificateArn
+        EndpointConfiguration: REGIONAL
+        SecurityPolicy: TLS_1_2
+        Route53:
+          HostedZoneId:
+            Fn::ImportValue: numun-prod-base-HostedZoneId
+
+  # ── Alarms ──────────────────────────────────────────────────────────────────
+  ApiFunctionErrorAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: numun-prod-api-lambda-errors
+      AlarmDescription: Lambdalith error count spike.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref ApiFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 5
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        # SNS topic is created by the base stack; this stack assumes it exists.
+        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:numun-prod-alarms"
+
+Outputs:
+  ApiFunctionName:
+    Value: !Ref ApiFunction
+  HttpApiId:
+    Value: !Ref HttpApi
+  HttpApiEndpoint:
+    Description: Internal HTTP API invoke URL — use api.numun.org in practice.
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"

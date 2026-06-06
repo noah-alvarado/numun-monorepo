@@ -25,7 +25,8 @@ import (
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 )
 
-// Build metadata stamped in at link time via -ldflags.
+// Build metadata stamped in at link time via -ldflags (CI) and
+// optionally overridden at runtime via env vars (SAM Environment.Variables).
 var (
 	commit  = "dev"
 	version = "0.0.0"
@@ -34,6 +35,13 @@ var (
 func main() {
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 	slog.SetDefault(logger)
+
+	if v := os.Getenv("COMMIT_SHA"); v != "" {
+		commit = v
+	}
+	if v := os.Getenv("RELEASE_VERSION"); v != "" {
+		version = v
+	}
 
 	mux := newMux()
 

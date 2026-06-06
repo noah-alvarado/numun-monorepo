@@ -1,0 +1,733 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  NUMUN — base infrastructure stack (slow-changing).
+
+  Provisions the single-table DynamoDB, six S3 buckets, four CloudFront
+  distributions, OAC bindings, Route 53 alias records, Cognito user pool,
+  SSM parameter scaffolding, SNS alarm topic. The api stack (Lambda + HTTP
+  API) is a separate, fast-changing template.
+
+  Region: us-east-2.
+  References: INFRASTRUCTURE.md, DATA_MODEL.md §4-§5, AUTH.md §6, SECURITY.md.
+
+Parameters:
+  HostedZoneId:
+    Type: AWS::Route53::HostedZone::Id
+    Description: Pre-created Route 53 hosted zone for numun.org.
+  CloudFrontCertificateArn:
+    Type: String
+    Description: ACM certificate ARN in us-east-1 covering numun.org + *.numun.org.
+    AllowedPattern: "^arn:aws:acm:us-east-1:[0-9]{12}:certificate/.+$"
+  ApiCertificateArn:
+    Type: String
+    Description: ACM certificate ARN in us-east-2 covering api.numun.org.
+    AllowedPattern: "^arn:aws:acm:us-east-2:[0-9]{12}:certificate/.+$"
+  AlarmEmail:
+    Type: String
+    Description: Email address subscribed to the alarms SNS topic.
+
+Resources:
+  # ── DynamoDB ────────────────────────────────────────────────────────────────
+  # Single-table per DATA_MODEL.md §4. PK/SK + GSI1 (reverse lookup, KEYS_ONLY)
+  # + GSI2 (status/search, ALL projection). PITR on; TTL attribute is
+  # `expiresAt` (used by Session, AuthAuditEvent, EmailEvent, BulkImport*,
+  # NotificationDedupe rows).
+  NumunTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: numun-prod
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+
+  # ── S3 buckets ──────────────────────────────────────────────────────────────
+  # Six buckets, all private. CloudFront OAC handles CDN reads; presigned URLs
+  # handle direct upload/download. Account-level Block Public Access is
+  # additionally enforced via a separate setting on the account.
+  # See INFRASTRUCTURE.md §3.6 and SECURITY.md §3.1.
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-site
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions-90d
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  PortalBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-portal
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  CmsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-cms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions-90d
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  AssetsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-assets
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-uploads
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-uploads-30d
+            Status: Enabled
+            ExpirationInDays: 30
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [PUT, GET]
+            AllowedOrigins:
+              - https://portal.numun.org
+            MaxAge: 3000
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-artifacts
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ── CloudFront OAC + distributions ──────────────────────────────────────────
+  # One OAC per distribution; bucket policies tie a single distribution's
+  # service principal to the bucket via aws:SourceArn. See SECURITY.md §3.1.
+
+  SiteOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: numun-org-site-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  PortalOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: numun-org-portal-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  CmsOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: numun-org-cms-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  AssetsOAC:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: numun-org-assets-oac
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  # Reusable response-headers policy: HSTS + security headers for the
+  # apex + portal + cms distributions. See SECURITY.md §3.4.
+  SecurityHeadersPolicy:
+    Type: AWS::CloudFront::ResponseHeadersPolicy
+    Properties:
+      ResponseHeadersPolicyConfig:
+        Name: numun-prod-security-headers
+        SecurityHeadersConfig:
+          StrictTransportSecurity:
+            AccessControlMaxAgeSec: 31536000
+            IncludeSubdomains: true
+            Preload: true
+            Override: true
+          ContentTypeOptions:
+            Override: true
+          FrameOptions:
+            FrameOption: DENY
+            Override: true
+          ReferrerPolicy:
+            ReferrerPolicy: strict-origin-when-cross-origin
+            Override: true
+
+  # CloudFront function: redirect www.numun.org → numun.org (single trailing-
+  # slash safe) and 301 the legacy /portal path → portal.numun.org.
+  # See INFRASTRUCTURE.md §1.
+  WwwRedirectFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: numun-www-redirect
+      AutoPublish: true
+      FunctionConfig:
+        Comment: Canonicalize numun.org host + legacy /portal redirect.
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          var host = request.headers.host && request.headers.host.value;
+          // www → apex
+          if (host === 'www.numun.org') {
+            return {
+              statusCode: 301,
+              statusDescription: 'Moved Permanently',
+              headers: { location: { value: 'https://numun.org' + request.uri } },
+            };
+          }
+          // Legacy /portal path → portal subdomain.
+          if (request.uri === '/portal' || request.uri.indexOf('/portal/') === 0) {
+            return {
+              statusCode: 301,
+              statusDescription: 'Moved Permanently',
+              headers: { location: { value: 'https://portal.numun.org' + request.uri.substring(7) } },
+            };
+          }
+          return request;
+        }
+
+  SiteDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: numun.org landing site
+        Aliases:
+          - numun.org
+          - www.numun.org
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: site-bucket
+            DomainName: !GetAtt SiteBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt SiteOAC.Id
+        DefaultCacheBehavior:
+          TargetOriginId: site-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6  # Managed-CachingOptimized
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt WwwRedirectFunction.FunctionMetadata.FunctionARN
+
+  PortalDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: portal.numun.org SPA
+        Aliases:
+          - portal.numun.org
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        # SPA fallback: rewrite 403/404 to /index.html so client-side routing works.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+          - ErrorCode: 404
+            ResponseCode: 200
+            ResponsePagePath: /index.html
+            ErrorCachingMinTTL: 0
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: portal-bucket
+            DomainName: !GetAtt PortalBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt PortalOAC.Id
+        DefaultCacheBehavior:
+          TargetOriginId: portal-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+
+  CmsDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: cms.numun.org Decap admin bundle
+        Aliases:
+          - cms.numun.org
+        DefaultRootObject: index.html
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: cms-bucket
+            DomainName: !GetAtt CmsBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt CmsOAC.Id
+        DefaultCacheBehavior:
+          TargetOriginId: cms-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+          ResponseHeadersPolicyId: !Ref SecurityHeadersPolicy
+
+  AssetsDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: assets.numun.org public files (BG guides, CMS images)
+        Aliases:
+          - assets.numun.org
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: assets-bucket
+            DomainName: !GetAtt AssetsBucket.RegionalDomainName
+            S3OriginConfig: {}
+            OriginAccessControlId: !GetAtt AssetsOAC.Id
+        DefaultCacheBehavior:
+          TargetOriginId: assets-bucket
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
+
+  # ── Bucket policies tying each S3 bucket to its single CloudFront OAC ──────
+
+  SiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref SiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${SiteBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
+
+  PortalBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref PortalBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${PortalBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${PortalDistribution}"
+
+  CmsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CmsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${CmsBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CmsDistribution}"
+
+  AssetsBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref AssetsBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudfront.amazonaws.com
+            Action: s3:GetObject
+            Resource: !Sub "${AssetsBucket.Arn}/*"
+            Condition:
+              StringEquals:
+                "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${AssetsDistribution}"
+
+  # ── Route 53 alias records ──────────────────────────────────────────────────
+  # Z2FDTNDATAQYW2 is CloudFront's hosted-zone id (constant; not the customer's).
+  ApexRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: numun.org.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt SiteDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  WwwRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: www.numun.org.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt SiteDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  PortalRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: portal.numun.org.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt PortalDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  CmsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: cms.numun.org.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt CmsDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  AssetsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: assets.numun.org.
+      Type: A
+      AliasTarget:
+        DNSName: !GetAtt AssetsDistribution.DomainName
+        HostedZoneId: Z2FDTNDATAQYW2
+        EvaluateTargetHealth: false
+
+  # api.numun.org alias is managed by the api stack (depends on API GW custom domain).
+
+  # ── Cognito user pool ───────────────────────────────────────────────────────
+  # AUTH.md §6: 12-char min, length-first (lower + digits, no upper, no symbol).
+  # TOTP MFA enabled at pool level, opt-in. Email sender stays Cognito-default
+  # until M2.5 wires SES via cognito@mail.numun.org.
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: numun-prod-users
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: false
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: phone_number
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: role
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: "1"
+            MaxLength: "32"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: numun-prod-portal
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false  # Public client; portal calls Cognito SDK directly.
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 60       # minutes (Cognito default; 1h)
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30      # days
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ReadAttributes:
+        - email
+        - name
+        - phone_number
+        - custom:role
+      WriteAttributes:
+        - email
+        - name
+        - phone_number
+      EnableTokenRevocation: true
+
+  # ── SSM parameter scaffolding ───────────────────────────────────────────────
+  # Empty placeholders so IAM policies in the api stack can reference these
+  # paths. Actual secrets are written out-of-band (CLI/console) — never
+  # checked into git. See SECURITY.md §3.3.
+  SsmCognitoUserPoolIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/cognito/user_pool_id
+      Type: String
+      Value: !Ref CognitoUserPool
+
+  SsmCognitoClientIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/cognito/client_id
+      Type: String
+      Value: !Ref CognitoUserPoolClient
+
+  SsmDdbTableNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/ddb/table_name
+      Type: String
+      Value: !Ref NumunTable
+
+  # ── Alarms ──────────────────────────────────────────────────────────────────
+  AlarmsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: numun-prod-alarms
+      DisplayName: NUMUN Alarms
+
+  AlarmsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmsTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  DdbThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: numun-prod-ddb-throttles
+      AlarmDescription: DynamoDB write/read throttling on numun-prod.
+      Namespace: AWS/DynamoDB
+      MetricName: ThrottledRequests
+      Dimensions:
+        - Name: TableName
+          Value: !Ref NumunTable
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmsTopic
+
+  # NOTE: The $10/mo billing alarm lives in a separate us-east-1 stack
+  # (see /infra/billing-alarm/us-east-1.yaml) — billing metrics are only
+  # published to us-east-1.
+
+Outputs:
+  TableName:
+    Value: !Ref NumunTable
+  CognitoUserPoolId:
+    Value: !Ref CognitoUserPool
+  CognitoClientId:
+    Value: !Ref CognitoUserPoolClient
+  AlarmsTopicArn:
+    Value: !Ref AlarmsTopic
+  SiteDistributionId:
+    Value: !Ref SiteDistribution
+  PortalDistributionId:
+    Value: !Ref PortalDistribution
+  CmsDistributionId:
+    Value: !Ref CmsDistribution
+  AssetsDistributionId:
+    Value: !Ref AssetsDistribution
+  ApiCertificateArn:
+    Value: !Ref ApiCertificateArn
+    Export:
+      Name: numun-prod-base-ApiCertificateArn
+  HostedZoneId:
+    Value: !Ref HostedZoneId
+    Export:
+      Name: numun-prod-base-HostedZoneId

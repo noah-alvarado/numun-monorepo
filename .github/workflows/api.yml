@@ -1,0 +1,67 @@
+name: deploy api
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "api/**"
+      - "infra/api/**"
+      - ".github/workflows/api.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write    # OIDC
+  contents: read
+
+concurrency:
+  group: deploy-api
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-2
+      STACK_NAME: numun-prod-api
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: api/go.mod
+          cache-dependency-path: api/go.sum
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_API_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: sam build
+        working-directory: infra/api
+        env:
+          COMMIT_SHA: ${{ github.sha }}
+          RELEASE_VERSION: ${{ github.run_number }}
+        run: sam build
+      - name: sam deploy
+        working-directory: infra/api
+        run: |
+          sam deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --s3-bucket "${{ vars.SAM_ARTIFACTS_BUCKET }}" \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              CommitSha=${{ github.sha }} \
+              ReleaseVersion=${{ github.run_number }}
+      - name: smoke check
+        run: |
+          for i in $(seq 1 30); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' https://api.numun.org/v1/health || true)
+            echo "attempt $i → $code"
+            [ "$code" = "200" ] && exit 0
+            sleep 2
+          done
+          echo "smoke check failed"
+          exit 1

@@ -1,0 +1,55 @@
+name: deploy site
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - "content/**"
+      - "packages/tailwind-tokens/**"
+      - ".github/workflows/site.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+concurrency:
+  group: deploy-site
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    env:
+      AWS_REGION: us-east-2
+      BUCKET: numun-org-site
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: build site
+        run: pnpm --filter @numun/site build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_SITE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: sync to S3
+        run: |
+          aws s3 sync site/dist/ "s3://$BUCKET/" \
+            --delete \
+            --cache-control "public, max-age=300" \
+            --exclude "*.html"
+          aws s3 sync site/dist/ "s3://$BUCKET/" \
+            --cache-control "public, max-age=60, must-revalidate" \
+            --content-type "text/html; charset=utf-8" \
+            --exclude "*" --include "*.html"
+      - name: CloudFront invalidation
+        run: |
+          aws cloudfront create-invalidation \
+            --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}" \
+            --paths "/*"

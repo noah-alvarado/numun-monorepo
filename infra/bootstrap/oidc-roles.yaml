@@ -1,0 +1,326 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  NUMUN — one-time bootstrap stack.
+
+  Provisions the GitHub Actions OIDC identity provider, four per-workflow
+  deploy roles (api, site, portal, cms), and the shared SAM artifacts bucket
+  used by `sam deploy`. Deployed once from a workstation via the break-glass
+  IAM user; subsequent deploys flow through GitHub Actions via the roles
+  created here.
+
+  Region: us-east-2.
+  Reference: SECURITY.md §3.2, INFRASTRUCTURE.md §3.10.
+
+Parameters:
+  GitHubOrg:
+    Type: String
+    Description: GitHub organization or user that owns the NUMUN monorepo.
+  GitHubRepo:
+    Type: String
+    Description: Repository name within GitHubOrg (e.g., "numun-vClaude").
+  GitHubBranch:
+    Type: String
+    Default: main
+    Description: Only allow deploys initiated from this branch.
+
+Resources:
+  # ── GitHub Actions OIDC provider ────────────────────────────────────────────
+  # AWS hosts a static trust for token.actions.githubusercontent.com; the
+  # thumbprint is required by IAM but verified internally regardless of value.
+  GitHubOIDCProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: https://token.actions.githubusercontent.com
+      ClientIdList:
+        - sts.amazonaws.com
+      ThumbprintList:
+        - 6938fd4d98bab03faadb97b34396831e3780aea1
+
+  # ── Shared SAM artifacts bucket ─────────────────────────────────────────────
+  # Holds packaged Lambda zips uploaded by `sam deploy`. Objects expire after
+  # 30 days to keep storage cost negligible.
+  SamArtifactsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "numun-prod-sam-deploys-${AWS::AccountId}"
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-deploys
+            Status: Enabled
+            ExpirationInDays: 30
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ── Trust policy fragment (re-used by every deploy role) ────────────────────
+  # Constrains the OIDC subject to <org>/<repo> on the named branch only — a
+  # fork's workflow cannot assume these roles even if it knows the role ARN.
+  # See SECURITY.md §3.2.
+
+  DeployRoleApi:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-deploy-api
+      Description: GitHub Actions OIDC role for the /api SAM deploy workflow.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: api-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # CloudFormation operations on the api stack only.
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStacks
+                  - cloudformation:ListStackResources
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-prod-api/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-prod-api*/*"
+              - Effect: Allow
+                Action:
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31"
+              # Lambda code/config updates (scoped by name).
+              - Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:ListVersionsByFunction
+                  - lambda:PublishVersion
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                Resource:
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:numun-prod-*"
+              # PassRole limited to roles created by the api stack.
+              - Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-prod-api-*"
+              # IAM ops on stack-managed roles (CFN creates these per deploy).
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRole
+                  - iam:GetRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-prod-api-*"
+              # API Gateway HTTP API + custom domain.
+              - Effect: Allow
+                Action:
+                  - apigateway:*
+                Resource:
+                  - !Sub "arn:aws:apigateway:${AWS::Region}::*"
+              # CloudWatch log groups for the Lambda function.
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:PutRetentionPolicy
+                  - logs:TagResource
+                  - logs:UntagResource
+                Resource:
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*:*"
+              # SAM artifacts bucket.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:GetObjectVersion
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::numun-prod-sam-deploys-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::numun-prod-sam-deploys-${AWS::AccountId}/*"
+              # SSM parameter reads at build time (env stamping etc).
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/prod/*"
+
+  DeployRoleSite:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-deploy-site
+      Description: GitHub Actions OIDC role for the /site landing-page deploy workflow.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: site-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::numun-org-site
+                  - arn:aws:s3:::numun-org-site/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetDistribution
+                  - cloudfront:ListDistributions
+                Resource: "*"
+
+  DeployRolePortal:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-deploy-portal
+      Description: GitHub Actions OIDC role for the /portal SPA deploy workflow.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: portal-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::numun-org-portal
+                  - arn:aws:s3:::numun-org-portal/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetDistribution
+                  - cloudfront:ListDistributions
+                Resource: "*"
+
+  DeployRoleCms:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-deploy-cms
+      Description: GitHub Actions OIDC role for the /cms admin-bundle deploy workflow.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+      Policies:
+        - PolicyName: cms-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - arn:aws:s3:::numun-org-cms
+                  - arn:aws:s3:::numun-org-cms/*
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateInvalidation
+                  - cloudfront:GetDistribution
+                  - cloudfront:ListDistributions
+                Resource: "*"
+
+Outputs:
+  OIDCProviderArn:
+    Description: ARN of the GitHub Actions OIDC identity provider.
+    Value: !Ref GitHubOIDCProvider
+  SamArtifactsBucketName:
+    Description: SAM artifacts bucket — pass to `sam deploy --s3-bucket`.
+    Value: !Ref SamArtifactsBucket
+  DeployRoleApiArn:
+    Description: ARN to set as role-to-assume in .github/workflows/api.yml.
+    Value: !GetAtt DeployRoleApi.Arn
+  DeployRoleSiteArn:
+    Description: ARN to set as role-to-assume in .github/workflows/site.yml.
+    Value: !GetAtt DeployRoleSite.Arn
+  DeployRolePortalArn:
+    Description: ARN to set as role-to-assume in .github/workflows/portal.yml.
+    Value: !GetAtt DeployRolePortal.Arn
+  DeployRoleCmsArn:
+    Description: ARN to set as role-to-assume in .github/workflows/cms.yml.
+    Value: !GetAtt DeployRoleCms.Arn
