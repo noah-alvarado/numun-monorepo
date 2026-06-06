@@ -56,10 +56,19 @@ jobs:
             --parameter-overrides \
               CommitSha=${{ github.sha }} \
               ReleaseVersion=${{ github.run_number }}
+      - name: get HTTP API endpoint
+        id: api
+        run: |
+          ENDPOINT=$(aws cloudformation describe-stacks \
+            --stack-name "$STACK_NAME" \
+            --query "Stacks[0].Outputs[?OutputKey=='HttpApiEndpoint'].OutputValue | [0]" \
+            --output text)
+          echo "endpoint=$ENDPOINT" >> "$GITHUB_OUTPUT"
+          echo "API endpoint: $ENDPOINT"
       - name: smoke check
         run: |
           for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' https://api.numun.org/v1/health || true)
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.api.outputs.endpoint }}/v1/health" || true)
             echo "attempt $i → $code"
             [ "$code" = "200" ] && exit 0
             sleep 2

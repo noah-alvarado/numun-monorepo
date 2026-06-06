@@ -1,0 +1,375 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  NUMUN — base-data stack.
+
+  DNS-free baseline: DynamoDB single-table, S3 buckets (no CloudFront
+  policy attached yet), Cognito user pool + client, SSM parameter
+  scaffolding, SNS alarm topic. Deployable before ACM certificates exist.
+
+  Pair with infra/base-cdn (CloudFront + bucket policies, needs us-east-1
+  ACM cert) once DNS records are in place to validate certs.
+
+  Region: us-east-2.
+  References: INFRASTRUCTURE.md, DATA_MODEL.md §4-§5, AUTH.md §6, SECURITY.md.
+
+Parameters:
+  AlarmEmail:
+    Type: String
+    Description: Email address subscribed to the alarms SNS topic.
+
+Resources:
+  # ── DynamoDB ────────────────────────────────────────────────────────────────
+  NumunTable:
+    Type: AWS::DynamoDB::Table
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      TableName: numun-prod
+      BillingMode: PAY_PER_REQUEST
+      PointInTimeRecoverySpecification:
+        PointInTimeRecoveryEnabled: true
+      TimeToLiveSpecification:
+        AttributeName: expiresAt
+        Enabled: true
+      AttributeDefinitions:
+        - AttributeName: PK
+          AttributeType: S
+        - AttributeName: SK
+          AttributeType: S
+        - AttributeName: GSI1PK
+          AttributeType: S
+        - AttributeName: GSI1SK
+          AttributeType: S
+        - AttributeName: GSI2PK
+          AttributeType: S
+        - AttributeName: GSI2SK
+          AttributeType: S
+      KeySchema:
+        - AttributeName: PK
+          KeyType: HASH
+        - AttributeName: SK
+          KeyType: RANGE
+      GlobalSecondaryIndexes:
+        - IndexName: GSI1
+          KeySchema:
+            - AttributeName: GSI1PK
+              KeyType: HASH
+            - AttributeName: GSI1SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
+        - IndexName: GSI2
+          KeySchema:
+            - AttributeName: GSI2PK
+              KeyType: HASH
+            - AttributeName: GSI2SK
+              KeyType: RANGE
+          Projection:
+            ProjectionType: ALL
+      SSESpecification:
+        SSEEnabled: true
+
+  # ── S3 buckets ──────────────────────────────────────────────────────────────
+  # Six private buckets. CloudFront OAC bindings + bucket policies are added
+  # by the base-cdn stack once certs land. Until then these are reachable
+  # only via IAM-authenticated calls.
+
+  SiteBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-site
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions-90d
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  PortalBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-portal
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  CmsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-cms
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions-90d
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 90
+
+  AssetsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-assets
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-uploads
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-uploads-30d
+            Status: Enabled
+            ExpirationInDays: 30
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders: ["*"]
+            AllowedMethods: [PUT, GET]
+            AllowedOrigins:
+              - https://portal.numun.org
+            MaxAge: 3000
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: numun-org-artifacts
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        IgnorePublicAcls: true
+        BlockPublicPolicy: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+
+  # ── Cognito user pool ───────────────────────────────────────────────────────
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: numun-prod-users
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: false
+      AutoVerifiedAttributes:
+        - email
+      UsernameAttributes:
+        - email
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: false
+          RequireUppercase: false
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: OPTIONAL
+      EnabledMfas:
+        - SOFTWARE_TOKEN_MFA
+      Schema:
+        - Name: email
+          AttributeDataType: String
+          Required: true
+          Mutable: true
+        - Name: name
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: phone_number
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+        - Name: role
+          AttributeDataType: String
+          Required: false
+          Mutable: true
+          StringAttributeConstraints:
+            MinLength: "1"
+            MaxLength: "32"
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserAttributeUpdateSettings:
+        AttributesRequireVerificationBeforeUpdate:
+          - email
+
+  CognitoUserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: numun-prod-portal
+      UserPoolId: !Ref CognitoUserPool
+      GenerateSecret: false
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      AccessTokenValidity: 60
+      IdTokenValidity: 60
+      RefreshTokenValidity: 30
+      TokenValidityUnits:
+        AccessToken: minutes
+        IdToken: minutes
+        RefreshToken: days
+      ReadAttributes:
+        - email
+        - name
+        - phone_number
+        - custom:role
+      WriteAttributes:
+        - email
+        - name
+        - phone_number
+      EnableTokenRevocation: true
+
+  # ── SSM parameter scaffolding ───────────────────────────────────────────────
+  SsmCognitoUserPoolIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/cognito/user_pool_id
+      Type: String
+      Value: !Ref CognitoUserPool
+
+  SsmCognitoClientIdParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/cognito/client_id
+      Type: String
+      Value: !Ref CognitoUserPoolClient
+
+  SsmDdbTableNameParam:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: /numun/prod/ddb/table_name
+      Type: String
+      Value: !Ref NumunTable
+
+  # ── Alarms ──────────────────────────────────────────────────────────────────
+  AlarmsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: numun-prod-alarms
+      DisplayName: NUMUN Alarms
+
+  AlarmsEmailSubscription:
+    Type: AWS::SNS::Subscription
+    Properties:
+      TopicArn: !Ref AlarmsTopic
+      Protocol: email
+      Endpoint: !Ref AlarmEmail
+
+  DdbThrottleAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: numun-prod-ddb-throttles
+      AlarmDescription: DynamoDB write/read throttling on numun-prod.
+      Namespace: AWS/DynamoDB
+      MetricName: ThrottledRequests
+      Dimensions:
+        - Name: TableName
+          Value: !Ref NumunTable
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Ref AlarmsTopic
+
+Outputs:
+  TableName:
+    Value: !Ref NumunTable
+    Export: { Name: numun-prod-base-data-TableName }
+  CognitoUserPoolId:
+    Value: !Ref CognitoUserPool
+    Export: { Name: numun-prod-base-data-CognitoUserPoolId }
+  CognitoUserPoolArn:
+    Value: !GetAtt CognitoUserPool.Arn
+    Export: { Name: numun-prod-base-data-CognitoUserPoolArn }
+  CognitoClientId:
+    Value: !Ref CognitoUserPoolClient
+    Export: { Name: numun-prod-base-data-CognitoClientId }
+  AlarmsTopicArn:
+    Value: !Ref AlarmsTopic
+    Export: { Name: numun-prod-base-data-AlarmsTopicArn }
+  SiteBucketArn:
+    Value: !GetAtt SiteBucket.Arn
+    Export: { Name: numun-prod-base-data-SiteBucketArn }
+  SiteBucketRegionalDomainName:
+    Value: !GetAtt SiteBucket.RegionalDomainName
+    Export: { Name: numun-prod-base-data-SiteBucketRegionalDomain }
+  PortalBucketArn:
+    Value: !GetAtt PortalBucket.Arn
+    Export: { Name: numun-prod-base-data-PortalBucketArn }
+  PortalBucketRegionalDomainName:
+    Value: !GetAtt PortalBucket.RegionalDomainName
+    Export: { Name: numun-prod-base-data-PortalBucketRegionalDomain }
+  CmsBucketArn:
+    Value: !GetAtt CmsBucket.Arn
+    Export: { Name: numun-prod-base-data-CmsBucketArn }
+  CmsBucketRegionalDomainName:
+    Value: !GetAtt CmsBucket.RegionalDomainName
+    Export: { Name: numun-prod-base-data-CmsBucketRegionalDomain }
+  AssetsBucketArn:
+    Value: !GetAtt AssetsBucket.Arn
+    Export: { Name: numun-prod-base-data-AssetsBucketArn }
+  AssetsBucketRegionalDomainName:
+    Value: !GetAtt AssetsBucket.RegionalDomainName
+    Export: { Name: numun-prod-base-data-AssetsBucketRegionalDomain }

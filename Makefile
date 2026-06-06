@@ -59,8 +59,10 @@ proto: ## Run Buf code-gen for Go + TS (writes into /api/internal/gen and /porta
 sam-validate: ## Validate all SAM/CFN templates under /infra (lint only; no deploy).
 	@echo "=== bootstrap/oidc-roles.yaml ==="
 	sam validate --lint --region us-east-2 --template infra/bootstrap/oidc-roles.yaml
-	@echo "=== base/template.yaml ==="
-	sam validate --lint --region us-east-2 --template infra/base/template.yaml
+	@echo "=== base-data/template.yaml ==="
+	sam validate --lint --region us-east-2 --template infra/base-data/template.yaml
+	@echo "=== base-cdn/template.yaml ==="
+	sam validate --lint --region us-east-2 --template infra/base-cdn/template.yaml
 	@echo "=== api/template.yaml ==="
 	sam validate --lint --region us-east-2 --template infra/api/template.yaml
 	@echo "=== billing-alarm/us-east-1.yaml ==="
