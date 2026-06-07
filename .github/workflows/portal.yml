@@ -20,10 +20,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: nalvarado
+    environment: test
     env:
       AWS_REGION: us-east-2
-      BUCKET: numun-org-portal
+      BUCKET: numun-${{ vars.ENV_NAME }}-portal
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -34,7 +34,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: build portal
         env:
-          VITE_API_BASE_URL: https://api.numun.org
+          VITE_API_BASE_URL: https://api.${{ vars.APEX_DOMAIN }}
+          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
+          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
         run: pnpm --filter @numun/portal build
       - uses: aws-actions/configure-aws-credentials@v4
         with:

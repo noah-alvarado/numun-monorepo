@@ -20,10 +20,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: nalvarado
+    environment: test
     env:
       AWS_REGION: us-east-2
-      STACK_NAME: numun-prod-api
+      STACK_NAME: numun-${{ vars.ENV_NAME }}-api
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
@@ -54,6 +54,9 @@ jobs:
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
+              Env=${{ vars.ENV_NAME }} \
+              RootDomain=${{ vars.ROOT_DOMAIN }} \
+              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
               CommitSha=${{ github.sha }} \
               ReleaseVersion=${{ github.run_number }} \
               ApiCertificateArn=${{ vars.API_CERTIFICATE_ARN }} \

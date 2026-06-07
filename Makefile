@@ -50,7 +50,7 @@ seed: ## Populate DynamoDB Local with the seed dataset (see /docs/seed-users.md)
 	  AWS_ACCESS_KEY_ID=local \
 	  AWS_SECRET_ACCESS_KEY=local \
 	  AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 \
-	  DDB_TABLE_NAME=numun-prod \
+	  DDB_TABLE_NAME=numun-test \
 	  go run ./cmd/seed
 
 # ── Build / codegen ───────────────────────────────────────────────────────────

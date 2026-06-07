@@ -21,10 +21,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: nalvarado
+    environment: test
     env:
       AWS_REGION: us-east-2
-      BUCKET: numun-org-site
+      BUCKET: numun-${{ vars.ENV_NAME }}-site
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4

@@ -15,8 +15,6 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 )
 
-const defaultTableName = "numun-prod"
-
 // Client holds the DynamoDB client + the resolved table name. Construct one
 // per process at startup and share across handlers.
 type Client struct {
@@ -26,6 +24,11 @@ type Client struct {
 
 // New builds a Client from the ambient AWS config. When AWS_ENDPOINT_URL_DYNAMODB
 // is set (the `make dev` path), the SDK auto-routes calls there.
+//
+// DDB_TABLE_NAME is required — there is no default. Per-env templates
+// (infra/api/template.yaml, scripts/sam-env-vars.json, docker-compose.yml)
+// inject the env-qualified name (e.g. `numun-test`). Failing fast here keeps
+// a misconfigured deploy from silently writing to the wrong table.
 func New(ctx context.Context) (*Client, error) {
 	cfg, err := config.LoadDefaultConfig(ctx)
 	if err != nil {
@@ -38,7 +41,7 @@ func New(ctx context.Context) (*Client, error) {
 	})
 	tbl := os.Getenv("DDB_TABLE_NAME")
 	if tbl == "" {
-		tbl = defaultTableName
+		return nil, fmt.Errorf("store: DDB_TABLE_NAME env var is required")
 	}
 	return &Client{DDB: ddb, Table: tbl}, nil
 }

@@ -19,10 +19,10 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: nalvarado
+    environment: test
     env:
       AWS_REGION: us-east-2
-      BUCKET: numun-org-cms
+      BUCKET: numun-${{ vars.ENV_NAME }}-cms
     steps:
       - uses: actions/checkout@v4
       - uses: aws-actions/configure-aws-credentials@v4
