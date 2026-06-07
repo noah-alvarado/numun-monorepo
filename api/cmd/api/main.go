@@ -21,8 +21,11 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
+	"github.com/numun/numun/api/internal/auth"
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
+	"github.com/numun/numun/api/internal/handlers"
+	"github.com/numun/numun/api/internal/store"
 )
 
 // Build metadata stamped in at link time via -ldflags (CI) and
@@ -43,32 +46,68 @@ func main() {
 		version = v
 	}
 
-	mux := newMux()
+	ctx := context.Background()
+	st, err := store.New(ctx)
+	if err != nil {
+		logger.Error("init store", "err", err)
+		os.Exit(1)
+	}
+	cog, err := auth.NewCognito(ctx)
+	if err != nil {
+		logger.Error("init cognito", "err", err)
+		os.Exit(1)
+	}
+	verifier := auth.NewVerifier(cog.Region, cog.UserPoolID)
+
+	root := buildHandler(logger, st, cog, verifier)
 
 	if os.Getenv("LOCAL_HTTP") == "true" {
 		addr := ":3000"
 		logger.Info("starting local HTTP server", "addr", addr)
-		if err := http.ListenAndServe(addr, mux); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		if err := http.ListenAndServe(addr, root); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("server exited", "err", err)
 			os.Exit(1)
 		}
 		return
 	}
 
-	lambda.Start(httpadapter.NewV2(mux).ProxyWithContext)
+	lambda.Start(httpadapter.NewV2(root).ProxyWithContext)
 }
 
-func newMux() *http.ServeMux {
+func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver *auth.Verifier) http.Handler {
 	mux := http.NewServeMux()
 
 	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
 	mux.HandleFunc("GET /v1/health", handleHealthHTTP)
 
-	// Connect-wired HealthService RPC at /numun.v1.HealthService/Check.
-	path, handler := numunv1connect.NewHealthServiceHandler(&healthServer{})
-	mux.Handle(path, handler)
+	healthPath, healthHandler := numunv1connect.NewHealthServiceHandler(&healthServer{})
+	mux.Handle(healthPath, healthHandler)
 
-	return mux
+	authSvc := &handlers.AuthService{
+		Store:    st,
+		Cognito:  cog,
+		Verifier: ver,
+		Logger:   logger,
+	}
+	authPath, authHandler := numunv1connect.NewAuthServiceHandler(authSvc)
+	mux.Handle(authPath, authHandler)
+
+	userSvc := &handlers.UserService{
+		Store:   st,
+		Cognito: cog,
+		Logger:  logger,
+	}
+	userPath, userHandler := numunv1connect.NewUserServiceHandler(userSvc)
+	mux.Handle(userPath, userHandler)
+
+	mw := auth.New(auth.MiddlewareConfig{
+		Store:     st,
+		Cognito:   cog,
+		Logger:    logger,
+		DevMode:   os.Getenv("DEV_MODE") == "true",
+		DevBypass: os.Getenv("DEV_BYPASS_AUTH") == "true",
+	})
+	return mw(mux)
 }
 
 type healthServer struct{}

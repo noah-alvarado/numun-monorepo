@@ -7,16 +7,15 @@
 # Approach (intentionally simple; revisit if it gets too noisy):
 #
 #   1. Find every Go file under /api/internal/handlers/.
-#   2. For each handler function whose first parameter looks like a request
-#      containing a *_id field for a scoped entity (delegation_id,
-#      delegate_id, committee_id, assignment_id, payment_id), verify the
-#      function body contains a call to the matching MustHaveScopeOn<Entity>.
+#   2. If the file references the PascalCase form of a scoped *_id field
+#      (DelegationId, DelegateId, CommitteeId, AssignmentId, PaymentId,
+#      ConferenceId), demand the matching MustHaveScopeOn<Entity> call.
 #   3. Whitelist files marked with the comment `// scope-check: skip` on
-#      line 1 so we can intentionally bypass when needed (rare).
+#      line 1 (or anywhere in the first 2 lines).
 #
 # Exits 0 when all handlers pass, 1 otherwise. Run from repo root.
 
-set -euo pipefail
+set -eo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 HANDLERS_DIR="$ROOT/api/internal/handlers"
@@ -26,46 +25,27 @@ if [[ ! -d "$HANDLERS_DIR" ]]; then
   exit 0
 fi
 
-shopt -s nullglob globstar
+# Parallel arrays: PascalCase field suffix → expected helper.
+FIELDS=(DelegationId DelegateId CommitteeId AssignmentId PaymentId ConferenceId)
+HELPERS=(MustHaveScopeOnDelegation MustHaveScopeOnDelegate MustHaveScopeOnCommittee MustHaveScopeOnAssignment MustHaveScopeOnPayment MustHaveScopeOnConference)
 
 fail=0
 
-declare -A ID_TO_HELPER=(
-  [delegation_id]=MustHaveScopeOnDelegation
-  [delegate_id]=MustHaveScopeOnDelegate
-  [committee_id]=MustHaveScopeOnCommittee
-  [assignment_id]=MustHaveScopeOnAssignment
-  [payment_id]=MustHaveScopeOnPayment
-  [conference_id]=MustHaveScopeOnConference
-)
-
-for f in "$HANDLERS_DIR"/**/*.go; do
-  # Honor opt-out marker on line 1.
-  if head -n1 "$f" | grep -q "scope-check: skip"; then
+while IFS= read -r -d '' f; do
+  if head -n2 "$f" | grep -q "scope-check: skip"; then
     continue
   fi
-  # Iterate field name → helper. If the file mentions a scoped id field at
-  # all, demand the matching helper invocation somewhere in the file. This
-  # is coarser than per-function analysis but cheap and good enough for v1;
-  # tighten when handler count grows.
-  for field in "${!ID_TO_HELPER[@]}"; do
-    helper="${ID_TO_HELPER[$field]}"
-    # The field name appears in request struct accessors as Go's PascalCase
-    # form (e.g., GetDelegationId, msg.DelegationId). Build a regex that
-    # matches the PascalCase suffix.
-    pascal_suffix="$(awk -v s="$field" 'BEGIN{
-      n=split(s,a,"_"); out=""
-      for(i=1;i<=n;i++){ p=a[i]; out = out toupper(substr(p,1,1)) substr(p,2) }
-      print out
-    }')"
-    if grep -qE "\\.${pascal_suffix}\\b|\\bGet${pascal_suffix}\\b" "$f"; then
-      if ! grep -q "auth\\.${helper}\\b\\|${helper}(" "$f"; then
-        echo "scope-check: $f mentions ${pascal_suffix} but does not call auth.${helper}"
+  for i in "${!FIELDS[@]}"; do
+    field="${FIELDS[$i]}"
+    helper="${HELPERS[$i]}"
+    if grep -qE "\\.${field}\\b|\\bGet${field}\\b" "$f"; then
+      if ! grep -q "${helper}(" "$f"; then
+        echo "scope-check: $f references ${field} but does not call ${helper}"
         fail=1
       fi
     fi
   done
-done
+done < <(find "$HANDLERS_DIR" -type f -name '*.go' -print0)
 
 if [[ $fail -ne 0 ]]; then
   echo ""
