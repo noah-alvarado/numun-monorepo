@@ -14,3 +14,7 @@ LDFLAGS := -s -w \
 build-ApiFunction:
 	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
 	  go build -trimpath -ldflags="$(LDFLAGS)" -o $(ARTIFACTS_DIR)/bootstrap ./cmd/api
+
+build-CognitoPostConfirmationFunction:
+	GOOS=linux GOARCH=arm64 CGO_ENABLED=0 \
+	  go build -trimpath -ldflags="$(LDFLAGS)" -o $(ARTIFACTS_DIR)/bootstrap ./cmd/cognito-post-confirmation

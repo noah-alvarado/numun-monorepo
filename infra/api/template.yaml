@@ -25,6 +25,15 @@ Parameters:
   HostedZoneId:
     Type: String
     Description: Route 53 zone id for numun.org.
+  CognitoUserPoolId:
+    Type: String
+    Description: Cognito user pool id (e.g., us-east-2_mFmtWvKtQ). Exported by the base-data stack.
+  CognitoUserPoolArn:
+    Type: String
+    Description: Cognito user pool ARN. Exported by the base-data stack.
+  CognitoClientId:
+    Type: String
+    Description: Cognito app client id used by the portal.
 
 Globals:
   Function:
@@ -83,6 +92,18 @@ Resources:
                   - ssm:GetParametersByPath
                 Resource:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/prod/*"
+              # Cognito operations used by AuthService.Exchange (token refresh,
+              # token revoke), UserService.InviteStaff, and the
+              # RecordPasswordResetCompleted lookup. Scoped to this pool.
+              - Effect: Allow
+                Action:
+                  - cognito-idp:InitiateAuth
+                  - cognito-idp:RevokeToken
+                  - cognito-idp:AdminCreateUser
+                  - cognito-idp:AdminGetUser
+                  - cognito-idp:AdminUpdateUserAttributes
+                Resource:
+                  - !Ref CognitoUserPoolArn
 
   # ── HTTP API ────────────────────────────────────────────────────────────────
   ApiFunction:
@@ -100,6 +121,10 @@ Resources:
           DDB_TABLE_NAME: numun-prod
           COMMIT_SHA: !Ref CommitSha
           RELEASE_VERSION: !Ref ReleaseVersion
+          COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
+          COGNITO_CLIENT_ID: !Ref CognitoClientId
+          COOKIE_DOMAIN: .numun.org
+          COOKIE_SECURE: "true"
       Events:
         AnyHttp:
           Type: HttpApi
@@ -151,6 +176,72 @@ Resources:
         Route53:
           HostedZoneId: !Ref HostedZoneId
 
+  # ── Cognito post-confirmation Lambda ───────────────────────────────────────
+  # Triggered by Cognito after a user confirms their sign-up email. Writes the
+  # DDB User row + signup_completed audit event so the first authenticated
+  # API call doesn't race against a missing mirror. See AUTH.md §3.1.
+  CognitoPostConfirmationFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: numun-prod-cognito-post-confirmation-execution
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: numun-cognito-trigger-ddb
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:PutItem
+                  - dynamodb:GetItem
+                  - dynamodb:UpdateItem
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod"
+
+  CognitoPostConfirmationFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: numun-prod-cognito-post-confirmation
+      CodeUri: ../../api
+      Handler: bootstrap
+      Role: !GetAtt CognitoPostConfirmationFunctionRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          AWS_REGION_NAME: !Ref AWS::Region
+          DDB_TABLE_NAME: numun-prod
+
+  CognitoPostConfirmationLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${CognitoPostConfirmationFunction}"
+      RetentionInDays: 30
+
+  CognitoPostConfirmationInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref CognitoPostConfirmationFunction
+      Action: lambda:InvokeFunction
+      Principal: cognito-idp.amazonaws.com
+      SourceArn: !Ref CognitoUserPoolArn
+
+  # The trigger attachment itself lives on the user pool, which is owned by
+  # the base-data stack. We expose the function ARN as an output here; a
+  # one-time `aws cognito-idp update-user-pool --lambda-config
+  # PostConfirmation=<arn>` wires it. Captured in the first-admin-bootstrap
+  # and seed-users runbooks so it gets executed during deployment.
+
   # ── Alarms ──────────────────────────────────────────────────────────────────
   ApiFunctionErrorAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -180,3 +271,10 @@ Outputs:
   HttpApiEndpoint:
     Description: Internal HTTP API invoke URL — use api.numun.org in practice.
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  CognitoPostConfirmationFunctionArn:
+    Description: >
+      ARN to wire into the Cognito user pool's LambdaConfig.PostConfirmation.
+      Run once after deploy:
+        aws cognito-idp update-user-pool --user-pool-id <id> \
+          --lambda-config PostConfirmation=<arn>
+    Value: !GetAtt CognitoPostConfirmationFunction.Arn

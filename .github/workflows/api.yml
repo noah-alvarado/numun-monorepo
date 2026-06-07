@@ -57,7 +57,10 @@ jobs:
               CommitSha=${{ github.sha }} \
               ReleaseVersion=${{ github.run_number }} \
               ApiCertificateArn=${{ vars.API_CERTIFICATE_ARN }} \
-              HostedZoneId=${{ vars.HOSTED_ZONE_ID }}
+              HostedZoneId=${{ vars.HOSTED_ZONE_ID }} \
+              CognitoUserPoolId=${{ vars.COGNITO_USER_POOL_ID }} \
+              CognitoUserPoolArn=${{ vars.COGNITO_USER_POOL_ARN }} \
+              CognitoClientId=${{ vars.COGNITO_CLIENT_ID }}
       - name: get HTTP API endpoint
         id: api
         run: |
