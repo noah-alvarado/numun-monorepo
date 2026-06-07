@@ -122,7 +122,7 @@ already exists, the call fails harmlessly with
 
 ### 5. Audit the action
 
-Tail CloudWatch logs for `numun-prod-cognito-post-confirmation` and
+Tail CloudWatch logs for `numun-prod-api-cognito-post-confirmation` and
 `numun-prod-api` to confirm clean operation, and check the audit table for
 the `sign_in_succeeded` event:
 

@@ -183,7 +183,9 @@ Resources:
   CognitoPostConfirmationFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-cognito-post-confirmation-execution
+      # Name must match the numun-prod-api-* pattern that the deploy-api OIDC
+      # role is allowed to manage via iam:CreateRole / iam:PassRole.
+      RoleName: numun-prod-api-cognito-post-confirmation-execution
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -211,7 +213,7 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      FunctionName: numun-prod-cognito-post-confirmation
+      FunctionName: numun-prod-api-cognito-post-confirmation
       CodeUri: ../../api
       Handler: bootstrap
       Role: !GetAtt CognitoPostConfirmationFunctionRole.Arn
