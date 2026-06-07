@@ -30,7 +30,7 @@ Globals:
   Function:
     Runtime: provided.al2023
     Architectures: [arm64]
-    Timeout: 29                # API Gateway HTTP API hard ceiling.
+    Timeout: 29 # API Gateway HTTP API hard ceiling.
     MemorySize: 512
     Tracing: Active
     LoggingConfig:

@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  id-token: write    # OIDC
+  id-token: write # OIDC
   contents: read
 
 concurrency:

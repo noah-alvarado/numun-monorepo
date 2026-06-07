@@ -87,7 +87,11 @@ services:
     volumes:
       - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:4566/_localstack/health || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fsS http://localhost:4566/_localstack/health || exit 1",
+        ]
       interval: 5s
       timeout: 3s
       retries: 20

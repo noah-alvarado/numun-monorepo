@@ -48,31 +48,34 @@ Attach this inline policy so the user can't perform any action without MFA:
 ```json
 {
   "Version": "2012-10-17",
-  "Statement": [{
-    "Sid": "DenyAllExceptListedIfNoMFA",
-    "Effect": "Deny",
-    "NotAction": [
-      "iam:CreateVirtualMFADevice",
-      "iam:EnableMFADevice",
-      "iam:GetUser",
-      "iam:ListMFADevices",
-      "iam:ListVirtualMFADevices",
-      "iam:ResyncMFADevice",
-      "sts:GetSessionToken"
-    ],
-    "Resource": "*",
-    "Condition": {
-      "BoolIfExists": {
-        "aws:MultiFactorAuthPresent": "false"
+  "Statement": [
+    {
+      "Sid": "DenyAllExceptListedIfNoMFA",
+      "Effect": "Deny",
+      "NotAction": [
+        "iam:CreateVirtualMFADevice",
+        "iam:EnableMFADevice",
+        "iam:GetUser",
+        "iam:ListMFADevices",
+        "iam:ListVirtualMFADevices",
+        "iam:ResyncMFADevice",
+        "sts:GetSessionToken"
+      ],
+      "Resource": "*",
+      "Condition": {
+        "BoolIfExists": {
+          "aws:MultiFactorAuthPresent": "false"
+        }
       }
     }
-  }]
+  ]
 }
 ```
 
 ## Using the user
 
 ### Console
+
 1. Sign in to `https://signin.aws.amazon.com/console` with username `numun-break-glass`.
 2. Provide TOTP code.
 3. Switch to `us-east-2` region for app resources, `us-east-1` for CloudFront / billing.
@@ -80,6 +83,7 @@ Attach this inline policy so the user can't perform any action without MFA:
 5. Sign out immediately when done.
 
 ### CLI (short session)
+
 ```bash
 # Get a 12-hour MFA-bearing session.
 aws sts get-session-token \

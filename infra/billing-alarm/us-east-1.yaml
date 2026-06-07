@@ -41,7 +41,7 @@ Resources:
         - Name: Currency
           Value: USD
       Statistic: Maximum
-      Period: 21600       # 6 hours — billing metrics update slowly
+      Period: 21600 # 6 hours — billing metrics update slowly
       EvaluationPeriods: 1
       Threshold: !Ref ThresholdUsd
       ComparisonOperator: GreaterThanThreshold

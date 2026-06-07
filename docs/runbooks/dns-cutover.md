@@ -3,6 +3,7 @@
 One-time procedure. The `numun.org` domain stays registered at GoDaddy; DNS authority moves to Route 53.
 
 ## Prerequisites
+
 - AWS console access (break-glass IAM user is fine).
 - GoDaddy account access for the `numun.org` domain.
 - A current snapshot of every DNS record on GoDaddy (`dig` or screenshot the DNS Management page).

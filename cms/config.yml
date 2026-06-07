@@ -5,13 +5,13 @@
 
 backend:
   name: github
-  repo: numun/numun-vClaude          # update once the repo is created
+  repo: numun/numun-vClaude # update once the repo is created
   branch: main
-  base_url: https://api.numun.org    # OAuth proxy lives on the Lambdalith
+  base_url: https://api.numun.org # OAuth proxy lives on the Lambdalith
   auth_endpoint: cms-oauth/auth
 
 publish_mode: simple
 media_folder: "content/uploads"
 public_folder: "/uploads"
 
-collections: []  # collections defined in M5
+collections: [] # collections defined in M5

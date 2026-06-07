@@ -98,17 +98,18 @@ aws ses send-email \
 ```
 
 Then check headers in your inbox:
+
 - `Authentication-Results: ... dkim=pass`
 - `Authentication-Results: ... spf=pass`
 - `Authentication-Results: ... dmarc=pass`
 
 ## DMARC progression (tracked through M12)
 
-| Stage | When | Record |
-|---|---|---|
-| Initial | M1 | `p=quarantine; pct=10` |
+| Stage      | When               | Record                  |
+| ---------- | ------------------ | ----------------------- |
+| Initial    | M1                 | `p=quarantine; pct=10`  |
 | Tightening | 2–4 weeks after M9 | `p=quarantine; pct=100` |
-| Final | M12 | `p=reject; pct=100` |
+| Final      | M12                | `p=reject; pct=100`     |
 
 Each tightening is a TXT update on `_dmarc.mail.numun.org`.
 

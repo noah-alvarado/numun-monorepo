@@ -107,17 +107,17 @@ You'll use the four role ARNs + the SAM artifacts bucket name in step 4.
 
 GitHub → repo → Settings → Secrets and variables → Actions → Variables tab. Add **repository variables** (not secrets — these are non-sensitive ARNs and ids):
 
-| Variable | Source |
-|---|---|
-| `DEPLOY_ROLE_API_ARN` | Output `DeployRoleApiArn` from step 3 |
-| `DEPLOY_ROLE_SITE_ARN` | Output `DeployRoleSiteArn` from step 3 |
-| `DEPLOY_ROLE_PORTAL_ARN` | Output `DeployRolePortalArn` from step 3 |
-| `DEPLOY_ROLE_CMS_ARN` | Output `DeployRoleCmsArn` from step 3 |
-| `SAM_ARTIFACTS_BUCKET` | Output `SamArtifactsBucketName` from step 3 |
-| `HOSTED_ZONE_ID` | Hosted-zone id from step 1 |
-| `SITE_DISTRIBUTION_ID` | Filled after step 5 |
-| `PORTAL_DISTRIBUTION_ID` | Filled after step 5 |
-| `CMS_DISTRIBUTION_ID` | Filled after step 5 |
+| Variable                 | Source                                      |
+| ------------------------ | ------------------------------------------- |
+| `DEPLOY_ROLE_API_ARN`    | Output `DeployRoleApiArn` from step 3       |
+| `DEPLOY_ROLE_SITE_ARN`   | Output `DeployRoleSiteArn` from step 3      |
+| `DEPLOY_ROLE_PORTAL_ARN` | Output `DeployRolePortalArn` from step 3    |
+| `DEPLOY_ROLE_CMS_ARN`    | Output `DeployRoleCmsArn` from step 3       |
+| `SAM_ARTIFACTS_BUCKET`   | Output `SamArtifactsBucketName` from step 3 |
+| `HOSTED_ZONE_ID`         | Hosted-zone id from step 1                  |
+| `SITE_DISTRIBUTION_ID`   | Filled after step 5                         |
+| `PORTAL_DISTRIBUTION_ID` | Filled after step 5                         |
+| `CMS_DISTRIBUTION_ID`    | Filled after step 5                         |
 
 The four distribution-id variables stay empty until the base stack is deployed in step 5.
 
