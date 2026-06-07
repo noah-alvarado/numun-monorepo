@@ -45,8 +45,13 @@ reset: ## Drop + recreate the DynamoDB Local table and LocalStack resources.
 	docker compose up -d
 
 seed: ## Populate DynamoDB Local with the seed dataset (see /docs/seed-users.md).
-	@echo "Seed runner not yet implemented — placeholder for M2 deliverable."
-	@exit 1
+	cd api && \
+	  AWS_REGION=us-east-2 \
+	  AWS_ACCESS_KEY_ID=local \
+	  AWS_SECRET_ACCESS_KEY=local \
+	  AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 \
+	  DDB_TABLE_NAME=numun-prod \
+	  go run ./cmd/seed
 
 # ── Build / codegen ───────────────────────────────────────────────────────────
 
