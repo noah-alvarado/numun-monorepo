@@ -65,6 +65,30 @@ if command -v node >/dev/null 2>&1; then
   fi
 fi
 
+# api/go.mod's `go` directive names the minimum supported toolchain;
+# newer releases are accepted.
+if command -v go >/dev/null 2>&1; then
+  expected=$(awk '/^go / {print $2; exit}' api/go.mod)
+  actual=$(go version | awk '{print $3}' | sed 's/^go//')
+  lowest=$(printf '%s\n%s\n' "$expected" "$actual" | sort -V | head -n1)
+  if [ "$lowest" != "$expected" ]; then
+    printf "  ${WARN} go too old: need >=%s, got %s (see api/go.mod)\n" "$expected" "$actual"
+    errors=$((errors+1))
+  fi
+fi
+
+# package.json's `packageManager` field names the pinned pnpm version
+# (corepack reads this). Newer releases are accepted.
+if command -v pnpm >/dev/null 2>&1; then
+  expected=$(sed -nE 's/.*"packageManager": *"pnpm@([^"]+)".*/\1/p' package.json | head -n1)
+  actual=$(pnpm --version)
+  lowest=$(printf '%s\n%s\n' "$expected" "$actual" | sort -V | head -n1)
+  if [ "$lowest" != "$expected" ]; then
+    printf "  ${WARN} pnpm too old: need >=%s, got %s (see package.json \"packageManager\")\n" "$expected" "$actual"
+    errors=$((errors+1))
+  fi
+fi
+
 if [ "$errors" -gt 0 ]; then
   echo
   echo "Missing $errors tool(s). See /DEVELOPERS.md for install instructions."

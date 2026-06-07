@@ -88,8 +88,8 @@ Install once:
 | Tool | Version | How |
 |---|---|---|
 | Node.js | **24.16.0** (pinned in `.nvmrc`) | `fnm install` from repo root |
-| pnpm | latest | `corepack enable && corepack prepare pnpm@latest --activate` |
-| Go | as pinned in `/api/go.mod` (≥ 1.22 for `net/http.ServeMux` pattern routing) | https://go.dev/dl/ |
+| pnpm | as pinned in `package.json` `packageManager` | `corepack enable` (auto-activates the pinned version) |
+| Go | as pinned in `/api/go.mod` | https://go.dev/dl/ |
 | AWS CLI v2 | latest | https://aws.amazon.com/cli/ |
 | AWS SAM CLI | latest | `brew install aws-sam-cli` (macOS) |
 | Docker Desktop | latest | https://www.docker.com/products/docker-desktop/ |

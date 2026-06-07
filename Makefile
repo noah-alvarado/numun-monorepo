@@ -1,10 +1,6 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-# Pinned tool versions (read by `make doctor`).
-NODE_VERSION := 24.16.0
-GO_MIN_VERSION := 1.22
-
 # ── Help ──────────────────────────────────────────────────────────────────────
 
 help: ## Show this help.

@@ -3,3 +3,7 @@ packages:
   - "portal"
   - "cms"
   - "packages/*"
+
+allowBuilds:
+  esbuild: true
+  sharp: true
