@@ -1,6 +1,6 @@
 module github.com/numun/numun/api
 
-go 1.25.0
+go 1.26.4
 
 require (
 	connectrpc.com/connect v1.20.0
