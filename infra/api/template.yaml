@@ -18,25 +18,13 @@ Parameters:
     Type: String
     Default: 0.0.0
     Description: Release version stamped into the binary via ldflags.
-  EnableCustomDomain:
-    Type: String
-    Default: "false"
-    AllowedValues: ["true", "false"]
-    Description: >
-      When "true", the HTTP API is fronted by api.numun.org via an API Gateway
-      custom domain + Route 53 alias. When "false" (default during DNS-deferred
-      bootstrap), the API is reachable only via its execute-api.* URL.
   ApiCertificateArn:
     Type: String
-    Default: ""
-    Description: ACM cert ARN in us-east-2 for api.numun.org. Required when EnableCustomDomain=true.
+    Description: ACM cert ARN in us-east-2 for api.numun.org.
+    AllowedPattern: "^arn:aws:acm:us-east-2:[0-9]{12}:certificate/.+$"
   HostedZoneId:
     Type: String
-    Default: ""
-    Description: Route 53 zone id for numun.org. Required when EnableCustomDomain=true.
-
-Conditions:
-  EnableCustomDomainCondition: !Equals [!Ref EnableCustomDomain, "true"]
+    Description: Route 53 zone id for numun.org.
 
 Globals:
   Function:
@@ -155,40 +143,13 @@ Resources:
           - Connect-Timeout-Ms
         AllowCredentials: true
         MaxAge: 600
-
-  # ── Custom domain (conditional) ────────────────────────────────────────────
-  # Gated by EnableCustomDomain. When false, the API is only reachable via
-  # its execute-api.* URL. When true, the three resources below wire up
-  # api.numun.org → this HTTP API.
-  ApiCustomDomain:
-    Type: AWS::ApiGatewayV2::DomainName
-    Condition: EnableCustomDomainCondition
-    Properties:
-      DomainName: api.numun.org
-      DomainNameConfigurations:
-        - CertificateArn: !Ref ApiCertificateArn
-          EndpointType: REGIONAL
-          SecurityPolicy: TLS_1_2
-
-  ApiCustomDomainMapping:
-    Type: AWS::ApiGatewayV2::ApiMapping
-    Condition: EnableCustomDomainCondition
-    Properties:
-      ApiId: !Ref HttpApi
-      DomainName: !Ref ApiCustomDomain
-      Stage: $default
-
-  ApiCustomDomainRecord:
-    Type: AWS::Route53::RecordSet
-    Condition: EnableCustomDomainCondition
-    Properties:
-      HostedZoneId: !Ref HostedZoneId
-      Name: api.numun.org.
-      Type: A
-      AliasTarget:
-        DNSName: !GetAtt ApiCustomDomain.RegionalDomainName
-        HostedZoneId: !GetAtt ApiCustomDomain.RegionalHostedZoneId
-        EvaluateTargetHealth: false
+      Domain:
+        DomainName: api.numun.org
+        CertificateArn: !Ref ApiCertificateArn
+        EndpointConfiguration: REGIONAL
+        SecurityPolicy: TLS_1_2
+        Route53:
+          HostedZoneId: !Ref HostedZoneId
 
   # ── Alarms ──────────────────────────────────────────────────────────────────
   ApiFunctionErrorAlarm:

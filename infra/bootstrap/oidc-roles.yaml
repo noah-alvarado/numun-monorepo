@@ -18,10 +18,10 @@ Parameters:
   GitHubRepo:
     Type: String
     Description: Repository name within GitHubOrg (e.g., "numun-vClaude").
-  GitHubBranch:
+  GitHubEnvironment:
     Type: String
-    Default: main
-    Description: Only allow deploys initiated from this branch.
+    Default: nalvarado
+    Description: Only allow deploys initiated from this GitHub Actions environment.
 
 Resources:
   # ── GitHub Actions OIDC provider ────────────────────────────────────────────
@@ -79,7 +79,7 @@ Resources:
               StringEquals:
                 "token.actions.githubusercontent.com:aud": sts.amazonaws.com
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: api-deploy
           PolicyDocument:
@@ -172,6 +172,17 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*"
                   - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*:*"
+              # CloudWatch alarms managed by the api stack (Lambda error rate, etc.).
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:TagResource
+                  - cloudwatch:UntagResource
+                  - cloudwatch:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:numun-prod-*"
               # SAM artifacts bucket.
               - Effect: Allow
                 Action:
@@ -207,7 +218,7 @@ Resources:
               StringEquals:
                 "token.actions.githubusercontent.com:aud": sts.amazonaws.com
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: site-deploy
           PolicyDocument:
@@ -245,7 +256,7 @@ Resources:
               StringEquals:
                 "token.actions.githubusercontent.com:aud": sts.amazonaws.com
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: portal-deploy
           PolicyDocument:
@@ -283,7 +294,7 @@ Resources:
               StringEquals:
                 "token.actions.githubusercontent.com:aud": sts.amazonaws.com
               StringLike:
-                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:ref:refs/heads/${GitHubBranch}"
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
       Policies:
         - PolicyName: cms-deploy
           PolicyDocument:
