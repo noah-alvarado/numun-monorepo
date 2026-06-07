@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package numun.v1;
+
+// ErrorInfo is the domain-error detail attached to Connect errors when the
+// status code alone is not enough to disambiguate the failure. See API.md §6.3.
+//
+// Stable, machine-readable. Add new `reason` values rather than re-purposing
+// existing ones.
+message ErrorInfo {
+  Reason reason = 1;
+  // Free-form fields keyed by reason; e.g., for VERSION_MISMATCH:
+  // { "currentVersion": "7", "expectedVersion": "6" }.
+  map<string, string> metadata = 2;
+
+  enum Reason {
+    REASON_UNSPECIFIED = 0;
+
+    // Optimistic-lock conflict: client `expected_version` did not match the
+    // server's current version. Surface code: ABORTED / HTTP 409.
+    REASON_VERSION_MISMATCH = 1;
+
+    // Idempotency-Key replay where the prior call is still in flight.
+    REASON_IDEMPOTENCY_IN_FLIGHT = 2;
+
+    // A unique-key collision on a domain field, e.g., duplicate school
+    // registration for the same conference. Surface code: ALREADY_EXISTS.
+    REASON_UNIQUE_VIOLATION = 3;
+
+    // State-machine violation: e.g., approving an already-approved
+    // delegation. Surface code: FAILED_PRECONDITION.
+    REASON_INVALID_STATE_TRANSITION = 4;
+
+    // CSRF cookie/header mismatch. Surface code: PERMISSION_DENIED.
+    REASON_CSRF_MISMATCH = 5;
+
+    // Caller's session was found but is expired or revoked.
+    REASON_SESSION_EXPIRED = 6;
+
+    // Cognito refused the token exchange in AuthService.Exchange.
+    REASON_TOKEN_INVALID = 7;
+  }
+}

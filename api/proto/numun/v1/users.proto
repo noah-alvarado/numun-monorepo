@@ -1,0 +1,92 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// User is the application-side profile mirroring a Cognito user. Credentials
+// + role are authoritative in Cognito; this row mirrors the role for
+// queryability and stores profile fields. See DATA_MODEL.md §2.2 and AUTH.md §2.
+message User {
+  // Cognito sub (UUID).
+  string id = 1;
+  Role role = 2;
+  string email = 3;
+  string name = 4;
+  string phone = 5;
+  EmailStatus email_status = 6;
+  bool announcements_opt_in = 7;
+  int32 version = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+
+  enum Role {
+    ROLE_UNSPECIFIED = 0;
+    ROLE_ADVISOR = 1;
+    ROLE_STAFF_STAFFER = 2;
+    ROLE_STAFF_ADMIN = 3;
+  }
+
+  enum EmailStatus {
+    EMAIL_STATUS_UNSPECIFIED = 0;
+    EMAIL_STATUS_OK = 1;
+    EMAIL_STATUS_BOUNCED = 2;
+    EMAIL_STATUS_COMPLAINED = 3;
+  }
+}
+
+// UserService — see API.md §10.3.
+service UserService {
+  // Returns the caller's User row. The portal calls this on app-shell mount
+  // to populate in-memory state after sign-in.
+  rpc GetMe(GetMeRequest) returns (GetMeResponse) {}
+
+  // Get a user by id. Self or staff-admin.
+  rpc GetUser(GetUserRequest) returns (GetUserResponse) {}
+
+  // Patch profile fields. Self or staff-admin.
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse) {}
+
+  // Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
+  // DDB written immediately). See AUTH.md §3.2.
+  rpc InviteStaff(InviteStaffRequest) returns (InviteStaffResponse) {}
+}
+
+message GetMeRequest {}
+message GetMeResponse {
+  User user = 1;
+}
+
+message GetUserRequest {
+  string user_id = 1;
+}
+message GetUserResponse {
+  User user = 1;
+}
+
+// UpdateUser only allows the caller to patch a small set of fields. Email
+// changes go through Cognito directly (AUTH.md §10.2); role changes go through
+// AdminUpdateUserAttributes (admin-only).
+message UpdateUserRequest {
+  string user_id = 1;
+  // Patch fields. Empty string means "no change" (proto3 default presence is
+  // intentional here; the portal sends only the fields the user edited).
+  optional string name = 2;
+  optional string phone = 3;
+  optional bool announcements_opt_in = 4;
+  int32 expected_version = 5;
+}
+message UpdateUserResponse {
+  User user = 1;
+}
+
+message InviteStaffRequest {
+  string email = 1;
+  string name = 2;
+  // ROLE_STAFF_ADMIN or ROLE_STAFF_STAFFER. Other roles return INVALID_ARGUMENT.
+  User.Role role = 3;
+}
+message InviteStaffResponse {
+  // The provisional User row written alongside Cognito AdminCreateUser.
+  User user = 1;
+}

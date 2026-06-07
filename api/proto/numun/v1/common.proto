@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// Money is the wire shape for currency amounts. See API.md §3.5.
+// All v1 amounts are USD; floats are never used on the wire.
+message Money {
+  // ISO 4217 currency code. Always "USD" for v1.
+  string currency = 1;
+  // Whole dollars. May be negative for invoice/charge entries.
+  int64 units = 2;
+  // 0..99 cents. May be negative when `units` is negative.
+  int32 cents = 3;
+}
+
+// Address is the postal-address shape carried by Delegation and similar.
+message Address {
+  string street = 1;
+  string city = 2;
+  string state = 3;
+  string postal_code = 4;
+  string country = 5;
+}
+
+// Page is the response-side pagination envelope. See API.md §4.2.
+message Page {
+  // Empty when there are no more pages.
+  string next_cursor = 1;
+  // Echo of the effective page size used.
+  int32 page_size = 2;
+}
+
+// PageRequest is the request-side pagination envelope. See API.md §4.1.
+// Embed by composition in List* requests rather than inheritance.
+message PageRequest {
+  // Default 100, max 500. Server clamps when exceeded.
+  int32 page_size = 1;
+  // Opaque base64-encoded DDB exclusive-start-key. Empty for first page.
+  string cursor = 2;
+}
+
+// AuditMetadata records who/when on a row. Most entities also carry version
+// (optimistic-lock) separately on their concrete messages.
+message AuditMetadata {
+  google.protobuf.Timestamp created_at = 1;
+  google.protobuf.Timestamp updated_at = 2;
+  string created_by = 3;
+  string updated_by = 4;
+}

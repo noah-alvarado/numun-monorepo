@@ -1,0 +1,57 @@
+syntax = "proto3";
+
+package numun.v1;
+
+// AuthService — see API.md §10.2 and AUTH.md §4–§5, §8, §10.
+//
+// Sign-up, password reset, email verification, and the NEW_PASSWORD_REQUIRED
+// challenge are performed by the portal calling Cognito's APIs directly using
+// `amazon-cognito-identity-js`. Only the session-cookie handshake and audit
+// events that Cognito does not natively emit live here.
+service AuthService {
+  // Exchanges Cognito tokens (returned by the portal's direct SDK call) for
+  // the opaque `numun_session` HttpOnly cookie + `csrf_token` cookie. No prior
+  // session is required — this *is* the auth handshake.
+  rpc Exchange(ExchangeRequest) returns (ExchangeResponse) {}
+
+  // Invalidates the current session: revokes the refresh token at Cognito
+  // (best-effort), deletes the Session row, sets cookies to expire.
+  rpc Logout(LogoutRequest) returns (LogoutResponse) {}
+
+  // Records a `password_reset_completed` AuthAuditEvent for the caller.
+  // Cognito does not emit a native trigger for ConfirmForgotPassword, so the
+  // portal calls this RPC after a successful password reset. See AUTH.md §10.1
+  // and IMPLEMENTATION_PLAN.md ambiguity #9.
+  //
+  // Unauthenticated (the user is mid-recovery and has no session yet); the
+  // server identifies the subject via the email parameter, which it must
+  // resolve against Cognito before writing the event.
+  rpc RecordPasswordResetCompleted(RecordPasswordResetCompletedRequest)
+      returns (RecordPasswordResetCompletedResponse) {}
+}
+
+message ExchangeRequest {
+  // Tokens returned by Cognito's InitiateAuth call on the portal side.
+  string id_token = 1;
+  string access_token = 2;
+  string refresh_token = 3;
+  // Seconds until the access token expires (Cognito's `ExpiresIn`).
+  int32 expires_in = 4;
+  // Controls cookie persistence per AUTH.md §4.3. Session row TTL is always
+  // 30 days; this flag only sets whether the cookie carries Max-Age.
+  bool remember_me = 5;
+}
+
+// Exchange returns no body; cookies are set as response headers and the call
+// returns HTTP 204 on success. The proto carries an empty response so the
+// generated client has a well-typed handle.
+message ExchangeResponse {}
+
+message LogoutRequest {}
+message LogoutResponse {}
+
+message RecordPasswordResetCompletedRequest {
+  // Email the user just successfully reset their password for.
+  string email = 1;
+}
+message RecordPasswordResetCompletedResponse {}
