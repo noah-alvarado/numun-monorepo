@@ -3,13 +3,30 @@ Transform: AWS::Serverless-2016-10-31
 Description: >
   NUMUN — api stack (fast-changing).
 
-  HTTP API + Lambdalith at api.numun.org. Code lives in /api/cmd/api; SAM
-  build cross-compiles a linux/arm64 `bootstrap` binary via /api/Makefile.
+  HTTP API + Lambdalith at api.${Apex}, where Apex is composed from
+  EnvSubdomain + RootDomain. Code lives in /api/cmd/api; SAM build
+  cross-compiles a linux/arm64 `bootstrap` binary via /api/Makefile.
 
   Region: us-east-2.
   References: APPLICATION.md §4, API.md, SECURITY.md §3.2.
 
 Parameters:
+  Env:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: >
+      Environment qualifier baked into named resources. `test` for staging,
+      `prod` for a future real-prod account.
+  RootDomain:
+    Type: String
+    Default: numun.org
+    Description: Apex registered domain.
+  EnvSubdomain:
+    Type: String
+    Default: ""
+    Description: >
+      Subdomain inserted between the environment and RootDomain (e.g.,
+      `test` → apex `test.numun.org`). Empty for prod (apex = RootDomain).
   CommitSha:
     Type: String
     Default: dev
@@ -20,20 +37,23 @@ Parameters:
     Description: Release version stamped into the binary via ldflags.
   ApiCertificateArn:
     Type: String
-    Description: ACM cert ARN in us-east-2 for api.numun.org.
+    Description: ACM cert ARN in us-east-2 for the api subdomain.
     AllowedPattern: "^arn:aws:acm:us-east-2:[0-9]{12}:certificate/.+$"
   HostedZoneId:
     Type: String
-    Description: Route 53 zone id for numun.org.
+    Description: Route 53 zone id for RootDomain.
   CognitoUserPoolId:
     Type: String
-    Description: Cognito user pool id (e.g., us-east-2_mFmtWvKtQ). Exported by the base-data stack.
+    Description: Cognito user pool id. Exported by the base-data stack.
   CognitoUserPoolArn:
     Type: String
     Description: Cognito user pool ARN. Exported by the base-data stack.
   CognitoClientId:
     Type: String
     Description: Cognito app client id used by the portal.
+
+Conditions:
+  HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
 
 Globals:
   Function:
@@ -48,12 +68,12 @@ Globals:
 Resources:
   # ── Lambda execution role ──────────────────────────────────────────────────
   # Minimal for M1 (health endpoint only). Subsequent milestones expand:
-  # DDB R/W on numun-prod, SES SendEmail, SSM GetParameter, S3 R/W on uploads
+  # DDB R/W on numun-${Env}, SES SendEmail, SSM GetParameter, S3 R/W on uploads
   # + artifacts, Cognito admin actions. See SECURITY.md §3.2.
   ApiFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-api-execution
+      RoleName: !Sub "numun-${Env}-api-execution"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -82,8 +102,8 @@ Resources:
                   - dynamodb:TransactWriteItems
                   - dynamodb:ConditionCheckItem
                 Resource:
-                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod"
-                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod/index/*"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}/index/*"
               # SSM secrets read at cold start.
               - Effect: Allow
                 Action:
@@ -91,7 +111,7 @@ Resources:
                   - ssm:GetParameters
                   - ssm:GetParametersByPath
                 Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/prod/*"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/*"
               # Cognito operations used by AuthService.Exchange (token refresh,
               # token revoke), UserService.InviteStaff, and the
               # RecordPasswordResetCompleted lookup. Scoped to this pool.
@@ -111,19 +131,22 @@ Resources:
     Metadata:
       BuildMethod: makefile
     Properties:
-      FunctionName: numun-prod-api
+      FunctionName: !Sub "numun-${Env}-api"
       CodeUri: ../../api
       Handler: bootstrap
       Role: !GetAtt ApiFunctionRole.Arn
       Environment:
         Variables:
           AWS_REGION_NAME: !Ref AWS::Region
-          DDB_TABLE_NAME: numun-prod
+          DDB_TABLE_NAME: !Sub "numun-${Env}"
           COMMIT_SHA: !Ref CommitSha
           RELEASE_VERSION: !Ref ReleaseVersion
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
           COGNITO_CLIENT_ID: !Ref CognitoClientId
-          COOKIE_DOMAIN: .numun.org
+          COOKIE_DOMAIN: !If
+            - HasSubdomain
+            - !Sub ".${EnvSubdomain}.${RootDomain}"
+            - !Sub ".${RootDomain}"
           COOKIE_SECURE: "true"
       Events:
         AnyHttp:
@@ -151,7 +174,10 @@ Resources:
       StageName: $default
       CorsConfiguration:
         AllowOrigins:
-          - https://portal.numun.org
+          - !If
+            - HasSubdomain
+            - !Sub "https://portal.${EnvSubdomain}.${RootDomain}"
+            - !Sub "https://portal.${RootDomain}"
         AllowMethods:
           - GET
           - POST
@@ -169,7 +195,10 @@ Resources:
         AllowCredentials: true
         MaxAge: 600
       Domain:
-        DomainName: api.numun.org
+        DomainName: !If
+          - HasSubdomain
+          - !Sub "api.${EnvSubdomain}.${RootDomain}"
+          - !Sub "api.${RootDomain}"
         CertificateArn: !Ref ApiCertificateArn
         EndpointConfiguration: REGIONAL
         SecurityPolicy: TLS_1_2
@@ -183,9 +212,9 @@ Resources:
   CognitoPostConfirmationFunctionRole:
     Type: AWS::IAM::Role
     Properties:
-      # Name must match the numun-prod-api-* pattern that the deploy-api OIDC
+      # Name must match the numun-${Env}-api-* pattern that the deploy-api OIDC
       # role is allowed to manage via iam:CreateRole / iam:PassRole.
-      RoleName: numun-prod-api-cognito-post-confirmation-execution
+      RoleName: !Sub "numun-${Env}-api-cognito-post-confirmation-execution"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -206,14 +235,14 @@ Resources:
                   - dynamodb:GetItem
                   - dynamodb:UpdateItem
                 Resource:
-                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-prod"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}"
 
   CognitoPostConfirmationFunction:
     Type: AWS::Serverless::Function
     Metadata:
       BuildMethod: makefile
     Properties:
-      FunctionName: numun-prod-api-cognito-post-confirmation
+      FunctionName: !Sub "numun-${Env}-api-cognito-post-confirmation"
       CodeUri: ../../api
       Handler: bootstrap
       Role: !GetAtt CognitoPostConfirmationFunctionRole.Arn
@@ -222,7 +251,7 @@ Resources:
       Environment:
         Variables:
           AWS_REGION_NAME: !Ref AWS::Region
-          DDB_TABLE_NAME: numun-prod
+          DDB_TABLE_NAME: !Sub "numun-${Env}"
 
   CognitoPostConfirmationLogGroup:
     Type: AWS::Logs::LogGroup
@@ -248,7 +277,7 @@ Resources:
   ApiFunctionErrorAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: numun-prod-api-lambda-errors
+      AlarmName: !Sub "numun-${Env}-api-lambda-errors"
       AlarmDescription: Lambdalith error count spike.
       Namespace: AWS/Lambda
       MetricName: Errors
@@ -263,7 +292,7 @@ Resources:
       TreatMissingData: notBreaching
       AlarmActions:
         # SNS topic is created by the base stack; this stack assumes it exists.
-        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:numun-prod-alarms"
+        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:numun-${Env}-alarms"
 
 Outputs:
   ApiFunctionName:
@@ -271,7 +300,7 @@ Outputs:
   HttpApiId:
     Value: !Ref HttpApi
   HttpApiEndpoint:
-    Description: Internal HTTP API invoke URL — use api.numun.org in practice.
+    Description: Internal HTTP API invoke URL — use the api.${Apex} custom domain in practice.
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   CognitoPostConfirmationFunctionArn:
     Description: >

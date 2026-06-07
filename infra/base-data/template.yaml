@@ -13,9 +13,31 @@ Description: >
   References: INFRASTRUCTURE.md, DATA_MODEL.md §4-§5, AUTH.md §6, SECURITY.md.
 
 Parameters:
+  Env:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: >
+      Environment qualifier baked into every named resource — `test` for
+      this staging account, `prod` in a future real-prod account.
+  RootDomain:
+    Type: String
+    Default: numun.org
+    Description: >
+      Apex registered domain. Used to compose CORS origins for the uploads
+      bucket. Combined with EnvSubdomain to produce the effective apex.
+  EnvSubdomain:
+    Type: String
+    Default: ""
+    Description: >
+      Optional subdomain qualifier that sits between the environment and
+      RootDomain. Empty for real prod (apex = RootDomain). For test the
+      apex becomes test.numun.org and portal lives at portal.test.numun.org.
   AlarmEmail:
     Type: String
     Description: Email address subscribed to the alarms SNS topic.
+
+Conditions:
+  HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
 
 Resources:
   # ── DynamoDB ────────────────────────────────────────────────────────────────
@@ -24,7 +46,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      TableName: numun-prod
+      TableName: !Sub "numun-${Env}"
       BillingMode: PAY_PER_REQUEST
       PointInTimeRecoverySpecification:
         PointInTimeRecoveryEnabled: true
@@ -79,7 +101,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-site
+      BucketName: !Sub "numun-${Env}-site"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -103,7 +125,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-portal
+      BucketName: !Sub "numun-${Env}-portal"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -119,7 +141,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-cms
+      BucketName: !Sub "numun-${Env}-cms"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -143,7 +165,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-assets
+      BucketName: !Sub "numun-${Env}-assets"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -159,7 +181,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-uploads
+      BucketName: !Sub "numun-${Env}-uploads"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -179,7 +201,10 @@ Resources:
           - AllowedHeaders: ["*"]
             AllowedMethods: [PUT, GET]
             AllowedOrigins:
-              - https://portal.numun.org
+              - !If
+                - HasSubdomain
+                - !Sub "https://portal.${EnvSubdomain}.${RootDomain}"
+                - !Sub "https://portal.${RootDomain}"
             MaxAge: 3000
 
   ArtifactsBucket:
@@ -187,7 +212,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      BucketName: numun-org-artifacts
+      BucketName: !Sub "numun-${Env}-artifacts"
       PublicAccessBlockConfiguration:
         BlockPublicAcls: true
         IgnorePublicAcls: true
@@ -204,7 +229,7 @@ Resources:
     DeletionPolicy: Retain
     UpdateReplacePolicy: Retain
     Properties:
-      UserPoolName: numun-prod-users
+      UserPoolName: !Sub "numun-${Env}-users"
       AdminCreateUserConfig:
         AllowAdminCreateUserOnly: false
       AutoVerifiedAttributes:
@@ -253,7 +278,7 @@ Resources:
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient
     Properties:
-      ClientName: numun-prod-portal
+      ClientName: !Sub "numun-${Env}-portal"
       UserPoolId: !Ref CognitoUserPool
       GenerateSecret: false
       ExplicitAuthFlows:
@@ -282,21 +307,21 @@ Resources:
   SsmCognitoUserPoolIdParam:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /numun/prod/cognito/user_pool_id
+      Name: !Sub "/numun/${Env}/cognito/user_pool_id"
       Type: String
       Value: !Ref CognitoUserPool
 
   SsmCognitoClientIdParam:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /numun/prod/cognito/client_id
+      Name: !Sub "/numun/${Env}/cognito/client_id"
       Type: String
       Value: !Ref CognitoUserPoolClient
 
   SsmDdbTableNameParam:
     Type: AWS::SSM::Parameter
     Properties:
-      Name: /numun/prod/ddb/table_name
+      Name: !Sub "/numun/${Env}/ddb/table_name"
       Type: String
       Value: !Ref NumunTable
 
@@ -304,7 +329,7 @@ Resources:
   AlarmsTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: numun-prod-alarms
+      TopicName: !Sub "numun-${Env}-alarms"
       DisplayName: NUMUN Alarms
 
   AlarmsEmailSubscription:
@@ -317,8 +342,8 @@ Resources:
   DdbThrottleAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: numun-prod-ddb-throttles
-      AlarmDescription: DynamoDB write/read throttling on numun-prod.
+      AlarmName: !Sub "numun-${Env}-ddb-throttles"
+      AlarmDescription: !Sub "DynamoDB write/read throttling on numun-${Env}."
       Namespace: AWS/DynamoDB
       MetricName: ThrottledRequests
       Dimensions:
@@ -336,40 +361,53 @@ Resources:
 Outputs:
   TableName:
     Value: !Ref NumunTable
-    Export: { Name: numun-prod-base-data-TableName }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-TableName"
   CognitoUserPoolId:
     Value: !Ref CognitoUserPool
-    Export: { Name: numun-prod-base-data-CognitoUserPoolId }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-CognitoUserPoolId"
   CognitoUserPoolArn:
     Value: !GetAtt CognitoUserPool.Arn
-    Export: { Name: numun-prod-base-data-CognitoUserPoolArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-CognitoUserPoolArn"
   CognitoClientId:
     Value: !Ref CognitoUserPoolClient
-    Export: { Name: numun-prod-base-data-CognitoClientId }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-CognitoClientId"
   AlarmsTopicArn:
     Value: !Ref AlarmsTopic
-    Export: { Name: numun-prod-base-data-AlarmsTopicArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-AlarmsTopicArn"
   SiteBucketArn:
     Value: !GetAtt SiteBucket.Arn
-    Export: { Name: numun-prod-base-data-SiteBucketArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-SiteBucketArn"
   SiteBucketRegionalDomainName:
     Value: !GetAtt SiteBucket.RegionalDomainName
-    Export: { Name: numun-prod-base-data-SiteBucketRegionalDomain }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-SiteBucketRegionalDomain"
   PortalBucketArn:
     Value: !GetAtt PortalBucket.Arn
-    Export: { Name: numun-prod-base-data-PortalBucketArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-PortalBucketArn"
   PortalBucketRegionalDomainName:
     Value: !GetAtt PortalBucket.RegionalDomainName
-    Export: { Name: numun-prod-base-data-PortalBucketRegionalDomain }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-PortalBucketRegionalDomain"
   CmsBucketArn:
     Value: !GetAtt CmsBucket.Arn
-    Export: { Name: numun-prod-base-data-CmsBucketArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-CmsBucketArn"
   CmsBucketRegionalDomainName:
     Value: !GetAtt CmsBucket.RegionalDomainName
-    Export: { Name: numun-prod-base-data-CmsBucketRegionalDomain }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-CmsBucketRegionalDomain"
   AssetsBucketArn:
     Value: !GetAtt AssetsBucket.Arn
-    Export: { Name: numun-prod-base-data-AssetsBucketArn }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-AssetsBucketArn"
   AssetsBucketRegionalDomainName:
     Value: !GetAtt AssetsBucket.RegionalDomainName
-    Export: { Name: numun-prod-base-data-AssetsBucketRegionalDomain }
+    Export:
+      Name: !Sub "numun-${Env}-base-data-AssetsBucketRegionalDomain"

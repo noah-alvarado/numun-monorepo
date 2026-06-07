@@ -12,6 +12,12 @@ Description: >
   Reference: SECURITY.md §3.2, INFRASTRUCTURE.md §3.10.
 
 Parameters:
+  Env:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: >
+      Environment qualifier baked into every named resource — `test` for
+      this staging account, `prod` in a future real-prod account.
   GitHubOrg:
     Type: String
     Description: GitHub organization or user that owns the NUMUN monorepo.
@@ -20,7 +26,7 @@ Parameters:
     Description: Repository name within GitHubOrg (e.g., "numun-vClaude").
   GitHubEnvironment:
     Type: String
-    Default: nalvarado
+    Default: test
     Description: Only allow deploys initiated from this GitHub Actions environment.
 
 Resources:
@@ -42,7 +48,7 @@ Resources:
   SamArtifactsBucket:
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: !Sub "numun-prod-sam-deploys-${AWS::AccountId}"
+      BucketName: !Sub "numun-${Env}-sam-deploys-${AWS::AccountId}"
       LifecycleConfiguration:
         Rules:
           - Id: expire-old-deploys
@@ -66,7 +72,7 @@ Resources:
   DeployRoleApi:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-deploy-api
+      RoleName: !Sub "numun-${Env}-deploy-api"
       Description: GitHub Actions OIDC role for the /api SAM deploy workflow.
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -105,8 +111,8 @@ Resources:
                   - cloudformation:ExecuteChangeSet
                   - cloudformation:DeleteChangeSet
                 Resource:
-                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-prod-api/*"
-                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-prod-api*/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-api/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-api*/*"
               - Effect: Allow
                 Action:
                   - cloudformation:ValidateTemplate
@@ -133,12 +139,12 @@ Resources:
                   - lambda:RemovePermission
                   - lambda:GetPolicy
                 Resource:
-                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:numun-prod-*"
+                  - !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:numun-${Env}-*"
               # PassRole limited to roles created by the api stack.
               - Effect: Allow
                 Action: iam:PassRole
                 Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-prod-api-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
               # IAM ops on stack-managed roles (CFN creates these per deploy).
               - Effect: Allow
                 Action:
@@ -153,7 +159,7 @@ Resources:
                   - iam:TagRole
                   - iam:UntagRole
                 Resource:
-                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-prod-api-*"
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
               # API Gateway HTTP API + custom domain.
               - Effect: Allow
                 Action:
@@ -170,8 +176,8 @@ Resources:
                   - logs:TagResource
                   - logs:UntagResource
                 Resource:
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*"
-                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-prod-*:*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-*"
+                  - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-*:*"
               # CloudWatch alarms managed by the api stack (Lambda error rate, etc.).
               - Effect: Allow
                 Action:
@@ -182,7 +188,7 @@ Resources:
                   - cloudwatch:UntagResource
                   - cloudwatch:ListTagsForResource
                 Resource:
-                  - !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:numun-prod-*"
+                  - !Sub "arn:aws:cloudwatch:${AWS::Region}:${AWS::AccountId}:alarm:numun-${Env}-*"
               # SAM artifacts bucket.
               - Effect: Allow
                 Action:
@@ -192,20 +198,20 @@ Resources:
                   - s3:GetObjectVersion
                   - s3:ListBucket
                 Resource:
-                  - !Sub "arn:aws:s3:::numun-prod-sam-deploys-${AWS::AccountId}"
-                  - !Sub "arn:aws:s3:::numun-prod-sam-deploys-${AWS::AccountId}/*"
+                  - !Sub "arn:aws:s3:::numun-${Env}-sam-deploys-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::numun-${Env}-sam-deploys-${AWS::AccountId}/*"
               # SSM parameter reads at build time (env stamping etc).
               - Effect: Allow
                 Action:
                   - ssm:GetParameter
                   - ssm:GetParameters
                 Resource:
-                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/prod/*"
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/*"
 
   DeployRoleSite:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-deploy-site
+      RoleName: !Sub "numun-${Env}-deploy-site"
       Description: GitHub Actions OIDC role for the /site landing-page deploy workflow.
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -231,8 +237,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - arn:aws:s3:::numun-org-site
-                  - arn:aws:s3:::numun-org-site/*
+                  - !Sub "arn:aws:s3:::numun-${Env}-site"
+                  - !Sub "arn:aws:s3:::numun-${Env}-site/*"
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation
@@ -243,7 +249,7 @@ Resources:
   DeployRolePortal:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-deploy-portal
+      RoleName: !Sub "numun-${Env}-deploy-portal"
       Description: GitHub Actions OIDC role for the /portal SPA deploy workflow.
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -269,8 +275,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - arn:aws:s3:::numun-org-portal
-                  - arn:aws:s3:::numun-org-portal/*
+                  - !Sub "arn:aws:s3:::numun-${Env}-portal"
+                  - !Sub "arn:aws:s3:::numun-${Env}-portal/*"
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation
@@ -281,7 +287,7 @@ Resources:
   DeployRoleCms:
     Type: AWS::IAM::Role
     Properties:
-      RoleName: numun-prod-deploy-cms
+      RoleName: !Sub "numun-${Env}-deploy-cms"
       Description: GitHub Actions OIDC role for the /cms admin-bundle deploy workflow.
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
@@ -307,8 +313,8 @@ Resources:
                   - s3:GetObject
                   - s3:ListBucket
                 Resource:
-                  - arn:aws:s3:::numun-org-cms
-                  - arn:aws:s3:::numun-org-cms/*
+                  - !Sub "arn:aws:s3:::numun-${Env}-cms"
+                  - !Sub "arn:aws:s3:::numun-${Env}-cms/*"
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation

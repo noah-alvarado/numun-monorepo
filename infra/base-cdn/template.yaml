@@ -4,20 +4,45 @@ Description: >
 
   Four CloudFront distributions (site, portal, cms, assets) with OAC
   bindings to the buckets created in base-data. Plus a shared
-  response-headers policy (HSTS) and the www → apex / legacy /portal
-  redirect CloudFront function.
+  response-headers policy (HSTS), the www → apex / legacy /portal
+  redirect CloudFront function, and the Route 53 alias records that
+  point each public subdomain at its distribution.
 
   Depends on base-data being deployed (imports bucket ARNs). Depends on
-  a us-east-1 ACM certificate covering numun.org + *.numun.org.
+  a us-east-1 ACM certificate covering the apex + *.apex.
 
   Region: us-east-2.
   References: INFRASTRUCTURE.md §3.1, SECURITY.md §3.1, §3.4.
 
 Parameters:
+  Env:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: >
+      Environment qualifier baked into resource names. `test` for staging,
+      `prod` for a future real-prod account.
+  RootDomain:
+    Type: String
+    Default: numun.org
+    Description: Apex registered domain.
+  EnvSubdomain:
+    Type: String
+    Default: ""
+    Description: >
+      Subdomain inserted between the environment and RootDomain (e.g.,
+      `test` → apex `test.numun.org`). Empty for prod (apex = RootDomain).
+  HostedZoneId:
+    Type: String
+    Description: Route 53 hosted zone id for RootDomain.
   CloudFrontCertificateArn:
     Type: String
-    Description: ACM certificate ARN in us-east-1 covering numun.org + *.numun.org.
     AllowedPattern: "^arn:aws:acm:us-east-1:[0-9]{12}:certificate/.+$"
+    Description: >
+      ACM cert ARN in us-east-1 covering the apex and *.apex. For staging
+      this is `test.numun.org` + `*.test.numun.org`.
+
+Conditions:
+  HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
 
 Resources:
   # ── CloudFront Origin Access Controls ───────────────────────────────────────
@@ -25,7 +50,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: numun-org-site-oac
+        Name: !Sub "numun-${Env}-site-oac"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -34,7 +59,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: numun-org-portal-oac
+        Name: !Sub "numun-${Env}-portal-oac"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -43,7 +68,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: numun-org-cms-oac
+        Name: !Sub "numun-${Env}-cms-oac"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -52,7 +77,7 @@ Resources:
     Type: AWS::CloudFront::OriginAccessControl
     Properties:
       OriginAccessControlConfig:
-        Name: numun-org-assets-oac
+        Name: !Sub "numun-${Env}-assets-oac"
         OriginAccessControlOriginType: s3
         SigningBehavior: always
         SigningProtocol: sigv4
@@ -62,7 +87,7 @@ Resources:
     Type: AWS::CloudFront::ResponseHeadersPolicy
     Properties:
       ResponseHeadersPolicyConfig:
-        Name: numun-prod-security-headers
+        Name: !Sub "numun-${Env}-security-headers"
         SecurityHeadersConfig:
           StrictTransportSecurity:
             AccessControlMaxAgeSec: 31536000
@@ -79,34 +104,41 @@ Resources:
             Override: true
 
   # ── www → apex + legacy /portal redirect ────────────────────────────────────
+  # Apex is computed per-environment via Fn::Sub. For staging the apex is
+  # `test.numun.org` so the function redirects `www.test.numun.org` → `test.numun.org`.
   WwwRedirectFunction:
     Type: AWS::CloudFront::Function
     Properties:
-      Name: numun-www-redirect
+      Name: !Sub "numun-${Env}-www-redirect"
       AutoPublish: true
       FunctionConfig:
-        Comment: Canonicalize numun.org host + legacy /portal redirect.
+        Comment: !Sub "Canonicalize ${Env} apex host + legacy /portal redirect."
         Runtime: cloudfront-js-2.0
-      FunctionCode: |
-        function handler(event) {
-          var request = event.request;
-          var host = request.headers.host && request.headers.host.value;
-          if (host === 'www.numun.org') {
-            return {
-              statusCode: 301,
-              statusDescription: 'Moved Permanently',
-              headers: { location: { value: 'https://numun.org' + request.uri } },
-            };
+      FunctionCode: !Sub
+        - |
+          function handler(event) {
+            var request = event.request;
+            var host = request.headers.host && request.headers.host.value;
+            if (host === 'www.${Apex}') {
+              return {
+                statusCode: 301,
+                statusDescription: 'Moved Permanently',
+                headers: { location: { value: 'https://${Apex}' + request.uri } },
+              };
+            }
+            if (request.uri === '/portal' || request.uri.indexOf('/portal/') === 0) {
+              return {
+                statusCode: 301,
+                statusDescription: 'Moved Permanently',
+                headers: { location: { value: 'https://portal.${Apex}' + request.uri.substring(7) } },
+              };
+            }
+            return request;
           }
-          if (request.uri === '/portal' || request.uri.indexOf('/portal/') === 0) {
-            return {
-              statusCode: 301,
-              statusDescription: 'Moved Permanently',
-              headers: { location: { value: 'https://portal.numun.org' + request.uri.substring(7) } },
-            };
-          }
-          return request;
-        }
+        - Apex: !If
+            - HasSubdomain
+            - !Sub "${EnvSubdomain}.${RootDomain}"
+            - !Ref RootDomain
 
   # ── CloudFront distributions ────────────────────────────────────────────────
   SiteDistribution:
@@ -114,10 +146,16 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: numun.org landing site
+        Comment: !Sub "Landing site for ${Env}"
         Aliases:
-          - numun.org
-          - www.numun.org
+          - !If
+            - HasSubdomain
+            - !Sub "${EnvSubdomain}.${RootDomain}"
+            - !Ref RootDomain
+          - !If
+            - HasSubdomain
+            - !Sub "www.${EnvSubdomain}.${RootDomain}"
+            - !Sub "www.${RootDomain}"
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_100
@@ -128,7 +166,7 @@ Resources:
         Origins:
           - Id: site-bucket
             DomainName:
-              Fn::ImportValue: numun-prod-base-data-SiteBucketRegionalDomain
+              Fn::ImportValue: !Sub "numun-${Env}-base-data-SiteBucketRegionalDomain"
             S3OriginConfig: {}
             OriginAccessControlId: !GetAtt SiteOAC.Id
         DefaultCacheBehavior:
@@ -148,9 +186,12 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: portal.numun.org SPA
+        Comment: !Sub "Portal SPA for ${Env}"
         Aliases:
-          - portal.numun.org
+          - !If
+            - HasSubdomain
+            - !Sub "portal.${EnvSubdomain}.${RootDomain}"
+            - !Sub "portal.${RootDomain}"
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_100
@@ -170,7 +211,7 @@ Resources:
         Origins:
           - Id: portal-bucket
             DomainName:
-              Fn::ImportValue: numun-prod-base-data-PortalBucketRegionalDomain
+              Fn::ImportValue: !Sub "numun-${Env}-base-data-PortalBucketRegionalDomain"
             S3OriginConfig: {}
             OriginAccessControlId: !GetAtt PortalOAC.Id
         DefaultCacheBehavior:
@@ -187,9 +228,12 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: cms.numun.org Decap admin bundle
+        Comment: !Sub "Decap admin bundle for ${Env}"
         Aliases:
-          - cms.numun.org
+          - !If
+            - HasSubdomain
+            - !Sub "cms.${EnvSubdomain}.${RootDomain}"
+            - !Sub "cms.${RootDomain}"
         DefaultRootObject: index.html
         HttpVersion: http2and3
         PriceClass: PriceClass_100
@@ -200,7 +244,7 @@ Resources:
         Origins:
           - Id: cms-bucket
             DomainName:
-              Fn::ImportValue: numun-prod-base-data-CmsBucketRegionalDomain
+              Fn::ImportValue: !Sub "numun-${Env}-base-data-CmsBucketRegionalDomain"
             S3OriginConfig: {}
             OriginAccessControlId: !GetAtt CmsOAC.Id
         DefaultCacheBehavior:
@@ -217,9 +261,12 @@ Resources:
     Properties:
       DistributionConfig:
         Enabled: true
-        Comment: assets.numun.org public files (BG guides, CMS images)
+        Comment: !Sub "Public files (BG guides, CMS images) for ${Env}"
         Aliases:
-          - assets.numun.org
+          - !If
+            - HasSubdomain
+            - !Sub "assets.${EnvSubdomain}.${RootDomain}"
+            - !Sub "assets.${RootDomain}"
         HttpVersion: http2and3
         PriceClass: PriceClass_100
         ViewerCertificate:
@@ -229,7 +276,7 @@ Resources:
         Origins:
           - Id: assets-bucket
             DomainName:
-              Fn::ImportValue: numun-prod-base-data-AssetsBucketRegionalDomain
+              Fn::ImportValue: !Sub "numun-${Env}-base-data-AssetsBucketRegionalDomain"
             S3OriginConfig: {}
             OriginAccessControlId: !GetAtt AssetsOAC.Id
         DefaultCacheBehavior:
@@ -241,12 +288,10 @@ Resources:
           CachePolicyId: 658327ea-f89d-4fab-a63d-7e88639e58f6
 
   # ── Bucket policies (tie each S3 bucket to its single CloudFront OAC) ──────
-  # Imports bucket ARNs from base-data via Fn::ImportValue and resolves bucket
-  # names from those ARNs (last segment).
   SiteBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: numun-org-site
+      Bucket: !Sub "numun-${Env}-site"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -256,7 +301,8 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub
               - "${Arn}/*"
-              - { Arn: !ImportValue numun-prod-base-data-SiteBucketArn }
+              - Arn:
+                  Fn::ImportValue: !Sub "numun-${Env}-base-data-SiteBucketArn"
             Condition:
               StringEquals:
                 "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${SiteDistribution}"
@@ -264,7 +310,7 @@ Resources:
   PortalBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: numun-org-portal
+      Bucket: !Sub "numun-${Env}-portal"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -274,7 +320,8 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub
               - "${Arn}/*"
-              - { Arn: !ImportValue numun-prod-base-data-PortalBucketArn }
+              - Arn:
+                  Fn::ImportValue: !Sub "numun-${Env}-base-data-PortalBucketArn"
             Condition:
               StringEquals:
                 "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${PortalDistribution}"
@@ -282,7 +329,7 @@ Resources:
   CmsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: numun-org-cms
+      Bucket: !Sub "numun-${Env}-cms"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -292,7 +339,8 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub
               - "${Arn}/*"
-              - { Arn: !ImportValue numun-prod-base-data-CmsBucketArn }
+              - Arn:
+                  Fn::ImportValue: !Sub "numun-${Env}-base-data-CmsBucketArn"
             Condition:
               StringEquals:
                 "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${CmsDistribution}"
@@ -300,7 +348,7 @@ Resources:
   AssetsBucketPolicy:
     Type: AWS::S3::BucketPolicy
     Properties:
-      Bucket: numun-org-assets
+      Bucket: !Sub "numun-${Env}-assets"
       PolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -310,10 +358,84 @@ Resources:
             Action: s3:GetObject
             Resource: !Sub
               - "${Arn}/*"
-              - { Arn: !ImportValue numun-prod-base-data-AssetsBucketArn }
+              - Arn:
+                  Fn::ImportValue: !Sub "numun-${Env}-base-data-AssetsBucketArn"
             Condition:
               StringEquals:
                 "AWS:SourceArn": !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/${AssetsDistribution}"
+
+  # ── Route 53 alias records ────────────────────────────────────────────────
+  # Point each public subdomain at its CloudFront distribution. CloudFront's
+  # zone id is the magic constant Z2FDTNDATAQYW2 (us-east-1 / global).
+  SiteApexRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - HasSubdomain
+        - !Sub "${EnvSubdomain}.${RootDomain}."
+        - !Sub "${RootDomain}."
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt SiteDistribution.DomainName
+        EvaluateTargetHealth: false
+
+  SiteWwwRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - HasSubdomain
+        - !Sub "www.${EnvSubdomain}.${RootDomain}."
+        - !Sub "www.${RootDomain}."
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt SiteDistribution.DomainName
+        EvaluateTargetHealth: false
+
+  PortalRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - HasSubdomain
+        - !Sub "portal.${EnvSubdomain}.${RootDomain}."
+        - !Sub "portal.${RootDomain}."
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt PortalDistribution.DomainName
+        EvaluateTargetHealth: false
+
+  CmsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - HasSubdomain
+        - !Sub "cms.${EnvSubdomain}.${RootDomain}."
+        - !Sub "cms.${RootDomain}."
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt CmsDistribution.DomainName
+        EvaluateTargetHealth: false
+
+  AssetsRecord:
+    Type: AWS::Route53::RecordSet
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      Name: !If
+        - HasSubdomain
+        - !Sub "assets.${EnvSubdomain}.${RootDomain}."
+        - !Sub "assets.${RootDomain}."
+      Type: A
+      AliasTarget:
+        HostedZoneId: Z2FDTNDATAQYW2
+        DNSName: !GetAtt AssetsDistribution.DomainName
+        EvaluateTargetHealth: false
 
 Outputs:
   SiteDistributionId:

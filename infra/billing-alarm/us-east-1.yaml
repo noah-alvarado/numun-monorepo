@@ -8,6 +8,10 @@ Description: >
   Reference: INFRASTRUCTURE.md §3.9, SECURITY.md §6.5.
 
 Parameters:
+  Env:
+    Type: String
+    AllowedPattern: "^[a-z][a-z0-9-]*$"
+    Description: Environment qualifier baked into resource names.
   AlarmEmail:
     Type: String
     Description: Email subscribed to the billing-alarm SNS topic.
@@ -20,7 +24,7 @@ Resources:
   BillingAlarmsTopic:
     Type: AWS::SNS::Topic
     Properties:
-      TopicName: numun-prod-billing-alarms
+      TopicName: !Sub "numun-${Env}-billing-alarms"
       DisplayName: NUMUN Billing Alarm
 
   BillingAlarmsSubscription:
@@ -33,7 +37,7 @@ Resources:
   EstimatedChargesAlarm:
     Type: AWS::CloudWatch::Alarm
     Properties:
-      AlarmName: numun-prod-estimated-monthly-charges
+      AlarmName: !Sub "numun-${Env}-estimated-monthly-charges"
       AlarmDescription: !Sub "Estimated monthly AWS charges exceeded $${ThresholdUsd}."
       Namespace: AWS/Billing
       MetricName: EstimatedCharges
