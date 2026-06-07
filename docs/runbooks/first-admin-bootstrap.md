@@ -28,10 +28,13 @@ The api stack publishes the function ARN as the
 `CognitoPostConfirmationFunctionArn` output; attach it manually:
 
 ```bash
+# Substitute $ENV (e.g. `test` or `prod`) and the actual pool id.
+USER_POOL_ID=<from cloudformation describe-stacks numun-${ENV}-base-data>
+
 aws cognito-idp update-user-pool \
-  --user-pool-id us-east-2_mFmtWvKtQ \
+  --user-pool-id "$USER_POOL_ID" \
   --lambda-config "PostConfirmation=$(aws cloudformation describe-stacks \
-      --stack-name numun-prod-api \
+      --stack-name numun-${ENV}-api \
       --query \"Stacks[0].Outputs[?OutputKey=='CognitoPostConfirmationFunctionArn'].OutputValue | [0]\" \
       --output text)"
 ```
@@ -46,7 +49,7 @@ against `infra/base-data/template.yaml` before running.
 ```bash
 ADMIN_EMAIL="ops@numun.org"               # the first human admin
 ADMIN_NAME="NUMUN Ops"
-USER_POOL_ID="us-east-2_mFmtWvKtQ"
+# USER_POOL_ID already set from §1 above.
 
 aws cognito-idp admin-create-user \
   --user-pool-id "$USER_POOL_ID" \
@@ -83,7 +86,7 @@ queryable beforehand and avoids race conditions in scripts that immediately
 look up the row:
 
 ```bash
-TABLE="numun-prod"
+TABLE="numun-${ENV}"
 NOW=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 aws dynamodb put-item \
@@ -122,13 +125,13 @@ already exists, the call fails harmlessly with
 
 ### 5. Audit the action
 
-Tail CloudWatch logs for `numun-prod-api-cognito-post-confirmation` and
-`numun-prod-api` to confirm clean operation, and check the audit table for
+Tail CloudWatch logs for `numun-${ENV}-api-cognito-post-confirmation` and
+`numun-${ENV}-api` to confirm clean operation, and check the audit table for
 the `sign_in_succeeded` event:
 
 ```bash
 aws dynamodb query \
-  --table-name numun-prod \
+  --table-name "numun-${ENV}" \
   --key-condition-expression "PK = :pk AND begins_with(SK, :sk)" \
   --expression-attribute-values "{
     \":pk\":{\"S\":\"USER#${SUB}\"},

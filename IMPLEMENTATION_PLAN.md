@@ -67,6 +67,20 @@ The SES domain identity from M1 is verified by now and ideally sandbox-exited. C
 
 **Verification:** End-to-end advisor self-sign-up works in prod; `UserService.GetMe` returns the caller's profile; logout clears cookies and invalidates the Session row.
 
+### M2.7 — Staging environment + IaC parameterization
+
+Goal: The current single-account "prod" deployment becomes a proper `test` staging environment, and the same SAM templates can stand up a future real-prod stack in a different AWS account by passing `Env=prod`.
+
+- All five SAM templates (`infra/bootstrap`, `infra/base-data`, `infra/base-cdn`, `infra/api`, `infra/billing-alarm`) accept an `Env` parameter that threads through every named resource and cross-stack Export. `numun-prod-*` and `numun-org-*` literals are gone.
+- Templates also accept `RootDomain` (default `numun.org`) and `EnvSubdomain` (empty for prod, `test` for staging) and compose the effective apex via a `HasSubdomain` Condition. Cookie domain, CORS origins, CloudFront aliases, API Gateway custom domain, and the www-redirect CloudFront function body all derive from the composed apex.
+- `base-cdn` adds the five Route 53 alias records (apex, www, portal, cms, assets) that were deferred in M1, so each env owns its own DNS records once the hosted zone is authoritative.
+- GitHub deploy workflows flip `environment:` from `nalvarado` to `test`. Stack/bucket names derive from `${{ vars.ENV_NAME }}`. The portal build picks up `VITE_API_BASE_URL`, `VITE_COGNITO_USER_POOL_ID`, and `VITE_COGNITO_CLIENT_ID` from env-scoped vars.
+- App-code: `defaultTableName = "numun-prod"` is gone — `DDB_TABLE_NAME` is now required at boot. Local-dev parity (docker-compose, LocalStack init, sam-env-vars.json, `make seed`) renames to `numun-test-*` to match the staging shape.
+- New runbook `/docs/runbooks/fresh-environment-deploy.md` captures the full teardown + rebuild procedure so a future real-prod buildout in a new AWS account is a single document away.
+- New `/scripts/verify-deploy.sh` generalizes the M2 verification one-shot for any env/pool/admin combination.
+
+**Verification:** A clean teardown of `numun-prod-*` followed by a rebuild as `numun-test-*` results in CI green on a no-op push, the bootstrapped admin in the new pool round-trips Exchange → GetMe → Logout via `scripts/verify-deploy.sh`, and the runbook is followable end-to-end without local-state cheats.
+
 ### M3 — Data layer + first entity flows
 
 Goal: An advisor registers a delegation; a staff-admin approves it.
@@ -209,20 +223,24 @@ Goal: All the SECURITY.md operational controls actually exist.
 ## Inter-milestone dependencies
 
 ```
-M0 ── M1 ── M2 ── M3 ── M4 ── M6 ── M7 ── M10 ── M11 ── M12
-            │      │     │     │     │
-            │      └──── M5    │     │
-            │            │     │     │
-            │            │     │     M8
-            │            │     │
-            │            └─── M9 (triggered by M3/M8/M7 events; templates can land later)
+M0 ── M1 ── M2 ── M2.7 ── M3 ── M4 ── M6 ── M7 ── M10 ── M11 ── M12
+            │             │     │     │     │
+            │             └──── M5    │     │
+            │                   │     │     │
+            │                   │     │     M8
+            │                   │     │
+            │                   └─── M9 (triggered by M3/M8/M7 events; templates can land later)
             │
             (M2 has internal M2.5 SES-Cognito wiring step that depends on M1's
-             SES domain identity verification done as an out-of-SAM manual step)
+             SES domain identity verification done as an out-of-SAM manual step.
+             M2.7 reshapes the prod AWS account into a `test` staging environment
+             and parameterizes the IaC so a future real-prod stack can come up
+             in a new account.)
 ```
 
 Critical chains:
-- **M2 blocks M3, M4** (auth needed for both).
+- **M2 blocks M2.7, M3, M4** (auth needed for both).
+- **M2.7 blocks M3** only in the sense that M3's new entities should land on the renamed table — it isn't a hard sequencing requirement on the code, but is on the runtime resource shape.
 - **M3 blocks M4, M5, M6, M7, M8, M9** (entities + repos + scope helpers).
 - **M5 needs the Lambdalith and PublicService deployed** (M3 slice), but is otherwise independent of M4 — can run in parallel.
 - **M6 needs DelegateService (M3) + S3 uploads + safe-http-client.**
