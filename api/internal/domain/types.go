@@ -25,19 +25,19 @@ const (
 
 // User is the application-side profile mirror of a Cognito identity.
 type User struct {
-	ID                  string
-	Role                Role
-	Email               string
-	Name                string
-	Phone               string
-	EmailStatus         EmailStatus
-	AnnouncementsOptIn  bool
-	IsDeleted           bool
-	Version             int
-	CreatedAt           time.Time
-	UpdatedAt           time.Time
-	CreatedBy           string
-	UpdatedBy           string
+	ID                 string
+	Role               Role
+	Email              string
+	Name               string
+	Phone              string
+	EmailStatus        EmailStatus
+	AnnouncementsOptIn bool
+	IsDeleted          bool
+	Version            int
+	CreatedAt          time.Time
+	UpdatedAt          time.Time
+	CreatedBy          string
+	UpdatedBy          string
 }
 
 // Session is a server-side opaque session row keyed by the value placed in the
