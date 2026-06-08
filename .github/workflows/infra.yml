@@ -1,0 +1,117 @@
+name: deploy infra
+
+# Deploys the base infrastructure stacks (base-data, base-cdn, billing-alarm).
+# Manual-only — these change rarely and shouldn't auto-deploy on every push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      stack:
+        description: Which stack to deploy
+        required: true
+        default: all
+        type: choice
+        options:
+          - all
+          - base-data
+          - base-cdn
+          - billing-alarm
+
+permissions:
+  id-token: write # OIDC
+  contents: read
+
+concurrency:
+  group: deploy-infra
+  cancel-in-progress: false
+
+jobs:
+  base-data:
+    if: ${{ inputs.stack == 'all' || inputs.stack == 'base-data' }}
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      AWS_REGION: us-east-2
+      STACK_NAME: numun-${{ vars.ENV_NAME }}-base-data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: deploy
+        working-directory: infra/base-data
+        run: |
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --template-file template.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Env=${{ vars.ENV_NAME }} \
+              RootDomain=${{ vars.ROOT_DOMAIN }} \
+              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
+              AlarmEmail=${{ vars.ALARM_EMAIL }}
+
+  base-cdn:
+    if: ${{ inputs.stack == 'all' || inputs.stack == 'base-cdn' }}
+    needs: [base-data]
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      AWS_REGION: us-east-2
+      STACK_NAME: numun-${{ vars.ENV_NAME }}-base-cdn
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/setup-sam@v2
+        with:
+          use-installer: true
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: deploy
+        working-directory: infra/base-cdn
+        run: |
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --template-file template.yaml \
+            --capabilities CAPABILITY_NAMED_IAM \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Env=${{ vars.ENV_NAME }} \
+              RootDomain=${{ vars.ROOT_DOMAIN }} \
+              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
+              HostedZoneId=${{ vars.HOSTED_ZONE_ID }} \
+              CloudFrontCertificateArn=${{ vars.CDN_CERTIFICATE_ARN }}
+
+  billing-alarm:
+    if: ${{ inputs.stack == 'all' || inputs.stack == 'billing-alarm' }}
+    runs-on: ubuntu-latest
+    environment: test
+    env:
+      AWS_REGION: us-east-1
+      STACK_NAME: numun-${{ vars.ENV_NAME }}-billing-alarm
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: deploy
+        working-directory: infra/billing-alarm
+        run: |
+          aws cloudformation deploy \
+            --stack-name "$STACK_NAME" \
+            --region "$AWS_REGION" \
+            --template-file us-east-1.yaml \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              Env=${{ vars.ENV_NAME }} \
+              AlarmEmail=${{ vars.ALARM_EMAIL }} \
+              ThresholdUsd=${{ vars.BILLING_THRESHOLD_USD || '10' }}

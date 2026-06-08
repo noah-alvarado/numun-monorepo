@@ -2,11 +2,11 @@ AWSTemplateFormatVersion: "2010-09-09"
 Description: >
   NUMUN — one-time bootstrap stack.
 
-  Provisions the GitHub Actions OIDC identity provider, four per-workflow
-  deploy roles (api, site, portal, cms), and the shared SAM artifacts bucket
-  used by `sam deploy`. Deployed once from a workstation via the break-glass
-  IAM user; subsequent deploys flow through GitHub Actions via the roles
-  created here.
+  Provisions the GitHub Actions OIDC identity provider, five per-workflow
+  deploy roles (api, site, portal, cms, infra), and the shared SAM artifacts
+  bucket used by `sam deploy`. Deployed once from a workstation via the
+  break-glass IAM user; subsequent deploys flow through GitHub Actions via
+  the roles created here.
 
   Region: us-east-2.
   Reference: SECURITY.md §3.2, INFRASTRUCTURE.md §3.10.
@@ -322,6 +322,194 @@ Resources:
                   - cloudfront:ListDistributions
                 Resource: "*"
 
+  # ── Infra role: deploys base-data + base-cdn (us-east-2) and the
+  # ── billing-alarm stack (us-east-1). Broader perms than the per-app
+  # ── roles because these stacks touch DynamoDB, Cognito, CloudFront,
+  # ── Route53, SSM, SNS, and CloudWatch — all scoped by name prefix.
+  DeployRoleInfra:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "numun-${Env}-deploy-infra"
+      Description: GitHub Actions OIDC role for the base-data, base-cdn, and billing-alarm stacks.
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+              StringLike:
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}"
+      Policies:
+        - PolicyName: infra-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              # CloudFormation operations on the three infra stacks (any region).
+              - Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:DescribeStackResource
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:ListStacks
+                  - cloudformation:ListStackResources
+                  - cloudformation:ValidateTemplate
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                Resource:
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/numun-${Env}-base-data/*"
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
+                  - !Sub "arn:aws:cloudformation:*:${AWS::AccountId}:stack/numun-${Env}-billing-alarm/*"
+              # S3 buckets created/managed by base-data (DDB exports use the
+              # numun-${Env}-* prefix; OAC bucket policies are on the same).
+              - Effect: Allow
+                Action:
+                  - s3:CreateBucket
+                  - s3:DeleteBucket
+                  - s3:PutBucketPolicy
+                  - s3:DeleteBucketPolicy
+                  - s3:GetBucketPolicy
+                  - s3:PutBucketVersioning
+                  - s3:GetBucketVersioning
+                  - s3:PutBucketPublicAccessBlock
+                  - s3:GetBucketPublicAccessBlock
+                  - s3:PutBucketCORS
+                  - s3:GetBucketCORS
+                  - s3:PutEncryptionConfiguration
+                  - s3:GetEncryptionConfiguration
+                  - s3:PutBucketTagging
+                  - s3:GetBucketTagging
+                  - s3:ListBucket
+                  - s3:GetBucketLocation
+                Resource:
+                  - !Sub "arn:aws:s3:::numun-${Env}-*"
+              # DynamoDB single-table.
+              - Effect: Allow
+                Action:
+                  - dynamodb:CreateTable
+                  - dynamodb:DeleteTable
+                  - dynamodb:DescribeTable
+                  - dynamodb:UpdateTable
+                  - dynamodb:UpdateContinuousBackups
+                  - dynamodb:DescribeContinuousBackups
+                  - dynamodb:TagResource
+                  - dynamodb:UntagResource
+                  - dynamodb:ListTagsOfResource
+                Resource:
+                  - !Sub "arn:aws:dynamodb:*:${AWS::AccountId}:table/numun-${Env}*"
+              # Cognito user pool + client.
+              - Effect: Allow
+                Action:
+                  - cognito-idp:CreateUserPool
+                  - cognito-idp:DeleteUserPool
+                  - cognito-idp:DescribeUserPool
+                  - cognito-idp:UpdateUserPool
+                  - cognito-idp:CreateUserPoolClient
+                  - cognito-idp:DeleteUserPoolClient
+                  - cognito-idp:DescribeUserPoolClient
+                  - cognito-idp:UpdateUserPoolClient
+                  - cognito-idp:TagResource
+                  - cognito-idp:UntagResource
+                  - cognito-idp:ListTagsForResource
+                  - cognito-idp:SetUserPoolMfaConfig
+                  - cognito-idp:GetUserPoolMfaConfig
+                Resource: "*"
+              # SSM parameters published by base-data.
+              - Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                Resource:
+                  - !Sub "arn:aws:ssm:*:${AWS::AccountId}:parameter/numun/${Env}/*"
+              # SNS topics (alarms in us-east-2, billing-alarms in us-east-1).
+              - Effect: Allow
+                Action:
+                  - sns:CreateTopic
+                  - sns:DeleteTopic
+                  - sns:GetTopicAttributes
+                  - sns:SetTopicAttributes
+                  - sns:Subscribe
+                  - sns:Unsubscribe
+                  - sns:ListSubscriptionsByTopic
+                  - sns:TagResource
+                  - sns:UntagResource
+                Resource:
+                  - !Sub "arn:aws:sns:*:${AWS::AccountId}:numun-${Env}-*"
+              # CloudWatch alarms (DDB throttles, billing).
+              - Effect: Allow
+                Action:
+                  - cloudwatch:PutMetricAlarm
+                  - cloudwatch:DeleteAlarms
+                  - cloudwatch:DescribeAlarms
+                  - cloudwatch:TagResource
+                  - cloudwatch:UntagResource
+                  - cloudwatch:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:cloudwatch:*:${AWS::AccountId}:alarm:numun-${Env}-*"
+              # CloudFront distributions, functions, OACs, response-headers policies.
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateDistribution
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:ListDistributions
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:CreateOriginAccessControl
+                  - cloudfront:UpdateOriginAccessControl
+                  - cloudfront:DeleteOriginAccessControl
+                  - cloudfront:GetOriginAccessControl
+                  - cloudfront:GetOriginAccessControlConfig
+                  - cloudfront:CreateFunction
+                  - cloudfront:UpdateFunction
+                  - cloudfront:DeleteFunction
+                  - cloudfront:DescribeFunction
+                  - cloudfront:GetFunction
+                  - cloudfront:PublishFunction
+                  - cloudfront:CreateResponseHeadersPolicy
+                  - cloudfront:UpdateResponseHeadersPolicy
+                  - cloudfront:DeleteResponseHeadersPolicy
+                  - cloudfront:GetResponseHeadersPolicy
+                Resource: "*"
+              # Route53 record sets in the numun.org hosted zone.
+              - Effect: Allow
+                Action:
+                  - route53:ChangeResourceRecordSets
+                  - route53:GetHostedZone
+                  - route53:ListResourceRecordSets
+                  - route53:GetChange
+                Resource:
+                  - "arn:aws:route53:::hostedzone/*"
+                  - "arn:aws:route53:::change/*"
+              # SAM packaging bucket (templates aren't currently SAM but this is
+              # cheap to keep in case base-cdn grows a Lambda@Edge).
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                  - s3:DeleteObject
+                  - s3:GetObjectVersion
+                Resource:
+                  - !Sub "arn:aws:s3:::numun-${Env}-sam-deploys-${AWS::AccountId}"
+                  - !Sub "arn:aws:s3:::numun-${Env}-sam-deploys-${AWS::AccountId}/*"
+
 Outputs:
   OIDCProviderArn:
     Description: ARN of the GitHub Actions OIDC identity provider.
@@ -341,3 +529,6 @@ Outputs:
   DeployRoleCmsArn:
     Description: ARN to set as role-to-assume in .github/workflows/cms.yml.
     Value: !GetAtt DeployRoleCms.Arn
+  DeployRoleInfraArn:
+    Description: ARN to set as role-to-assume in .github/workflows/infra.yml.
+    Value: !GetAtt DeployRoleInfra.Arn
