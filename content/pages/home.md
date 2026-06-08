@@ -7,7 +7,8 @@ hero:
     alt: NUMUN delegates at conference
   primaryCta:
     label: Register
-    href: https://portal.numun.org/sign-up
+    # Empty href falls back to the env-appropriate portal at render time.
+    href: ""
   secondaryCta:
     label: Learn more
     href: /about

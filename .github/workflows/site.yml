@@ -63,6 +63,10 @@ jobs:
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - name: build site
+        # SITE_BASE flows into `Astro.site` so canonical URLs, sitemap.xml,
+        # and feed.xml carry the env's apex.
+        env:
+          SITE_BASE: https://${{ vars.APEX_DOMAIN }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
         with:

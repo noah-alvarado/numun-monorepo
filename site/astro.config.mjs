@@ -6,8 +6,11 @@ import rehypeSanitize from "rehype-sanitize";
 
 // Site is environment-aware: SITE_BASE is set in CI per environment so
 // `<link rel="canonical">`, sitemap.xml, and feed.xml all carry the right
-// origin. Default for local dev is the staging origin so editors can preview.
-const site = process.env.SITE_BASE ?? "https://test.numun.org";
+// origin. The deploy workflow (.github/workflows/site.yml) wires it from
+// `vars.APEX_DOMAIN`. Falling back to a localhost sentinel for local `astro
+// dev` keeps the build green without ever silently shipping a wrong origin
+// to prod.
+const site = process.env.SITE_BASE ?? "http://localhost:4321";
 
 // https://astro.build/config
 export default defineConfig({

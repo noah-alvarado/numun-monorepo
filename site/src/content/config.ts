@@ -40,6 +40,13 @@ const ctaShape = z.object({
   href: z.string(),
 });
 
+// Hero primary CTA: href is optional. Empty / unset → renderer falls back to
+// the env-appropriate portal URL (site/src/lib/site-urls.ts).
+const heroPrimaryCtaShape = z.object({
+  label: z.string().max(30),
+  href: z.string().optional(),
+});
+
 // ── singletons under /content/pages/ ────────────────────────────────────────
 
 const home = defineCollection({
@@ -49,7 +56,7 @@ const home = defineCollection({
       headline: z.string().max(100),
       subheadline: z.string().max(200),
       image,
-      primaryCta: ctaShape,
+      primaryCta: heroPrimaryCtaShape,
       secondaryCta: ctaShape.optional(),
     }),
     intro: z.object({
@@ -95,7 +102,11 @@ const hostedConference = defineCollection({
     tagline: z.string().max(200),
     forAdvisorsBody: z.string().optional(),
     forDelegatesBody: z.string().optional(),
-    registrationPortalUrl: z.string().default("https://portal.numun.org"),
+    // Optional override. When empty, the page renders the env-appropriate
+    // portal URL (https://portal.<apex>) computed from Astro.site at build
+    // time. Keeping the default out of the schema avoids baking the wrong
+    // origin into prod or test content trees.
+    registrationPortalUrl: z.string().optional(),
     seo,
   }),
 });

@@ -1,6 +1,7 @@
 ---
 import { getEntry, render } from "astro:content";
 import Layout from "@/layouts/Layout.astro";
+import { portalUrl } from "@/lib/site-urls";
 
 import activeConference from "@/data/active-conference";
 
@@ -9,6 +10,13 @@ if (!home) throw new Error("content/pages/home.md is required");
 const { Content } = await render(home);
 const { hero, intro, featuredSections, currentConferenceTeaser, seo } =
   home.data;
+
+// Env-aware register URL: prefer the CMS-supplied CTA href; fall back to the
+// env's portal sign-up URL so test deploys never link to prod.
+if (!Astro.site) throw new Error("Astro.site is required (set SITE_BASE)");
+const heroPrimaryHref =
+  hero.primaryCta.href || portalUrl(Astro.site, "/sign-up");
+const registerUrl = portalUrl(Astro.site, "/sign-up");
 
 const conf = activeConference;
 ---
@@ -31,7 +39,7 @@ const conf = activeConference;
         </p>
         <div class="mt-5 flex flex-wrap gap-3">
           <a
-            href={hero.primaryCta.href}
+            href={heroPrimaryHref}
             class="rounded bg-nu-purple px-5 py-2 text-white"
           >
             {hero.primaryCta.label}
@@ -66,7 +74,7 @@ const conf = activeConference;
             Registration status: {conf.registrationStatus}
           </p>
           <a
-            href="https://portal.numun.org/sign-up"
+            href={registerUrl}
             class="mt-3 inline-block rounded bg-nu-purple px-4 py-1.5 text-sm text-white"
           >
             {currentConferenceTeaser?.overrideCtaLabel ?? "Register"}

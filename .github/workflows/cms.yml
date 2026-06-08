@@ -25,6 +25,26 @@ jobs:
       BUCKET: numun-${{ vars.ENV_NAME }}-cms
     steps:
       - uses: actions/checkout@v4
+      - name: Substitute env-specific domain in config.yml
+        # config.yml is committed with `__APEX_DOMAIN__` tokens; we resolve them
+        # here per env. APEX_DOMAIN is set on the env-scoped GitHub Environment
+        # (e.g. `test.numun.org` for test, `numun.org` for prod).
+        env:
+          APEX_DOMAIN: ${{ vars.APEX_DOMAIN }}
+        run: |
+          if [[ -z "$APEX_DOMAIN" ]]; then
+            echo "vars.APEX_DOMAIN is unset; cannot resolve config.yml placeholders." >&2
+            exit 1
+          fi
+          # In-place substitution into a build copy so the working tree stays clean.
+          mkdir -p cms-dist
+          cp -r cms/. cms-dist/
+          sed -i "s|__APEX_DOMAIN__|${APEX_DOMAIN}|g" cms-dist/config.yml
+          # Sanity-check: no placeholders should survive.
+          if grep -q "__APEX_DOMAIN__" cms-dist/config.yml; then
+            echo "Placeholder substitution failed; __APEX_DOMAIN__ still present." >&2
+            exit 1
+          fi
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ vars.DEPLOY_ROLE_CMS_ARN }}
@@ -32,7 +52,7 @@ jobs:
       - name: sync to S3
         # cms is just a Decap-CDN bootstrap + config.yml — static; no build.
         run: |
-          aws s3 sync cms/ "s3://$BUCKET/" \
+          aws s3 sync cms-dist/ "s3://$BUCKET/" \
             --delete \
             --exclude "package.json" \
             --exclude "node_modules/*" \

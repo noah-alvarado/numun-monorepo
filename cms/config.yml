@@ -16,13 +16,16 @@ backend:
   name: github
   repo: noah-alvarado/numun-monorepo
   branch: main
-  base_url: https://api.test.numun.org # OAuth proxy on the Lambdalith (staging)
+  # __APEX_DOMAIN__ is substituted at deploy time by .github/workflows/cms.yml
+  # using `vars.APEX_DOMAIN` for the env. Local edits to this file should keep
+  # the placeholder; never commit a resolved hostname.
+  base_url: https://api.__APEX_DOMAIN__
   auth_endpoint: cms-oauth/auth
 
 publish_mode: simple
 
-site_url: https://test.numun.org
-display_url: https://test.numun.org
+site_url: https://__APEX_DOMAIN__
+display_url: https://__APEX_DOMAIN__
 
 media_folder: content/uploads
 public_folder: /uploads
@@ -76,7 +79,15 @@ collections:
                       widget: string,
                       pattern: ["^.{1,30}$", "Max 30 characters"],
                     }
-                  - { name: href, label: Link, widget: string }
+                  - {
+                      name: href,
+                      label: Link,
+                      widget: string,
+                      required: false,
+                      hint:
+                        "Leave empty to use the env-appropriate portal sign-up URL
+                        (e.g. https://portal.numun.org/sign-up in prod).",
+                    }
               - name: secondaryCta
                 label: Secondary CTA
                 widget: object
@@ -268,7 +279,10 @@ collections:
               name: registrationPortalUrl,
               label: Registration portal URL,
               widget: string,
-              default: "https://portal.numun.org",
+              required: false,
+              hint:
+                "Optional override. When empty, the site renders the env-appropriate portal URL
+                (e.g., https://portal.numun.org in prod, https://portal.test.numun.org in test).",
             }
           - name: seo
             label: SEO
