@@ -476,6 +476,7 @@ Resources:
                   - cloudfront:ListDistributions
                   - cloudfront:TagResource
                   - cloudfront:UntagResource
+                  - cloudfront:ListTagsForResource
                   - cloudfront:CreateOriginAccessControl
                   - cloudfront:UpdateOriginAccessControl
                   - cloudfront:DeleteOriginAccessControl
