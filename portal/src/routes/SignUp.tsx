@@ -2,27 +2,44 @@ import { createSignal, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 
 import { signUp } from "@/lib/cognito";
+import { normalizePhone } from "@/lib/phone";
 
 export default function SignUp() {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [name, setName] = createSignal("");
   const [phone, setPhone] = createSignal("");
+  const [phoneError, setPhoneError] = createSignal<string | null>(null);
   const [pending, setPending] = createSignal(false);
   const [submitted, setSubmitted] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const navigate = useNavigate();
 
+  function validatePhoneOnBlur() {
+    if (!phone().trim()) {
+      setPhoneError(null);
+      return;
+    }
+    const result = normalizePhone(phone());
+    setPhoneError(result.ok ? null : result.reason);
+  }
+
   async function onSubmit(e: SubmitEvent) {
     e.preventDefault();
     setError(null);
+    const phoneResult = normalizePhone(phone());
+    if (!phoneResult.ok) {
+      setPhoneError(phoneResult.reason);
+      return;
+    }
+    setPhoneError(null);
     setPending(true);
     try {
       await signUp({
         email: email().trim(),
         password: password(),
         name: name().trim(),
-        phone: phone().trim(),
+        phone: phoneResult.e164,
       });
       setSubmitted(true);
     } catch (err) {
@@ -56,7 +73,7 @@ export default function SignUp() {
           </div>
         }
       >
-        <form class="mt-6 space-y-4" onSubmit={onSubmit}>
+        <form class="mt-6 space-y-4" onSubmit={onSubmit} novalidate>
           <label class="block">
             <span class="text-sm">Full name</span>
             <input
@@ -84,10 +101,27 @@ export default function SignUp() {
               type="tel"
               required
               autocomplete="tel"
+              inputmode="tel"
+              placeholder="e.g. 8472462882"
+              aria-invalid={phoneError() ? "true" : "false"}
+              aria-describedby={phoneError() ? "phone-error" : undefined}
               value={phone()}
-              onInput={(e) => setPhone(e.currentTarget.value)}
-              class="mt-1 block w-full rounded border border-nu-purple-200 px-3 py-2"
+              onInput={(e) => {
+                setPhone(e.currentTarget.value);
+                if (phoneError()) setPhoneError(null);
+              }}
+              onBlur={validatePhoneOnBlur}
+              class={`mt-1 block w-full rounded border px-3 py-2 ${
+                phoneError()
+                  ? "border-red-500 ring-1 ring-red-500 focus:outline-none focus:ring-red-600"
+                  : "border-nu-purple-200"
+              }`}
             />
+            <Show when={phoneError()}>
+              <p id="phone-error" class="mt-1 text-sm text-red-700">
+                {phoneError()}
+              </p>
+            </Show>
           </label>
           <label class="block">
             <span class="text-sm">
