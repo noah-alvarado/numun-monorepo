@@ -169,6 +169,12 @@ export default function AdminDelegations() {
                       </div>
                     </div>
                     <div class="flex gap-2">
+                      <a
+                        href={`/delegations/${d.id}`}
+                        class="rounded border border-nu-purple-300 px-3 py-1 text-sm text-nu-purple-700 hover:bg-nu-purple-50"
+                      >
+                        Open
+                      </a>
                       <button
                         type="button"
                         disabled={busy() === d.id}

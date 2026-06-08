@@ -1,0 +1,118 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// PaymentKind — the ledger entry's flavor. See DATA_MODEL.md §2.12.
+enum PaymentKind {
+  PAYMENT_KIND_UNSPECIFIED = 0;
+  // A charge against the delegation (increases balanceDue). Amount is signed
+  // negative on the ledger (debit) but the proto carries the absolute value
+  // for UX clarity; the server applies the sign based on kind.
+  PAYMENT_KIND_CHARGE = 1;
+  // A credit applied to the delegation (decreases balanceDue).
+  PAYMENT_KIND_PAYMENT = 2;
+  // Manual adjustment (sign-explicit; staff supplies a signed amount).
+  PAYMENT_KIND_ADJUSTMENT = 3;
+}
+
+// PaymentMethod — how the money moved. See DATA_MODEL.md §2.12.
+enum PaymentMethod {
+  PAYMENT_METHOD_UNSPECIFIED = 0;
+  PAYMENT_METHOD_CHECK = 1;
+  PAYMENT_METHOD_WIRE = 2;
+  PAYMENT_METHOD_CASH = 3;
+  PAYMENT_METHOD_OTHER = 4;
+}
+
+// PaymentRecord — DATA_MODEL.md §2.12. Append-only ledger entry; balance is
+// derived by summing the ledger but the parent Delegation carries a
+// denormalized cache (`balance_due`, `paid_in_full`) updated transactionally.
+message PaymentRecord {
+  string id = 1;
+  string conference_id = 2;
+  string delegation_id = 3;
+  Money amount = 4;
+  PaymentKind kind = 5;
+  PaymentMethod method = 6;
+  // Free-form reference (check number, wire confirmation, etc.).
+  string reference = 7;
+  string notes = 8;
+  string recorded_by = 9;
+  google.protobuf.Timestamp recorded_at = 10;
+
+  int32 version = 20;
+  google.protobuf.Timestamp created_at = 21;
+  google.protobuf.Timestamp updated_at = 22;
+}
+
+// PaymentService — DATA_MODEL.md §10.11. Reads scoped per AUTH.md §9.2;
+// writes are staff-admin only.
+service PaymentService {
+  rpc ListPayments(ListPaymentsRequest) returns (ListPaymentsResponse) {}
+  rpc ListAllPayments(ListAllPaymentsRequest) returns (ListAllPaymentsResponse) {}
+  rpc GetPayment(GetPaymentRequest) returns (GetPaymentResponse) {}
+  rpc RecordPayment(RecordPaymentRequest) returns (RecordPaymentResponse) {}
+  // UpdatePayment edits only `notes` and `reference`. Changes to `amount` /
+  // `kind` / `method` are intentionally not supported — record a new ledger
+  // entry instead so the audit trail stays intact. See plan ambiguity #7.
+  rpc UpdatePayment(UpdatePaymentRequest) returns (UpdatePaymentResponse) {}
+  rpc DeletePayment(DeletePaymentRequest) returns (DeletePaymentResponse) {}
+}
+
+message ListPaymentsRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  PageRequest page = 2;
+}
+message ListPaymentsResponse {
+  repeated PaymentRecord items = 1;
+  Page page = 2;
+}
+
+message ListAllPaymentsRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListAllPaymentsResponse {
+  repeated PaymentRecord items = 1;
+}
+
+message GetPaymentRequest {
+  string payment_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetPaymentResponse {
+  PaymentRecord payment = 1;
+}
+
+message RecordPaymentRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Always positive; the server applies sign based on kind. For
+  // PAYMENT_KIND_ADJUSTMENT the caller may supply a negative value in
+  // `signed_units`/`signed_cents` via the dedicated adjustment fields below.
+  Money amount = 2 [(buf.validate.field).required = true];
+  PaymentKind kind = 3;
+  PaymentMethod method = 4;
+  string reference = 5;
+  string notes = 6;
+}
+message RecordPaymentResponse {
+  PaymentRecord payment = 1;
+}
+
+message UpdatePaymentRequest {
+  string payment_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string reference = 2;
+  optional string notes = 3;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdatePaymentResponse {
+  PaymentRecord payment = 1;
+}
+
+message DeletePaymentRequest {
+  string payment_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message DeletePaymentResponse {}

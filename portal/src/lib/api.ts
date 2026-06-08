@@ -25,6 +25,7 @@ import {
   AssignmentService,
   AssignmentRunService,
 } from "@/gen/numun/v1/assignments_pb";
+import { PaymentService } from "@/gen/numun/v1/payments_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -87,3 +88,4 @@ export const assignmentRunClient = createClient(
   AssignmentRunService,
   transport,
 );
+export const paymentClient = createClient(PaymentService, transport);

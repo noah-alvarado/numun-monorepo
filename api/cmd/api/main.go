@@ -148,6 +148,15 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	assignmentRunPath, assignmentRunHandler := numunv1connect.NewAssignmentRunServiceHandler(assignmentRunSvc, opts)
 	mux.Handle(assignmentRunPath, assignmentRunHandler)
 
+	paymentSvc := &handlers.PaymentService{Store: st, Scoper: scoper, Logger: logger}
+	paymentPath, paymentHandler := numunv1connect.NewPaymentServiceHandler(paymentSvc, opts)
+	mux.Handle(paymentPath, paymentHandler)
+
+	// CSV export surface (API.md §12.1): non-Connect HTTP routes mounted on
+	// the same mux. Auth + CSRF middleware below covers them.
+	exportRoutes := &handlers.ExportRoutes{Store: st, Scoper: scoper, Logger: logger}
+	exportRoutes.Register(mux)
+
 	pubSvc := &handlers.PublicService{Store: st, Logger: logger}
 	pubPath, pubHandler := numunv1connect.NewPublicServiceHandler(pubSvc, opts)
 	mux.Handle(pubPath, pubHandler)

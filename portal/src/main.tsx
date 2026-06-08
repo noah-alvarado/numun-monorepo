@@ -50,6 +50,14 @@ render(
         )}
       />
       <Route
+        path="/delegations/:delegationId"
+        component={() => (
+          <AppShell>
+            <MyDelegation />
+          </AppShell>
+        )}
+      />
+      <Route
         path="/admin/delegations"
         component={() => (
           <AppShell>

@@ -457,6 +457,80 @@ func protoAssignmentRunStatus(s domain.AssignmentRunStatus) v1.AssignmentRunStat
 	return v1.AssignmentRunStatus_ASSIGNMENT_RUN_STATUS_UNSPECIFIED
 }
 
+// ── Payment ──────────────────────────────────────────────────────────────────
+
+func protoPaymentKind(k domain.PaymentKind) v1.PaymentKind {
+	switch k {
+	case domain.PaymentKindCharge:
+		return v1.PaymentKind_PAYMENT_KIND_CHARGE
+	case domain.PaymentKindPayment:
+		return v1.PaymentKind_PAYMENT_KIND_PAYMENT
+	case domain.PaymentKindAdjustment:
+		return v1.PaymentKind_PAYMENT_KIND_ADJUSTMENT
+	}
+	return v1.PaymentKind_PAYMENT_KIND_UNSPECIFIED
+}
+
+func domainPaymentKind(k v1.PaymentKind) (domain.PaymentKind, bool) {
+	switch k {
+	case v1.PaymentKind_PAYMENT_KIND_CHARGE:
+		return domain.PaymentKindCharge, true
+	case v1.PaymentKind_PAYMENT_KIND_PAYMENT:
+		return domain.PaymentKindPayment, true
+	case v1.PaymentKind_PAYMENT_KIND_ADJUSTMENT:
+		return domain.PaymentKindAdjustment, true
+	}
+	return "", false
+}
+
+func protoPaymentMethod(m domain.PaymentMethod) v1.PaymentMethod {
+	switch m {
+	case domain.PaymentMethodCheck:
+		return v1.PaymentMethod_PAYMENT_METHOD_CHECK
+	case domain.PaymentMethodWire:
+		return v1.PaymentMethod_PAYMENT_METHOD_WIRE
+	case domain.PaymentMethodCash:
+		return v1.PaymentMethod_PAYMENT_METHOD_CASH
+	case domain.PaymentMethodOther:
+		return v1.PaymentMethod_PAYMENT_METHOD_OTHER
+	}
+	return v1.PaymentMethod_PAYMENT_METHOD_UNSPECIFIED
+}
+
+func domainPaymentMethod(m v1.PaymentMethod) domain.PaymentMethod {
+	switch m {
+	case v1.PaymentMethod_PAYMENT_METHOD_CHECK:
+		return domain.PaymentMethodCheck
+	case v1.PaymentMethod_PAYMENT_METHOD_WIRE:
+		return domain.PaymentMethodWire
+	case v1.PaymentMethod_PAYMENT_METHOD_CASH:
+		return domain.PaymentMethodCash
+	}
+	return domain.PaymentMethodOther
+}
+
+func paymentToProto(p domain.PaymentRecord) *v1.PaymentRecord {
+	return &v1.PaymentRecord{
+		Id:           p.ID,
+		ConferenceId: p.ConferenceID,
+		DelegationId: p.DelegationID,
+		Amount: &v1.Money{
+			Currency: p.AmountCurrency,
+			Units:    p.AmountUnits,
+			Cents:    p.AmountCents,
+		},
+		Kind:       protoPaymentKind(p.Kind),
+		Method:     protoPaymentMethod(p.Method),
+		Reference:  p.Reference,
+		Notes:      p.Notes,
+		RecordedBy: p.RecordedBy,
+		RecordedAt: tsOrNilFor(p.RecordedAt),
+		Version:    int32(p.Version),
+		CreatedAt:  tsOrNilFor(p.CreatedAt),
+		UpdatedAt:  tsOrNilFor(p.UpdatedAt),
+	}
+}
+
 func assignmentRunToProto(r domain.AssignmentRun) *v1.AssignmentRun {
 	return &v1.AssignmentRun{
 		Id:              r.ID,

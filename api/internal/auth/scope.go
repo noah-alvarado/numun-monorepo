@@ -172,8 +172,18 @@ func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, assignmentID str
 	return s.MustHaveScopeOnDelegation(ctx, a.DelegationID)
 }
 
-// MustHaveScopeOnPayment — Payment repo lands in M8. Until then, admin-only.
-func (s *Scoper) MustHaveScopeOnPayment(ctx context.Context, _ string) error {
+// MustHaveScopeOnPayment gates access to a PaymentRecord id. Per API.md §9.2:
+//
+//   - staff-admin → always pass.
+//   - advisor → pass iff the caller has scope on the parent delegation.
+//   - staff-staffer → pass iff the caller has direct-oversight (case a) on
+//     the parent delegation. Committee-only (case c) staffers are denied —
+//     per API.md §9.2 the PaymentService reads row lists "scoped (a)" only,
+//     so payments are intentionally not visible via committee scope. The
+//     denial is already correct because MustHaveScopeOnDelegation returns
+//     ErrScopeDenied for staffers without a direct delegation link; case (c)
+//     is not resolved through that helper.
+func (s *Scoper) MustHaveScopeOnPayment(ctx context.Context, paymentID string) error {
 	c, ok := FromContext(ctx)
 	if !ok {
 		return ErrUnauthenticated
@@ -181,7 +191,17 @@ func (s *Scoper) MustHaveScopeOnPayment(ctx context.Context, _ string) error {
 	if c.Role == domain.RoleStaffAdmin {
 		return nil
 	}
-	return ErrScopeDenied
+	if s == nil || s.Store == nil {
+		return ErrScopeDenied
+	}
+	p, err := s.Store.FindPaymentByID(ctx, paymentID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return ErrScopeDenied
+		}
+		return err
+	}
+	return s.MustHaveScopeOnDelegation(ctx, p.DelegationID)
 }
 
 // MustHaveScopeOnConference gates Conference access. Reads on conferences

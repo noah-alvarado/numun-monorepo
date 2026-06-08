@@ -1,19 +1,21 @@
-// My Delegation — the first authenticated screen an advisor sees post-sign-in.
+// My Delegation — the first authenticated screen an advisor sees post-sign-in,
+// and the per-delegation drilldown reachable via /delegations/:delegationId
+// for staff-admin (and direct deep-links).
 //
 // Flow:
 //   1. AppShell guarantees a user + (best-effort) active conference.
-//   2. On mount we look up the caller's delegations within the active
-//      conference via DelegationService.ListAllDelegations. Server-side scope
-//      filtering keeps advisors to their own rows; admins see everything in
-//      the conference, but this screen always picks the first row matching
-//      the conference. Cross-conference history is M11.
-//   3. Zero rows → render the create form. Non-zero → render the edit form
-//      preloaded from the existing delegation.
+//   2. If the URL carries :delegationId we load that specific delegation via
+//      DelegationService.GetDelegation. Otherwise we look up the caller's own
+//      delegations via ListAllDelegations and pick the first row matching the
+//      active conference (M4 advisor flow).
+//   3. Zero rows on the advisor flow → render the create form. Non-zero →
+//      render the edit form preloaded from the existing delegation, alongside
+//      tab navigation (Overview / Delegates / Payments).
 //   4. Edits go through UpdateDelegation with expected_version. A 409
 //      (Connect Aborted) prompts the user to re-fetch.
 
-import { onMount, Show, createSignal } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { onMount, Show, createSignal, createMemo } from "solid-js";
+import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
 import {
@@ -25,6 +27,7 @@ import { delegationClient } from "@/lib/api";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import DelegationForm from "@/components/DelegationForm";
+import DelegationPayments from "@/routes/DelegationPayments";
 import { type DelegationFormValues } from "@/lib/delegation-schema";
 import {
   delegationToForm,
@@ -33,15 +36,56 @@ import {
   formToPrefs,
 } from "@/lib/delegation-mappers";
 
+type TabKey = "overview" | "delegates" | "payments";
+
+const TABS: { key: TabKey; label: string }[] = [
+  { key: "overview", label: "Overview" },
+  { key: "delegates", label: "Delegates" },
+  { key: "payments", label: "Payments" },
+];
+
 export default function MyDelegation() {
   const [user] = userSignal;
   const [conference] = activeConferenceSignal;
   const [, setLoading] = loadingSignal;
   const navigate = useNavigate();
+  const params = useParams<{ delegationId?: string }>();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [delegation, setDelegation] = createSignal<Delegation | null>(null);
   const [loaded, setLoaded] = createSignal(false);
   const [banner, setBanner] = createSignal<string | null>(null);
+
+  const activeTab = createMemo<TabKey>(() => {
+    const raw = Array.isArray(searchParams.tab)
+      ? searchParams.tab[0]
+      : searchParams.tab;
+    if (raw === "delegates" || raw === "payments" || raw === "overview") {
+      return raw;
+    }
+    return "overview";
+  });
+
+  function selectTab(t: TabKey) {
+    setSearchParams(
+      { tab: t === "overview" ? undefined : t },
+      { replace: true },
+    );
+  }
+
+  async function loadByParam(delegationId: string) {
+    setBanner(null);
+    setLoading(true);
+    try {
+      const resp = await delegationClient.getDelegation({ delegationId });
+      setDelegation(resp.delegation ?? null);
+    } catch (err) {
+      setBanner(connectMessage(err) ?? "Failed to load delegation.");
+    } finally {
+      setLoading(false);
+      setLoaded(true);
+    }
+  }
 
   async function loadMyDelegation() {
     setBanner(null);
@@ -55,9 +99,6 @@ export default function MyDelegation() {
       const resp = await delegationClient.listAllDelegations({
         conferenceId: conf.conferenceId,
       });
-      // For advisors the server already scopes to their own delegations.
-      // For admins we'd usually filter further; M4 is advisor-focused so we
-      // just grab the first row.
       setDelegation(resp.items[0] ?? null);
     } catch (err) {
       setBanner(connectMessage(err) ?? "Failed to load delegation.");
@@ -67,7 +108,16 @@ export default function MyDelegation() {
     }
   }
 
-  onMount(loadMyDelegation);
+  async function reload() {
+    const id = params.delegationId;
+    if (id) {
+      await loadByParam(id);
+    } else {
+      await loadMyDelegation();
+    }
+  }
+
+  onMount(reload);
 
   async function handleCreate(values: DelegationFormValues) {
     const conf = conference();
@@ -118,10 +168,12 @@ export default function MyDelegation() {
   }
 
   return (
-    <main class="mx-auto max-w-3xl px-6 py-8">
+    <main class="mx-auto max-w-5xl px-6 py-8">
       <header class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-nu-purple">My Delegation</h1>
+          <h1 class="text-2xl font-bold text-nu-purple">
+            {params.delegationId ? "Delegation" : "My Delegation"}
+          </h1>
           <Show when={conference()}>
             {(c) => (
               <p class="mt-1 text-sm text-nu-purple-700">
@@ -141,7 +193,7 @@ export default function MyDelegation() {
           <Show when={delegation()}>
             <button
               type="button"
-              onClick={loadMyDelegation}
+              onClick={reload}
               class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
             >
               Reload
@@ -152,6 +204,7 @@ export default function MyDelegation() {
 
       <Show
         when={
+          !params.delegationId &&
           user()?.role !== User_Role.ADVISOR &&
           user()?.role !== User_Role.STAFF_ADMIN
         }
@@ -161,42 +214,84 @@ export default function MyDelegation() {
         </p>
       </Show>
 
-      <Show when={!conference() && loaded()}>
+      <Show when={!conference() && loaded() && !params.delegationId}>
         <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
           No active conference. Contact NUMUN leadership.
         </p>
       </Show>
 
-      <Show when={loaded() && conference()}>
-        <section class="mt-6">
-          <Show
-            when={delegation()}
-            fallback={
-              <CreateBlock
-                onSubmit={handleCreate}
-                banner={
-                  <Show when={banner()}>
-                    {(b) => <Banner message={b()} kind="error" />}
-                  </Show>
-                }
-              />
-            }
-          >
-            {(d) => (
-              <EditBlock
-                delegation={d()}
-                onSubmit={handleUpdate}
-                banner={
-                  <Show when={banner()}>
-                    {(b) => <Banner message={b()} kind="error" />}
-                  </Show>
-                }
-              />
-            )}
-          </Show>
-        </section>
+      <Show when={loaded()}>
+        <Show
+          when={delegation()}
+          fallback={
+            <Show when={!params.delegationId && conference()}>
+              <section class="mt-6">
+                <CreateBlock
+                  onSubmit={handleCreate}
+                  banner={
+                    <Show when={banner()}>
+                      {(b) => <Banner message={b()} kind="error" />}
+                    </Show>
+                  }
+                />
+              </section>
+            </Show>
+          }
+        >
+          {(d) => (
+            <section class="mt-6 space-y-4">
+              <TabStrip current={activeTab()} onSelect={selectTab} />
+              <Show when={banner()}>
+                {(b) => <Banner message={b()} kind="error" />}
+              </Show>
+              <Show when={activeTab() === "overview"}>
+                <EditBlock delegation={d()} onSubmit={handleUpdate} />
+              </Show>
+              <Show when={activeTab() === "delegates"}>
+                <DelegatesPlaceholder delegationId={d().id} />
+              </Show>
+              <Show when={activeTab() === "payments"}>
+                <DelegationPayments delegation={d()} />
+              </Show>
+            </section>
+          )}
+        </Show>
       </Show>
     </main>
+  );
+}
+
+function TabStrip(props: { current: TabKey; onSelect: (t: TabKey) => void }) {
+  return (
+    <nav class="flex gap-1 border-b border-nu-purple-200">
+      {TABS.map((t) => (
+        <button
+          type="button"
+          onClick={() => props.onSelect(t.key)}
+          class={
+            props.current === t.key
+              ? "border-b-2 border-nu-purple px-3 py-2 text-sm font-semibold text-nu-purple"
+              : "border-b-2 border-transparent px-3 py-2 text-sm text-nu-purple-700 hover:border-nu-purple-300"
+          }
+        >
+          {t.label}
+        </button>
+      ))}
+    </nav>
+  );
+}
+
+function DelegatesPlaceholder(props: { delegationId: string }) {
+  return (
+    <div class="rounded border border-nu-purple-200 bg-white p-6 text-sm">
+      <p class="text-nu-purple-700">Delegate roster lives on its own screen.</p>
+      <a
+        href={`/delegations/${props.delegationId}/delegates/import`}
+        class="mt-3 inline-block rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700 hover:bg-nu-purple-50"
+      >
+        Bulk import delegates
+      </a>
+    </div>
   );
 }
 
@@ -226,10 +321,8 @@ function CreateBlock(props: {
 function EditBlock(props: {
   delegation: Delegation;
   onSubmit: (v: DelegationFormValues) => Promise<void>;
-  banner: ReturnType<typeof Show>;
 }) {
   const statusLabel = (s: Delegation["status"]): string => {
-    // 1=pending, 2=approved, 3=rejected (mirror of generated enum order)
     switch (s) {
       case 1:
         return "Pending review";
@@ -262,7 +355,6 @@ function EditBlock(props: {
           initialValues={delegationToForm(props.delegation)}
           onSubmit={props.onSubmit}
           submitLabel="Save changes"
-          banner={props.banner}
         />
       </div>
     </div>

@@ -297,6 +297,53 @@ type StaffCommitteeAssignment struct {
 	UpdatedBy string
 }
 
+// PaymentKind mirrors DATA_MODEL.md §2.12. Determines the sign the handler
+// applies to the stored amount.
+type PaymentKind string
+
+const (
+	PaymentKindCharge     PaymentKind = "charge"
+	PaymentKindPayment    PaymentKind = "payment"
+	PaymentKindAdjustment PaymentKind = "adjustment"
+)
+
+// PaymentMethod mirrors DATA_MODEL.md §2.12.
+type PaymentMethod string
+
+const (
+	PaymentMethodCheck PaymentMethod = "check"
+	PaymentMethodWire  PaymentMethod = "wire"
+	PaymentMethodCash  PaymentMethod = "cash"
+	PaymentMethodOther PaymentMethod = "other"
+)
+
+// PaymentRecord — append-only ledger entry. DATA_MODEL.md §2.12.
+// AmountUnits + AmountCents are SIGNED (negative for charges, positive for
+// payments); the handler applies the sign based on Kind. AmountCurrency is
+// always "USD" in v1 but stored explicitly so future multi-currency support
+// doesn't require a migration.
+type PaymentRecord struct {
+	ID             string
+	ConferenceID   string
+	DelegationID   string
+	AmountCurrency string
+	AmountUnits    int64
+	AmountCents    int32
+	Kind           PaymentKind
+	Method         PaymentMethod
+	Reference      string
+	Notes          string
+	RecordedBy     string
+	RecordedAt     time.Time
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
+
 // AuthAuditEventKind enumerates the values listed in AUTH.md §11.
 type AuthAuditEventKind string
 
@@ -342,6 +389,11 @@ const (
 	AuthEventAssignmentApproved       AuthAuditEventKind = "assignment_approved"
 	AuthEventAssignmentUnapproved     AuthAuditEventKind = "assignment_unapproved"
 	AuthEventAssignmentManuallyEdited AuthAuditEventKind = "assignment_manually_edited"
+
+	// Payment lifecycle (M8).
+	AuthEventPaymentRecorded AuthAuditEventKind = "payment_recorded"
+	AuthEventPaymentUpdated  AuthAuditEventKind = "payment_updated"
+	AuthEventPaymentDeleted  AuthAuditEventKind = "payment_deleted"
 )
 
 // CommitteeType — DATA_MODEL.md §2.8.
