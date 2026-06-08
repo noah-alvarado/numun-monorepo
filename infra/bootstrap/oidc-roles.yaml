@@ -207,6 +207,17 @@ Resources:
                   - ssm:GetParameters
                 Resource:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/*"
+              # Route53 alias record for the api custom domain
+              # (SAM Domain block with Route53 config).
+              - Effect: Allow
+                Action:
+                  - route53:GetHostedZone
+                  - route53:ChangeResourceRecordSets
+                  - route53:ListResourceRecordSets
+                  - route53:GetChange
+                Resource:
+                  - "arn:aws:route53:::hostedzone/*"
+                  - "arn:aws:route53:::change/*"
 
   DeployRoleSite:
     Type: AWS::IAM::Role
