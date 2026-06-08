@@ -1,0 +1,168 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// CommitteeType — crisis vs non-crisis. See DATA_MODEL.md §2.8.
+enum CommitteeType {
+  COMMITTEE_TYPE_UNSPECIFIED = 0;
+  COMMITTEE_TYPE_CRISIS = 1;
+  COMMITTEE_TYPE_NON_CRISIS = 2;
+}
+
+// CommitteeSize — small/medium/large. See DATA_MODEL.md §2.8.
+enum CommitteeSize {
+  COMMITTEE_SIZE_UNSPECIFIED = 0;
+  COMMITTEE_SIZE_SMALL = 1;
+  COMMITTEE_SIZE_MEDIUM = 2;
+  COMMITTEE_SIZE_LARGE = 3;
+}
+
+// PrestigeTier — Position's prestige bucket. See DATA_MODEL.md §2.9 and
+// ASSIGNMENT_ALGORITHM.md §4.2 (experienceMatch) + H5 (reserved).
+enum PrestigeTier {
+  PRESTIGE_TIER_UNSPECIFIED = 0;
+  PRESTIGE_TIER_STANDARD = 1;
+  PRESTIGE_TIER_ELEVATED = 2;
+  PRESTIGE_TIER_RESERVED = 3;
+}
+
+// Committee — DATA_MODEL.md §2.8.
+message Committee {
+  string id = 1;
+  string conference_id = 2;
+  string name = 3;
+  CommitteeType type = 4;
+  CommitteeSize size = 5;
+  // Path to a CMS-managed file under /content/background-guides/. Empty when
+  // no guide has been linked yet.
+  string background_guide_ref = 6;
+
+  int32 version = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// Position — DATA_MODEL.md §2.9.
+message Position {
+  string id = 1;
+  string conference_id = 2;
+  string committee_id = 3;
+  string name = 4;
+  int32 max_delegates = 5;
+  bool dual_delegation = 6;
+  PrestigeTier prestige_tier = 7;
+
+  int32 version = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// CommitteeService — CRUD for committees + nested-position listing. See
+// IMPLEMENTATION_PLAN.md §M7.
+service CommitteeService {
+  rpc ListCommittees(ListCommitteesRequest) returns (ListCommitteesResponse) {}
+  rpc GetCommittee(GetCommitteeRequest) returns (GetCommitteeResponse) {}
+  rpc CreateCommittee(CreateCommitteeRequest) returns (CreateCommitteeResponse) {}
+  rpc UpdateCommittee(UpdateCommitteeRequest) returns (UpdateCommitteeResponse) {}
+  rpc DeleteCommittee(DeleteCommitteeRequest) returns (DeleteCommitteeResponse) {}
+}
+
+// PositionService — CRUD for positions within a committee. Dual-delegation
+// implies max_delegates == 2; the handler enforces.
+service PositionService {
+  rpc ListPositions(ListPositionsRequest) returns (ListPositionsResponse) {}
+  rpc GetPosition(GetPositionRequest) returns (GetPositionResponse) {}
+  rpc CreatePosition(CreatePositionRequest) returns (CreatePositionResponse) {}
+  rpc UpdatePosition(UpdatePositionRequest) returns (UpdatePositionResponse) {}
+  rpc DeletePosition(DeletePositionRequest) returns (DeletePositionResponse) {}
+}
+
+message ListCommitteesRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListCommitteesResponse {
+  repeated Committee items = 1;
+}
+
+message GetCommitteeRequest {
+  string committee_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetCommitteeResponse {
+  Committee committee = 1;
+}
+
+message CreateCommitteeRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
+  CommitteeType type = 3;
+  CommitteeSize size = 4;
+  string background_guide_ref = 5;
+}
+message CreateCommitteeResponse {
+  Committee committee = 1;
+}
+
+message UpdateCommitteeRequest {
+  string committee_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string name = 2;
+  optional CommitteeType type = 3;
+  optional CommitteeSize size = 4;
+  optional string background_guide_ref = 5;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateCommitteeResponse {
+  Committee committee = 1;
+}
+
+message DeleteCommitteeRequest {
+  string committee_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message DeleteCommitteeResponse {}
+
+message ListPositionsRequest {
+  string committee_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListPositionsResponse {
+  repeated Position items = 1;
+}
+
+message GetPositionRequest {
+  string position_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetPositionResponse {
+  Position position = 1;
+}
+
+message CreatePositionRequest {
+  string committee_id = 1 [(buf.validate.field).string.min_len = 1];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
+  int32 max_delegates = 3 [(buf.validate.field).int32 = {gte: 1, lte: 4}];
+  bool dual_delegation = 4;
+  PrestigeTier prestige_tier = 5;
+}
+message CreatePositionResponse {
+  Position position = 1;
+}
+
+message UpdatePositionRequest {
+  string position_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string name = 2;
+  optional int32 max_delegates = 3;
+  optional bool dual_delegation = 4;
+  optional PrestigeTier prestige_tier = 5;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdatePositionResponse {
+  Position position = 1;
+}
+
+message DeletePositionRequest {
+  string position_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message DeletePositionResponse {}

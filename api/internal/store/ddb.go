@@ -88,6 +88,11 @@ var ErrInvariantViolation = errors.New("store: invariant violation")
 // failed_precondition per API.md §10.1b.
 var ErrMultipleActiveConferences = errors.New("store: multiple active conferences")
 
+// ErrAlgorithmAlreadyRunning is returned by CreateAssignmentRun when another
+// run with status=running already exists for the conference. Handlers
+// translate this to failed_precondition per ASSIGNMENT_ALGORITHM.md §9.
+var ErrAlgorithmAlreadyRunning = errors.New("store: assignment algorithm already running for conference")
+
 // cursorPayload is the JSON shape we base64-encode for opaque pagination
 // cursors. Keep it minimal — the DDB ExclusiveStartKey is just a map of
 // attribute names to scalar values, so we round-trip the string subset.

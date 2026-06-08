@@ -1,0 +1,206 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// AssignmentStatus — proposed vs approved. See DATA_MODEL.md §2.10 and
+// ASSIGNMENT_ALGORITHM.md §7 (approved → pinned across re-runs).
+enum AssignmentStatus {
+  ASSIGNMENT_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_STATUS_PROPOSED = 1;
+  ASSIGNMENT_STATUS_APPROVED = 2;
+}
+
+// AssignmentRunStatus — DATA_MODEL.md §2.11 and ASSIGNMENT_ALGORITHM.md §9.
+enum AssignmentRunStatus {
+  ASSIGNMENT_RUN_STATUS_UNSPECIFIED = 0;
+  ASSIGNMENT_RUN_STATUS_RUNNING = 1;
+  ASSIGNMENT_RUN_STATUS_DONE = 2;
+  ASSIGNMENT_RUN_STATUS_FAILED = 3;
+}
+
+// Assignment — DATA_MODEL.md §2.10.
+message Assignment {
+  string id = 1;
+  string conference_id = 2;
+  string delegate_id = 3;
+  string position_id = 4;
+  // Denormalized for filter/scope queries. See DATA_MODEL.md §2.10.
+  string committee_id = 5;
+  string delegation_id = 6;
+  AssignmentStatus status = 7;
+  // Null when status == proposed.
+  google.protobuf.Timestamp approved_at = 8;
+  string approved_by = 9;
+  // Null when the assignment was created manually outside an algorithm run.
+  string run_id = 10;
+  // Per-assignment objective score at proposal time. See
+  // ASSIGNMENT_ALGORITHM.md §4.2.
+  double score = 11;
+  string reason = 12;
+  google.protobuf.Timestamp proposed_at = 13;
+
+  int32 version = 20;
+  google.protobuf.Timestamp created_at = 21;
+  google.protobuf.Timestamp updated_at = 22;
+}
+
+// AssignmentRun — DATA_MODEL.md §2.11.
+message AssignmentRun {
+  string id = 1;
+  string conference_id = 2;
+  // The 64-bit RNG seed actually used for this run. Echoed back so the
+  // portal can display canonical vs shuffle.
+  uint64 seed = 3;
+  int32 run_ordinal = 4;
+  bool is_canonical = 5;
+  string triggered_by = 6;
+  google.protobuf.Timestamp triggered_at = 7;
+  google.protobuf.Timestamp completed_at = 8;
+  AssignmentRunStatus status = 9;
+  // Final objective O value if status == DONE.
+  double objective = 10;
+  int32 assignment_count = 11;
+  // sha256 hex of the canonicalized inputs (see ASSIGNMENT_ALGORITHM.md §10.5
+  // and IMPLEMENTATION_PLAN.md M7 ambiguity #2).
+  string inputs_hash = 12;
+  // Populated when status == FAILED.
+  string diagnostics = 13;
+}
+
+// AssignmentService — DATA_MODEL.md §10.7 and ASSIGNMENT_ALGORITHM.md §8.
+service AssignmentService {
+  rpc ListAssignments(ListAssignmentsRequest) returns (ListAssignmentsResponse) {}
+  rpc GetAssignment(GetAssignmentRequest) returns (GetAssignmentResponse) {}
+
+  // Propose runs the algorithm and either persists the proposed assignment
+  // set (default) or returns the proposal without writes (dry_run=true).
+  // See ASSIGNMENT_ALGORITHM.md §8.
+  rpc Propose(ProposeRequest) returns (ProposeResponse) {}
+
+  // Approve flips an assignment's status from proposed to approved; pins
+  // across re-runs. See ASSIGNMENT_ALGORITHM.md §7.
+  rpc Approve(AssignmentServiceApproveRequest) returns (AssignmentServiceApproveResponse) {}
+
+  // Unapprove flips approved back to proposed.
+  rpc Unapprove(AssignmentServiceUnapproveRequest) returns (AssignmentServiceUnapproveResponse) {}
+
+  // ApproveAll is a convenience for the "approve every proposed assignment"
+  // bulk action in Assignment Studio.
+  rpc ApproveAll(ApproveAllRequest) returns (ApproveAllResponse) {}
+
+  // UpdateAssignment lets staff manually edit a single assignment's
+  // delegate/position pairing. Audited as assignment_manually_edited.
+  rpc UpdateAssignment(UpdateAssignmentRequest) returns (UpdateAssignmentResponse) {}
+}
+
+// AssignmentRunService — read-side surface for run history + the in-flight
+// run, plus a helper for the "Re-shuffle" UI affordance.
+service AssignmentRunService {
+  rpc ListAssignmentRuns(ListAssignmentRunsRequest) returns (ListAssignmentRunsResponse) {}
+  rpc GetCurrentRun(GetCurrentRunRequest) returns (GetCurrentRunResponse) {}
+  rpc GetAssignmentRun(GetAssignmentRunRequest) returns (GetAssignmentRunResponse) {}
+}
+
+message ListAssignmentsRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Optional filters; UNSPECIFIED means "no filter on that dimension".
+  string committee_id = 2;
+  string delegation_id = 3;
+  AssignmentStatus status = 4;
+  PageRequest page = 5;
+}
+message ListAssignmentsResponse {
+  repeated Assignment items = 1;
+  Page page = 2;
+}
+
+message GetAssignmentRequest {
+  string assignment_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetAssignmentResponse {
+  Assignment assignment = 1;
+}
+
+// ProposeRequest — see ASSIGNMENT_ALGORITHM.md §8 and §6 for seed semantics.
+message ProposeRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  // When true, runs the algorithm and returns the proposal without writes.
+  // No AssignmentRun record is persisted.
+  bool dry_run = 2;
+  // Optional explicit seed for shuffle mode. Unset → canonical seed
+  // hash(conferenceId). See ASSIGNMENT_ALGORITHM.md §6.
+  optional uint64 seed = 3;
+}
+message ProposeResponse {
+  // The persisted (or dry-run-only) AssignmentRun for this proposal.
+  AssignmentRun run = 1;
+  // Proposed assignments. Up to ~2000 items; the portal renders paginated.
+  repeated Assignment assignments = 2;
+}
+
+message AssignmentServiceApproveRequest {
+  string assignment_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message AssignmentServiceApproveResponse {
+  Assignment assignment = 1;
+}
+
+message AssignmentServiceUnapproveRequest {
+  string assignment_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message AssignmentServiceUnapproveResponse {
+  Assignment assignment = 1;
+}
+
+message ApproveAllRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  // When set, scopes approval to one run (e.g., "approve all from the
+  // canonical run"). Empty → approves every proposed assignment in the
+  // conference.
+  string run_id = 2;
+}
+message ApproveAllResponse {
+  int32 approved_count = 1;
+}
+
+message UpdateAssignmentRequest {
+  string assignment_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Either or both may be set. The handler validates the new pairing
+  // against all hard constraints before committing.
+  optional string delegate_id = 2;
+  optional string position_id = 3;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateAssignmentResponse {
+  Assignment assignment = 1;
+}
+
+message ListAssignmentRunsRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  PageRequest page = 2;
+}
+message ListAssignmentRunsResponse {
+  repeated AssignmentRun items = 1;
+  Page page = 2;
+}
+
+message GetCurrentRunRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetCurrentRunResponse {
+  // Unset when no run is in-flight.
+  AssignmentRun run = 1;
+}
+
+message GetAssignmentRunRequest {
+  string run_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetAssignmentRunResponse {
+  AssignmentRun run = 1;
+}

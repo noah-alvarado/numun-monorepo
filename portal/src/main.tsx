@@ -16,6 +16,8 @@ import AdminDelegations from "@/routes/AdminDelegations";
 import DelegateImport from "@/routes/DelegateImport";
 import DelegateImportPreview from "@/routes/DelegateImportPreview";
 import DelegateImportResult from "@/routes/DelegateImportResult";
+import Committees from "@/routes/Committees";
+import AssignmentStudio from "@/routes/AssignmentStudio";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -76,6 +78,22 @@ render(
         component={() => (
           <AppShell>
             <DelegateImportResult />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/conferences/:conferenceId/committees"
+        component={() => (
+          <AppShell>
+            <Committees />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/conferences/:conferenceId/assignments"
+        component={() => (
+          <AppShell>
+            <AssignmentStudio />
           </AppShell>
         )}
       />

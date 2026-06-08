@@ -60,7 +60,10 @@ Globals:
     Runtime: provided.al2023
     Architectures: [arm64]
     Timeout: 29 # API Gateway HTTP API hard ceiling.
-    MemorySize: 512
+    # Bumped from 512 → 2048 for M7's assignment algorithm; gives Go's GC
+    # headroom while staying inside the 29s API Gateway window. The cognito-
+    # post-confirmation function overrides this back to 256 MB.
+    MemorySize: 2048
     Tracing: Active
     LoggingConfig:
       LogFormat: JSON

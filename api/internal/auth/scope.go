@@ -140,9 +140,18 @@ func (s *Scoper) MustHaveScopeOnCommittee(ctx context.Context, committeeID strin
 	return err
 }
 
-// MustHaveScopeOnAssignment — Assignment repo lands in M7. Until then,
-// admin-only.
-func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, _ string) error {
+// MustHaveScopeOnAssignment gates access to an Assignment id.
+//
+//   - staff-admin → always pass.
+//   - otherwise: resolve the Assignment by id, then delegate to
+//     MustHaveScopeOnDelegation using the assignment's delegationId. Going
+//     via delegation covers both the advisor case and the staff-staffer
+//     direct-oversight case (a); staff-staffer committee scope (c) is
+//     covered separately because the assignment row also carries
+//     committeeId, but in v1 we route through delegation since approved +
+//     proposed assignments remain visible to the delegation's advisor and
+//     staff overseers.
+func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, assignmentID string) error {
 	c, ok := FromContext(ctx)
 	if !ok {
 		return ErrUnauthenticated
@@ -150,7 +159,17 @@ func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, _ string) error 
 	if c.Role == domain.RoleStaffAdmin {
 		return nil
 	}
-	return ErrScopeDenied
+	if s == nil || s.Store == nil {
+		return ErrScopeDenied
+	}
+	a, err := s.Store.FindAssignmentByID(ctx, assignmentID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return ErrScopeDenied
+		}
+		return err
+	}
+	return s.MustHaveScopeOnDelegation(ctx, a.DelegationID)
 }
 
 // MustHaveScopeOnPayment — Payment repo lands in M8. Until then, admin-only.

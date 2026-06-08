@@ -302,3 +302,175 @@ func delegateToProto(d domain.Delegate) *v1.Delegate {
 		UpdatedAt:       tsOrNilFor(d.UpdatedAt),
 	}
 }
+
+// ── Committee ────────────────────────────────────────────────────────────────
+
+func protoCommitteeType(t domain.CommitteeType) v1.CommitteeType {
+	switch t {
+	case domain.CommitteeTypeCrisis:
+		return v1.CommitteeType_COMMITTEE_TYPE_CRISIS
+	case domain.CommitteeTypeNonCrisis:
+		return v1.CommitteeType_COMMITTEE_TYPE_NON_CRISIS
+	}
+	return v1.CommitteeType_COMMITTEE_TYPE_UNSPECIFIED
+}
+
+func domainCommitteeType(t v1.CommitteeType) (domain.CommitteeType, bool) {
+	switch t {
+	case v1.CommitteeType_COMMITTEE_TYPE_CRISIS:
+		return domain.CommitteeTypeCrisis, true
+	case v1.CommitteeType_COMMITTEE_TYPE_NON_CRISIS:
+		return domain.CommitteeTypeNonCrisis, true
+	}
+	return "", false
+}
+
+func protoCommitteeSize(s domain.CommitteeSize) v1.CommitteeSize {
+	switch s {
+	case domain.CommitteeSizeSmall:
+		return v1.CommitteeSize_COMMITTEE_SIZE_SMALL
+	case domain.CommitteeSizeMedium:
+		return v1.CommitteeSize_COMMITTEE_SIZE_MEDIUM
+	case domain.CommitteeSizeLarge:
+		return v1.CommitteeSize_COMMITTEE_SIZE_LARGE
+	}
+	return v1.CommitteeSize_COMMITTEE_SIZE_UNSPECIFIED
+}
+
+func domainCommitteeSize(s v1.CommitteeSize) (domain.CommitteeSize, bool) {
+	switch s {
+	case v1.CommitteeSize_COMMITTEE_SIZE_SMALL:
+		return domain.CommitteeSizeSmall, true
+	case v1.CommitteeSize_COMMITTEE_SIZE_MEDIUM:
+		return domain.CommitteeSizeMedium, true
+	case v1.CommitteeSize_COMMITTEE_SIZE_LARGE:
+		return domain.CommitteeSizeLarge, true
+	}
+	return "", false
+}
+
+func protoPrestigeTier(p domain.PrestigeTier) v1.PrestigeTier {
+	switch p {
+	case domain.PrestigeTierStandard:
+		return v1.PrestigeTier_PRESTIGE_TIER_STANDARD
+	case domain.PrestigeTierElevated:
+		return v1.PrestigeTier_PRESTIGE_TIER_ELEVATED
+	case domain.PrestigeTierReserved:
+		return v1.PrestigeTier_PRESTIGE_TIER_RESERVED
+	}
+	return v1.PrestigeTier_PRESTIGE_TIER_UNSPECIFIED
+}
+
+func domainPrestigeTier(p v1.PrestigeTier) domain.PrestigeTier {
+	switch p {
+	case v1.PrestigeTier_PRESTIGE_TIER_ELEVATED:
+		return domain.PrestigeTierElevated
+	case v1.PrestigeTier_PRESTIGE_TIER_RESERVED:
+		return domain.PrestigeTierReserved
+	}
+	return domain.PrestigeTierStandard
+}
+
+func committeeToProto(c domain.Committee) *v1.Committee {
+	return &v1.Committee{
+		Id:                 c.ID,
+		ConferenceId:       c.ConferenceID,
+		Name:               c.Name,
+		Type:               protoCommitteeType(c.Type),
+		Size:               protoCommitteeSize(c.Size),
+		BackgroundGuideRef: c.BackgroundGuideRef,
+		Version:            int32(c.Version),
+		CreatedAt:          tsOrNilFor(c.CreatedAt),
+		UpdatedAt:          tsOrNilFor(c.UpdatedAt),
+	}
+}
+
+func positionToProto(p domain.Position) *v1.Position {
+	return &v1.Position{
+		Id:             p.ID,
+		ConferenceId:   p.ConferenceID,
+		CommitteeId:    p.CommitteeID,
+		Name:           p.Name,
+		MaxDelegates:   int32(p.MaxDelegates),
+		DualDelegation: p.DualDelegation,
+		PrestigeTier:   protoPrestigeTier(p.PrestigeTier),
+		Version:        int32(p.Version),
+		CreatedAt:      tsOrNilFor(p.CreatedAt),
+		UpdatedAt:      tsOrNilFor(p.UpdatedAt),
+	}
+}
+
+// ── Assignment ───────────────────────────────────────────────────────────────
+
+func protoAssignmentStatus(s domain.AssignmentStatus) v1.AssignmentStatus {
+	switch s {
+	case domain.AssignmentStatusProposed:
+		return v1.AssignmentStatus_ASSIGNMENT_STATUS_PROPOSED
+	case domain.AssignmentStatusApproved:
+		return v1.AssignmentStatus_ASSIGNMENT_STATUS_APPROVED
+	}
+	return v1.AssignmentStatus_ASSIGNMENT_STATUS_UNSPECIFIED
+}
+
+func domainAssignmentStatus(s v1.AssignmentStatus) (domain.AssignmentStatus, bool) {
+	switch s {
+	case v1.AssignmentStatus_ASSIGNMENT_STATUS_PROPOSED:
+		return domain.AssignmentStatusProposed, true
+	case v1.AssignmentStatus_ASSIGNMENT_STATUS_APPROVED:
+		return domain.AssignmentStatusApproved, true
+	}
+	return "", false
+}
+
+func assignmentToProto(a domain.Assignment) *v1.Assignment {
+	return &v1.Assignment{
+		Id:           a.ID,
+		ConferenceId: a.ConferenceID,
+		DelegateId:   a.DelegateID,
+		PositionId:   a.PositionID,
+		CommitteeId:  a.CommitteeID,
+		DelegationId: a.DelegationID,
+		Status:       protoAssignmentStatus(a.Status),
+		ProposedAt:   tsOrNilFor(a.ProposedAt),
+		ApprovedAt:   tsOrNilFor(a.ApprovedAt),
+		ApprovedBy:   a.ApprovedBy,
+		RunId:        a.RunID,
+		Score:        a.Score,
+		Reason:       a.Reason,
+		Version:      int32(a.Version),
+		CreatedAt:    tsOrNilFor(a.CreatedAt),
+		UpdatedAt:    tsOrNilFor(a.UpdatedAt),
+	}
+}
+
+// ── AssignmentRun ────────────────────────────────────────────────────────────
+
+func protoAssignmentRunStatus(s domain.AssignmentRunStatus) v1.AssignmentRunStatus {
+	switch s {
+	case domain.AssignmentRunStatusRunning:
+		return v1.AssignmentRunStatus_ASSIGNMENT_RUN_STATUS_RUNNING
+	case domain.AssignmentRunStatusDone:
+		return v1.AssignmentRunStatus_ASSIGNMENT_RUN_STATUS_DONE
+	case domain.AssignmentRunStatusFailed:
+		return v1.AssignmentRunStatus_ASSIGNMENT_RUN_STATUS_FAILED
+	}
+	return v1.AssignmentRunStatus_ASSIGNMENT_RUN_STATUS_UNSPECIFIED
+}
+
+func assignmentRunToProto(r domain.AssignmentRun) *v1.AssignmentRun {
+	return &v1.AssignmentRun{
+		Id:              r.ID,
+		ConferenceId:    r.ConferenceID,
+		Seed:            r.Seed,
+		RunOrdinal:      int32(r.RunOrdinal),
+		IsCanonical:     r.IsCanonical,
+		TriggeredBy:     r.TriggeredBy,
+		TriggeredAt:     tsOrNilFor(r.TriggeredAt),
+		CompletedAt:     tsOrNilFor(r.CompletedAt),
+		Status:          protoAssignmentRunStatus(r.Status),
+		Objective:       r.Objective,
+		AssignmentCount: int32(r.AssignmentCount),
+		InputsHash:      r.InputsHash,
+		Diagnostics:     r.Diagnostics,
+	}
+}

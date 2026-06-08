@@ -17,6 +17,14 @@ import { DelegationService } from "@/gen/numun/v1/delegations_pb";
 import { DelegateService } from "@/gen/numun/v1/delegates_pb";
 import { UploadService } from "@/gen/numun/v1/uploads_pb";
 import { PublicService } from "@/gen/numun/v1/public_pb";
+import {
+  CommitteeService,
+  PositionService,
+} from "@/gen/numun/v1/committees_pb";
+import {
+  AssignmentService,
+  AssignmentRunService,
+} from "@/gen/numun/v1/assignments_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -72,3 +80,10 @@ export const delegationClient = createClient(DelegationService, transport);
 export const delegateClient = createClient(DelegateService, transport);
 export const uploadClient = createClient(UploadService, transport);
 export const publicClient = createClient(PublicService, transport);
+export const committeeClient = createClient(CommitteeService, transport);
+export const positionClient = createClient(PositionService, transport);
+export const assignmentClient = createClient(AssignmentService, transport);
+export const assignmentRunClient = createClient(
+  AssignmentRunService,
+  transport,
+);

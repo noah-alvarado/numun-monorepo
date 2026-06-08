@@ -77,6 +77,30 @@ export default function Dashboard() {
                   description="Review and approve school registrations."
                   onClick={() => navigate("/admin/delegations")}
                 />
+                <Show when={conference()}>
+                  {(c) => (
+                    <>
+                      <NavCard
+                        title="Committees"
+                        description="Manage committees and positions."
+                        onClick={() =>
+                          navigate(
+                            `/conferences/${c().conferenceId}/committees`,
+                          )
+                        }
+                      />
+                      <NavCard
+                        title="Assignment Studio"
+                        description="Propose, review, and approve delegate assignments."
+                        onClick={() =>
+                          navigate(
+                            `/conferences/${c().conferenceId}/assignments`,
+                          )
+                        }
+                      />
+                    </>
+                  )}
+                </Show>
               </section>
             </Show>
 

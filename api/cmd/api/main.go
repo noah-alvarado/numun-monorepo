@@ -132,6 +132,22 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	uploadPath, uploadHandler := numunv1connect.NewUploadServiceHandler(uploadSvc, opts)
 	mux.Handle(uploadPath, uploadHandler)
 
+	committeeSvc := &handlers.CommitteeService{Store: st, Scoper: scoper, Logger: logger}
+	committeePath, committeeHandler := numunv1connect.NewCommitteeServiceHandler(committeeSvc, opts)
+	mux.Handle(committeePath, committeeHandler)
+
+	positionSvc := &handlers.PositionService{Store: st, Scoper: scoper, Logger: logger}
+	positionPath, positionHandler := numunv1connect.NewPositionServiceHandler(positionSvc, opts)
+	mux.Handle(positionPath, positionHandler)
+
+	assignmentSvc := &handlers.AssignmentService{Store: st, Scoper: scoper, Logger: logger}
+	assignmentPath, assignmentHandler := numunv1connect.NewAssignmentServiceHandler(assignmentSvc, opts)
+	mux.Handle(assignmentPath, assignmentHandler)
+
+	assignmentRunSvc := &handlers.AssignmentRunService{Store: st, Scoper: scoper, Logger: logger}
+	assignmentRunPath, assignmentRunHandler := numunv1connect.NewAssignmentRunServiceHandler(assignmentRunSvc, opts)
+	mux.Handle(assignmentRunPath, assignmentRunHandler)
+
 	pubSvc := &handlers.PublicService{Store: st, Logger: logger}
 	pubPath, pubHandler := numunv1connect.NewPublicServiceHandler(pubSvc, opts)
 	mux.Handle(pubPath, pubHandler)

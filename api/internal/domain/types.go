@@ -327,7 +327,149 @@ const (
 	AuthEventDelegateUpdated  AuthAuditEventKind = "delegate_updated"
 	AuthEventDelegateDeleted  AuthAuditEventKind = "delegate_deleted"
 	AuthEventDelegateCheckedIn AuthAuditEventKind = "delegate_checked_in"
+
+	// Committee + position lifecycle (M7).
+	AuthEventCommitteeCreated AuthAuditEventKind = "committee_created"
+	AuthEventCommitteeUpdated AuthAuditEventKind = "committee_updated"
+	AuthEventCommitteeDeleted AuthAuditEventKind = "committee_deleted"
+	AuthEventPositionCreated  AuthAuditEventKind = "position_created"
+	AuthEventPositionUpdated  AuthAuditEventKind = "position_updated"
+	AuthEventPositionDeleted  AuthAuditEventKind = "position_deleted"
+
+	// Assignment algorithm lifecycle (M7).
+	AuthEventAssignmentRunStarted     AuthAuditEventKind = "assignment_run_started"
+	AuthEventAssignmentRunCompleted   AuthAuditEventKind = "assignment_run_completed"
+	AuthEventAssignmentApproved       AuthAuditEventKind = "assignment_approved"
+	AuthEventAssignmentUnapproved     AuthAuditEventKind = "assignment_unapproved"
+	AuthEventAssignmentManuallyEdited AuthAuditEventKind = "assignment_manually_edited"
 )
+
+// CommitteeType — DATA_MODEL.md §2.8.
+type CommitteeType string
+
+const (
+	CommitteeTypeCrisis    CommitteeType = "crisis"
+	CommitteeTypeNonCrisis CommitteeType = "non-crisis"
+)
+
+// CommitteeSize — DATA_MODEL.md §2.8.
+type CommitteeSize string
+
+const (
+	CommitteeSizeSmall  CommitteeSize = "small"
+	CommitteeSizeMedium CommitteeSize = "medium"
+	CommitteeSizeLarge  CommitteeSize = "large"
+)
+
+// PrestigeTier — DATA_MODEL.md §2.9.
+type PrestigeTier string
+
+const (
+	PrestigeTierStandard PrestigeTier = "standard"
+	PrestigeTierElevated PrestigeTier = "elevated"
+	PrestigeTierReserved PrestigeTier = "reserved"
+)
+
+// Committee — DATA_MODEL.md §2.8.
+type Committee struct {
+	ID                 string
+	ConferenceID       string
+	Name               string
+	Type               CommitteeType
+	Size               CommitteeSize
+	BackgroundGuideRef string
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
+
+// Position — DATA_MODEL.md §2.9.
+type Position struct {
+	ID             string
+	ConferenceID   string
+	CommitteeID    string
+	Name           string
+	MaxDelegates   int
+	DualDelegation bool
+	PrestigeTier   PrestigeTier
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
+
+// AssignmentStatus — DATA_MODEL.md §2.10.
+type AssignmentStatus string
+
+const (
+	AssignmentStatusProposed AssignmentStatus = "proposed"
+	AssignmentStatusApproved AssignmentStatus = "approved"
+)
+
+// Assignment — DATA_MODEL.md §2.10.
+type Assignment struct {
+	ID           string
+	ConferenceID string
+	DelegateID   string
+	PositionID   string
+	CommitteeID  string
+	DelegationID string
+
+	Status     AssignmentStatus
+	ProposedAt time.Time
+	ApprovedAt time.Time
+	ApprovedBy string
+	RunID      string
+	Score      float64
+	Reason     string
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
+
+// AssignmentRunStatus — DATA_MODEL.md §2.11.
+type AssignmentRunStatus string
+
+const (
+	AssignmentRunStatusRunning AssignmentRunStatus = "running"
+	AssignmentRunStatusDone    AssignmentRunStatus = "done"
+	AssignmentRunStatusFailed  AssignmentRunStatus = "failed"
+)
+
+// AssignmentRun — DATA_MODEL.md §2.11.
+type AssignmentRun struct {
+	ID              string
+	ConferenceID    string
+	Seed            uint64
+	RunOrdinal      int
+	IsCanonical     bool
+	TriggeredBy     string
+	TriggeredAt     time.Time
+	CompletedAt     time.Time
+	Status          AssignmentRunStatus
+	Objective       float64
+	AssignmentCount int
+	InputsHash      string
+	Diagnostics     string
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
 
 // AuthAuditEvent is the append-only auth audit row. See AUTH.md §13.2.
 type AuthAuditEvent struct {
