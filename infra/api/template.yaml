@@ -148,6 +148,22 @@ Resources:
             - !Sub ".${EnvSubdomain}.${RootDomain}"
             - !Sub ".${RootDomain}"
           COOKIE_SECURE: "true"
+          # Used by /cms-oauth/* to build the GitHub redirect_uri and the
+          # postMessage target origin. See CMS_CONTENT_MODEL.md §8.3.
+          ROOT_DOMAIN: !Ref RootDomain
+          ENV_SUBDOMAIN: !Ref EnvSubdomain
+          ENV: !Ref Env
+          # The CMS-OAuth proxy reads three SSM SecureString params at
+          # cold-start:
+          #   /numun/${Env}/cms_oauth/client_id
+          #   /numun/${Env}/cms_oauth/client_secret
+          #   /numun/${Env}/cms_oauth/state_secret
+          # CloudFormation cannot create SecureString parameters natively, so
+          # these MUST be created out-of-band before the first deploy. See
+          # docs/cms-oauth-app-setup.md (TODO: author this runbook in a
+          # follow-up; it is the GitHub OAuth App registration walkthrough).
+          # The existing IAM policy below already permits ssm:GetParameter on
+          # the full /numun/${Env}/* tree, so no IAM change is needed.
       Events:
         AnyHttp:
           Type: HttpApi

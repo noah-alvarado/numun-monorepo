@@ -1,15 +1,105 @@
 ---
+import { getEntry, render } from "astro:content";
 import Layout from "@/layouts/Layout.astro";
+
+import activeConference from "@/data/active-conference";
+
+const home = await getEntry("home", "home");
+if (!home) throw new Error("content/pages/home.md is required");
+const { Content } = await render(home);
+const { hero, intro, featuredSections, currentConferenceTeaser, seo } =
+  home.data;
+
+const conf = activeConference;
 ---
 
-<Layout title="Northwestern University Model United Nations">
-  <main class="mx-auto max-w-3xl px-6 py-20">
-    <h1 class="text-5xl font-bold text-nu-purple">NUMUN</h1>
-    <p class="mt-4 text-lg text-nu-purple-700">
-      Northwestern University Model United Nations. Foundation milestone (M4).
-    </p>
-    <p class="mt-2 text-sm text-nu-purple-700">
-      Real content lands in M5 when the CMS goes live.
-    </p>
+<Layout
+  title={seo?.title}
+  description={seo?.description}
+  ogImage={seo?.ogImage}
+  noindex={seo?.noindex}
+  canonicalPath="/"
+>
+  <main class="mx-auto max-w-5xl px-6 py-16">
+    <section class="grid gap-6 md:grid-cols-[1fr_auto] md:items-end">
+      <div>
+        <h1 class="text-5xl font-bold text-nu-purple leading-tight">
+          {hero.headline}
+        </h1>
+        <p class="mt-3 text-lg text-nu-purple-700 max-w-2xl">
+          {hero.subheadline}
+        </p>
+        <div class="mt-5 flex flex-wrap gap-3">
+          <a
+            href={hero.primaryCta.href}
+            class="rounded bg-nu-purple px-5 py-2 text-white"
+          >
+            {hero.primaryCta.label}
+          </a>
+          {
+            hero.secondaryCta && (
+              <a
+                href={hero.secondaryCta.href}
+                class="rounded border border-nu-purple-300 px-5 py-2 text-nu-purple-700"
+              >
+                {hero.secondaryCta.label}
+              </a>
+            )
+          }
+        </div>
+      </div>
+      <img
+        src={hero.image.src}
+        alt={hero.image.alt}
+        class="rounded-lg shadow max-w-md w-full"
+      />
+    </section>
+
+    {
+      conf && conf.conferenceId && (
+        <section class="mt-12 rounded border border-nu-purple-200 bg-nu-purple-50 p-5">
+          <h2 class="text-xl font-semibold text-nu-purple">
+            {currentConferenceTeaser?.overrideHeadline ??
+              `${conf.name} — ${conf.year}`}
+          </h2>
+          <p class="mt-1 text-sm text-nu-purple-700">
+            Registration status: {conf.registrationStatus}
+          </p>
+          <a
+            href="https://portal.numun.org/sign-up"
+            class="mt-3 inline-block rounded bg-nu-purple px-4 py-1.5 text-sm text-white"
+          >
+            {currentConferenceTeaser?.overrideCtaLabel ?? "Register"}
+          </a>
+        </section>
+      )
+    }
+
+    <section class="mt-12">
+      <h2 class="text-2xl font-bold text-nu-purple">{intro.headline}</h2>
+      <div class="mt-3 prose prose-headings:text-nu-purple max-w-none">
+        <Content />
+      </div>
+    </section>
+
+    {
+      featuredSections.length > 0 && (
+        <section class="mt-12 grid gap-6 md:grid-cols-3">
+          {featuredSections.map((s) => (
+            <a
+              href={s.ctaHref}
+              class="rounded border border-nu-purple-200 bg-white p-4 transition hover:border-nu-purple-400"
+            >
+              <img src={s.image.src} alt={s.image.alt} class="rounded mb-3" />
+              <h3 class="text-lg font-semibold text-nu-purple">{s.label}</h3>
+              <p class="mt-1 text-sm text-nu-purple-700">{s.summary}</p>
+              <span class="mt-3 inline-block text-sm text-nu-purple-700">
+                {s.ctaLabel} →
+              </span>
+            </a>
+          ))}
+        </section>
+      )
+    }
   </main>
 </Layout>

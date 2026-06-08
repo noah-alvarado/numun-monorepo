@@ -1,5 +1,7 @@
 name: deploy site
 
+# workflow_dispatch is the manual trigger for "admin manually triggers a site
+# rebuild after a conference status change in DDB" (per CMS_CONTENT_MODEL.md §9.2).
 on:
   push:
     branches: [main]
@@ -25,8 +27,35 @@ jobs:
     env:
       AWS_REGION: us-east-2
       BUCKET: numun-${{ vars.ENV_NAME }}-site
+      # Prefer an explicit override; otherwise derive from APEX_DOMAIN
+      # (e.g. test.numun.org -> https://api.test.numun.org).
+      API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || format('https://api.{0}', vars.APEX_DOMAIN) }}
     steps:
       - uses: actions/checkout@v4
+      - name: Fetch active conference
+        # Calls PublicService.GetActiveConference and writes the result to
+        # content/_generated/active-conference.json for the Astro build to
+        # consume. On any failure (network, non-2xx, malformed JSON), writes
+        # a fallback file so the build still succeeds with a "between
+        # conferences" placeholder (see CMS_CONTENT_MODEL.md §9.1).
+        run: |
+          mkdir -p content/_generated
+          response=$(curl -sS --max-time 10 -X POST \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            --data '{}' \
+            "${API_BASE_URL}/numun.v1.PublicService/GetActiveConference" \
+            || true)
+
+          if echo "$response" | jq -e '.conference' >/dev/null 2>&1; then
+            echo "$response" | jq '.conference // null' > content/_generated/active-conference.json
+          else
+            echo "Active-conference fetch failed; writing fallback." >&2
+            echo '{"conferenceId": null}' > content/_generated/active-conference.json
+          fi
+
+          echo "Active conference file:"
+          cat content/_generated/active-conference.json
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:

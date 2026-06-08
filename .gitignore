@@ -12,6 +12,9 @@ build/
 .astro/
 .vite/
 
+# Build-time generated CMS content (regenerated per build; see CMS_CONTENT_MODEL.md §9.2)
+content/_generated/
+
 # Go
 /api/bin/
 /api/coverage.out

@@ -1,17 +1,1026 @@
-# NUMUN Decap CMS config — placeholder for M0.
+# NUMUN Decap CMS configuration.
 #
-# Full content-model + OAuth wiring lands in M5 per
-# IMPLEMENTATION_PLAN.md and CMS_CONTENT_MODEL.md.
+# This file is the authoritative editor-facing schema for the landing site.
+# Every collection below is derived from docs/subsystems/CMS_CONTENT_MODEL.md;
+# see the cited section above each block for the source of truth.
+#
+# Conventions (CMS_CONTENT_MODEL.md §4):
+#   - Fields are required by default; only explicitly-optional fields carry
+#     `required: false`.
+#   - Headlines / short labels: max 100 chars. Descriptions / summaries: 200.
+#   - Every image widget includes an `alt` sub-field marked required (§6.2).
+#   - The `seo` sub-object schema (§7) is duplicated per collection rather
+#     than aliased — Decap's YAML parser doesn't reliably resolve anchors.
 
 backend:
   name: github
-  repo: numun/numun-vClaude # update once the repo is created
+  repo: noah-alvarado/numun-monorepo
   branch: main
-  base_url: https://api.test.numun.org # OAuth proxy lives on the Lambdalith (staging)
+  base_url: https://api.test.numun.org # OAuth proxy on the Lambdalith (staging)
   auth_endpoint: cms-oauth/auth
 
 publish_mode: simple
-media_folder: "content/uploads"
-public_folder: "/uploads"
 
-collections: [] # collections defined in M5
+site_url: https://test.numun.org
+display_url: https://test.numun.org
+
+media_folder: content/uploads
+public_folder: /uploads
+
+slug:
+  encoding: ascii
+  clean_accents: true
+  sanitize_replacement: "-"
+
+collections:
+  # -------------------------------------------------------------------------
+  # Pages — single-instance files (CMS_CONTENT_MODEL.md §4.1)
+  # -------------------------------------------------------------------------
+  - name: pages
+    label: Pages
+    description: Single-instance pages of the landing site.
+    files:
+      # -- §4.1.1 home.md ---------------------------------------------------
+      - name: home
+        label: Home
+        file: content/pages/home.md
+        fields:
+          - name: hero
+            label: Hero
+            widget: object
+            fields:
+              - {
+                  name: headline,
+                  label: Headline,
+                  widget: string,
+                  pattern: ["^.{1,100}$", "Max 100 characters"],
+                }
+              - {
+                  name: subheadline,
+                  label: Subheadline,
+                  widget: string,
+                  pattern: ["^.{1,200}$", "Max 200 characters"],
+                }
+              - name: image
+                label: Hero image
+                widget: image
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - name: primaryCta
+                label: Primary CTA
+                widget: object
+                fields:
+                  - {
+                      name: label,
+                      label: Label,
+                      widget: string,
+                      pattern: ["^.{1,30}$", "Max 30 characters"],
+                    }
+                  - { name: href, label: Link, widget: string }
+              - name: secondaryCta
+                label: Secondary CTA
+                widget: object
+                required: false
+                fields:
+                  - {
+                      name: label,
+                      label: Label,
+                      widget: string,
+                      pattern: ["^.{1,30}$", "Max 30 characters"],
+                    }
+                  - { name: href, label: Link, widget: string }
+          - name: intro
+            label: Intro
+            widget: object
+            fields:
+              - {
+                  name: headline,
+                  label: Headline,
+                  widget: string,
+                  pattern: ["^.{1,100}$", "Max 100 characters"],
+                }
+              - { name: body, label: Body, widget: markdown }
+          - name: featuredSections
+            label: Featured sections
+            widget: list
+            summary: "{{fields.label}}"
+            fields:
+              - {
+                  name: label,
+                  label: Label,
+                  widget: string,
+                  pattern: ["^.{1,80}$", "Max 80 characters"],
+                }
+              - {
+                  name: summary,
+                  label: Summary,
+                  widget: string,
+                  pattern: ["^.{1,200}$", "Max 200 characters"],
+                }
+              - name: image
+                label: Image
+                widget: image
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: ctaLabel,
+                  label: CTA label,
+                  widget: string,
+                  pattern: ["^.{1,30}$", "Max 30 characters"],
+                }
+              - { name: ctaHref, label: CTA link, widget: string }
+          - name: currentConferenceTeaser
+            label: Current conference teaser
+            widget: object
+            required: false
+            hint: Overrides the default copy baked from DDB. Leave blank to use defaults.
+            fields:
+              - {
+                  name: overrideHeadline,
+                  label: Override headline,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,100}$", "Max 100 characters"],
+                }
+              - {
+                  name: overrideCtaLabel,
+                  label: Override CTA label,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,30}$", "Max 30 characters"],
+                }
+          # seo — §7
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+      # -- §4.1.2 about.md --------------------------------------------------
+      - name: about
+        label: About
+        file: content/pages/about.md
+        fields:
+          - { name: title, label: Title, widget: string }
+          - name: heroImage
+            label: Hero image
+            widget: image
+            required: false
+            fields:
+              - { name: alt, label: Alt text, widget: string }
+          - {
+              name: mission,
+              label: Mission,
+              widget: string,
+              pattern: ["^.{1,300}$", "Max 300 characters"],
+            }
+          - {
+              name: vision,
+              label: Vision,
+              widget: string,
+              pattern: ["^.{1,300}$", "Max 300 characters"],
+            }
+          - { name: body, label: Body, widget: markdown }
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+      # -- §4.1.3 hosted-conference.md -------------------------------------
+      - name: hosted-conference
+        label: Hosted conference
+        file: content/pages/hosted-conference.md
+        fields:
+          - { name: title, label: Title, widget: string }
+          - {
+              name: tagline,
+              label: Tagline,
+              widget: string,
+              pattern: ["^.{1,200}$", "Max 200 characters"],
+            }
+          - { name: overviewBody, label: Overview, widget: markdown }
+          - {
+              name: forAdvisorsBody,
+              label: For advisors,
+              widget: markdown,
+              required: false,
+            }
+          - {
+              name: forDelegatesBody,
+              label: For delegates,
+              widget: markdown,
+              required: false,
+            }
+          - {
+              name: registrationPortalUrl,
+              label: Registration portal URL,
+              widget: string,
+              default: "https://portal.numun.org",
+            }
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+      # -- §4.1.4 travel-team.md -------------------------------------------
+      - name: travel-team
+        label: Travel team
+        file: content/pages/travel-team.md
+        fields:
+          - { name: title, label: Title, widget: string }
+          - { name: body, label: Body, widget: markdown }
+          - name: conferencesAttended
+            label: Conferences attended
+            widget: list
+            summary: "{{fields.conferenceName}} ({{fields.date}})"
+            fields:
+              - { name: conferenceName, label: Conference name, widget: string }
+              - { name: location, label: Location, widget: string }
+              - { name: date, label: Date, widget: date }
+              - {
+                  name: summary,
+                  label: Summary,
+                  widget: string,
+                  pattern: ["^.{1,200}$", "Max 200 characters"],
+                }
+              - name: highlights
+                label: Highlights
+                widget: list
+                required: false
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+      # -- §4.1.5 resources.md ---------------------------------------------
+      - name: resources
+        label: Resources
+        file: content/pages/resources.md
+        fields:
+          - { name: title, label: Title, widget: string }
+          - { name: intro, label: Intro, widget: markdown, required: false }
+          - name: linkGroups
+            label: Link groups
+            widget: list
+            summary: "{{fields.groupTitle}}"
+            fields:
+              - {
+                  name: groupTitle,
+                  label: Group title,
+                  widget: string,
+                  pattern: ["^.{1,80}$", "Max 80 characters"],
+                }
+              - name: links
+                label: Links
+                widget: list
+                summary: "{{fields.label}}"
+                fields:
+                  - {
+                      name: label,
+                      label: Label,
+                      widget: string,
+                      pattern: ["^.{1,80}$", "Max 80 characters"],
+                    }
+                  - { name: href, label: URL, widget: string }
+                  - {
+                      name: description,
+                      label: Description,
+                      widget: string,
+                      required: false,
+                      pattern: ["^.{0,200}$", "Max 200 characters"],
+                    }
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+      # -- §4.1.6 contact.md -----------------------------------------------
+      - name: contact
+        label: Contact
+        file: content/pages/contact.md
+        fields:
+          - { name: title, label: Title, widget: string }
+          - { name: body, label: Body, widget: markdown, required: false }
+          - {
+              name: generalEmail,
+              label: General email,
+              widget: string,
+              pattern: ['^[^@\s]+@[^@\s]+\.[^@\s]+$', "Must be a valid email"],
+            }
+          - name: inquiryRouting
+            label: Inquiry routing
+            widget: list
+            required: false
+            summary: "{{fields.label}} -> {{fields.email}}"
+            fields:
+              - {
+                  name: label,
+                  label: Label,
+                  widget: string,
+                  pattern: ["^.{1,80}$", "Max 80 characters"],
+                }
+              - {
+                  name: email,
+                  label: Email,
+                  widget: string,
+                  pattern:
+                    ['^[^@\s]+@[^@\s]+\.[^@\s]+$', "Must be a valid email"],
+                }
+          - name: seo
+            label: SEO
+            widget: object
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+              - name: ogImage
+                label: Open Graph image
+                widget: image
+                required: false
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: noindex,
+                  label: Hide from search engines,
+                  widget: boolean,
+                  default: false,
+                  required: false,
+                }
+
+  # -------------------------------------------------------------------------
+  # Leadership — folder collection (CMS_CONTENT_MODEL.md §4.2)
+  # -------------------------------------------------------------------------
+  - name: leadership
+    label: Leadership
+    label_singular: Leadership entry
+    folder: content/leadership
+    create: true
+    slug: "{{year}}-{{slug}}"
+    summary: "{{fields.name}} — {{fields.role}} ({{fields.year}})"
+    preview_path: "leadership/{{slug}}"
+    sortable_fields: [year, roleCategory, order, name]
+    fields:
+      - {
+          name: name,
+          label: Name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - {
+          name: role,
+          label: Role,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - name: roleCategory
+        label: Role category
+        widget: select
+        options:
+          - { label: Secretariat, value: secretariat }
+          - { label: Executive board, value: executive-board }
+          - { label: Staff, value: staff }
+      - {
+          name: year,
+          label: Academic year (start),
+          widget: number,
+          value_type: int,
+          min: 2000,
+          max: 2100,
+        }
+      - {
+          name: order,
+          label: Sort order within category,
+          widget: number,
+          value_type: int,
+        }
+      - name: headshot
+        label: Headshot
+        widget: image
+        fields:
+          - { name: alt, label: Alt text, widget: string }
+      - { name: bio, label: Bio, widget: markdown, required: false }
+      - { name: email, label: Email, widget: string, required: false }
+      - { name: linkedIn, label: LinkedIn URL, widget: string, required: false }
+
+  # -------------------------------------------------------------------------
+  # News — folder collection (CMS_CONTENT_MODEL.md §4.3)
+  # -------------------------------------------------------------------------
+  - name: news
+    label: News
+    label_singular: News post
+    folder: content/news
+    create: true
+    slug: "{{year}}-{{month}}-{{day}}-{{slug}}"
+    summary: "{{date | date('YYYY-MM-DD')}} — {{title}}"
+    preview_path: "news/{{year}}/{{slug}}"
+    sortable_fields: [date, title]
+    fields:
+      - {
+          name: title,
+          label: Title,
+          widget: string,
+          pattern: ["^.{1,120}$", "Max 120 characters"],
+        }
+      - {
+          name: slug,
+          label: Slug,
+          widget: string,
+          hint: "Auto-generated from title; editable.",
+        }
+      - { name: date, label: Publish date, widget: datetime }
+      - {
+          name: author,
+          label: Author,
+          widget: string,
+          required: false,
+          pattern: ["^.{0,80}$", "Max 80 characters"],
+        }
+      - {
+          name: summary,
+          label: Summary,
+          widget: string,
+          pattern: ["^.{1,200}$", "Max 200 characters"],
+        }
+      - name: heroImage
+        label: Hero image
+        widget: image
+        required: false
+        fields:
+          - { name: alt, label: Alt text, widget: string }
+      - { name: body, label: Body, widget: markdown }
+      - name: tags
+        label: Tags
+        widget: list
+        required: false
+      - name: seo
+        label: SEO
+        widget: object
+        fields:
+          - {
+              name: title,
+              label: SEO title,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,70}$", "Max 70 characters"],
+            }
+          - {
+              name: description,
+              label: SEO description,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,200}$", "Max 200 characters"],
+            }
+          - name: ogImage
+            label: Open Graph image
+            widget: image
+            required: false
+            fields:
+              - { name: alt, label: Alt text, widget: string }
+          - {
+              name: noindex,
+              label: Hide from search engines,
+              widget: boolean,
+              default: false,
+              required: false,
+            }
+
+  # -------------------------------------------------------------------------
+  # Past conferences — folder collection (CMS_CONTENT_MODEL.md §4.4)
+  # -------------------------------------------------------------------------
+  - name: past-conferences
+    label: Past conferences
+    label_singular: Past conference
+    folder: content/past-conferences
+    create: true
+    slug: "numun-{{editionNumber}}-{{slug}}"
+    summary: "{{fields.conferenceName}} ({{fields.year}})"
+    preview_path: "past-conferences/{{slug}}"
+    sortable_fields: [editionNumber, year]
+    fields:
+      - {
+          name: conferenceName,
+          label: Conference name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - {
+          name: editionNumber,
+          label: Edition number,
+          widget: number,
+          value_type: int,
+        }
+      - {
+          name: year,
+          label: Year,
+          widget: number,
+          value_type: int,
+          min: 1900,
+          max: 2100,
+        }
+      - {
+          name: dateRange,
+          label: Date range,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - name: heroImage
+        label: Hero image
+        widget: image
+        required: false
+        fields:
+          - { name: alt, label: Alt text, widget: string }
+      - { name: body, label: Recap, widget: markdown }
+      - name: photoGallery
+        label: Photo gallery
+        widget: list
+        required: false
+        summary: "{{fields.caption}}"
+        fields:
+          - name: image
+            label: Image
+            widget: image
+            fields:
+              - { name: alt, label: Alt text, widget: string }
+          - {
+              name: caption,
+              label: Caption,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,200}$", "Max 200 characters"],
+            }
+      - name: notableAwards
+        label: Notable awards
+        widget: list
+        required: false
+        summary: "{{fields.awardName}} — {{fields.recipient}}"
+        fields:
+          - {
+              name: awardName,
+              label: Award name,
+              widget: string,
+              pattern: ["^.{1,80}$", "Max 80 characters"],
+            }
+          - {
+              name: recipient,
+              label: Recipient,
+              widget: string,
+              pattern: ["^.{1,120}$", "Max 120 characters"],
+            }
+          - name: kind
+            label: Recipient kind
+            widget: select
+            options:
+              - { label: Delegate, value: delegate }
+              - { label: Delegation, value: delegation }
+      - name: seo
+        label: SEO
+        widget: object
+        fields:
+          - {
+              name: title,
+              label: SEO title,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,70}$", "Max 70 characters"],
+            }
+          - {
+              name: description,
+              label: SEO description,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,200}$", "Max 200 characters"],
+            }
+          - name: ogImage
+            label: Open Graph image
+            widget: image
+            required: false
+            fields:
+              - { name: alt, label: Alt text, widget: string }
+          - {
+              name: noindex,
+              label: Hide from search engines,
+              widget: boolean,
+              default: false,
+              required: false,
+            }
+
+  # -------------------------------------------------------------------------
+  # Awards archive — folder collection (CMS_CONTENT_MODEL.md §4.5)
+  # -------------------------------------------------------------------------
+  - name: awards-archive
+    label: Awards archive
+    label_singular: Award entry
+    folder: content/awards-archive
+    create: true
+    slug: "{{year}}-{{slug}}"
+    summary: "{{fields.year}} — {{fields.awardName}}"
+    sortable_fields: [year, awardName]
+    fields:
+      - {
+          name: year,
+          label: Year,
+          widget: number,
+          value_type: int,
+          min: 1900,
+          max: 2100,
+        }
+      - {
+          name: awardName,
+          label: Award name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - {
+          name: recipientName,
+          label: Recipient name,
+          widget: string,
+          pattern: ["^.{1,120}$", "Max 120 characters"],
+        }
+      - name: recipientType
+        label: Recipient type
+        widget: select
+        options:
+          - { label: Delegate, value: delegate }
+          - { label: Delegation, value: delegation }
+      - {
+          name: conferenceName,
+          label: Conference name,
+          widget: string,
+          required: false,
+          pattern: ["^.{0,80}$", "Max 80 characters"],
+        }
+      - {
+          name: description,
+          label: Description,
+          widget: markdown,
+          required: false,
+        }
+
+  # -------------------------------------------------------------------------
+  # Background guides — folder collection (CMS_CONTENT_MODEL.md §4.6)
+  # -------------------------------------------------------------------------
+  # NOTE: §4.6 places files under <conference-slug>/<committee-slug>.md.
+  # Decap folder collections are flat by default. The `path` template below
+  # nests entries by the conference slug derived from `conferenceName`.
+  - name: background-guides
+    label: Background guides
+    label_singular: Background guide
+    folder: content/background-guides
+    create: true
+    path: "{{fields.conferenceName | lower | replace(' ', '-')}}/{{slug}}"
+    slug: "{{committeeName | lower | replace(' ', '-')}}"
+    summary: "{{fields.conferenceName}} — {{fields.committeeName}}"
+    sortable_fields: [conferenceName, committeeName, updatedAt]
+    fields:
+      - {
+          name: committeeName,
+          label: Committee name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - name: committeeType
+        label: Committee type
+        widget: select
+        options:
+          - { label: Crisis, value: crisis }
+          - { label: Non-crisis, value: non-crisis }
+      - name: committeeSize
+        label: Committee size
+        widget: select
+        options:
+          - { label: Small, value: small }
+          - { label: Medium, value: medium }
+          - { label: Large, value: large }
+      - {
+          name: conferenceName,
+          label: Conference name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - {
+          name: pdfFile,
+          label: PDF,
+          widget: file,
+          media_library: { config: { max_file_size: 26214400 } },
+        }
+      - { name: summary, label: Summary, widget: markdown, required: false }
+      - {
+          name: updatedAt,
+          label: Updated at,
+          widget: datetime,
+          hint: "Auto-set on save.",
+        }
+
+  # -------------------------------------------------------------------------
+  # FAQ — folder collection (CMS_CONTENT_MODEL.md §4.7)
+  # -------------------------------------------------------------------------
+  - name: faq
+    label: FAQ
+    label_singular: FAQ entry
+    folder: content/faq
+    create: true
+    slug: "{{slug}}"
+    summary: "[{{fields.category}}] {{fields.question}}"
+    sortable_fields: [category, order]
+    fields:
+      - {
+          name: question,
+          label: Question,
+          widget: string,
+          pattern: ["^.{1,200}$", "Max 200 characters"],
+        }
+      - { name: answer, label: Answer, widget: markdown }
+      - name: category
+        label: Category
+        widget: select
+        options:
+          - { label: General, value: general }
+          - { label: Registration, value: registration }
+          - { label: Payment, value: payment }
+          - { label: Day-of, value: day-of }
+          - { label: Delegates, value: delegates }
+          - { label: Advisors, value: advisors }
+      - {
+          name: order,
+          label: Order within category,
+          widget: number,
+          value_type: int,
+        }
+
+  # -------------------------------------------------------------------------
+  # Site config — singleton files (CMS_CONTENT_MODEL.md §4.8)
+  # -------------------------------------------------------------------------
+  - name: config
+    label: Site configuration
+    description: Site-wide singletons (SEO defaults, footer, contact links).
+    files:
+      - name: seo-defaults
+        label: SEO defaults
+        file: content/config/seo-defaults.md
+        fields:
+          - { name: siteTitle, label: Site title, widget: string }
+          - {
+              name: siteDescription,
+              label: Site description,
+              widget: string,
+              pattern: ["^.{1,200}$", "Max 200 characters"],
+            }
+          - name: defaultOgImage
+            label: Default Open Graph image
+            widget: image
+            fields:
+              - { name: alt, label: Alt text, widget: string }
+          - {
+              name: twitterHandle,
+              label: Twitter handle,
+              widget: string,
+              required: false,
+            }
+          - {
+              name: themeColor,
+              label: Theme color,
+              widget: string,
+              pattern:
+                [
+                  "^#([0-9a-fA-F]{3}){1,2}$",
+                  "Must be a hex color like #112233",
+                ],
+            }
+
+      - name: footer
+        label: Footer
+        file: content/config/footer.md
+        fields:
+          - {
+              name: copyrightText,
+              label: Copyright text,
+              widget: string,
+              pattern: ["^.{1,200}$", "Max 200 characters"],
+            }
+          - name: legalLinks
+            label: Legal links
+            widget: list
+            summary: "{{fields.label}}"
+            fields:
+              - {
+                  name: label,
+                  label: Label,
+                  widget: string,
+                  pattern: ["^.{1,40}$", "Max 40 characters"],
+                }
+              - { name: href, label: URL, widget: string }
+          - name: sponsorLogos
+            label: Sponsor logos
+            widget: list
+            required: false
+            summary: "{{fields.name}}"
+            fields:
+              - {
+                  name: name,
+                  label: Sponsor name,
+                  widget: string,
+                  pattern: ["^.{1,80}$", "Max 80 characters"],
+                }
+              - name: image
+                label: Logo
+                widget: image
+                fields:
+                  - { name: alt, label: Alt text, widget: string }
+              - {
+                  name: href,
+                  label: Sponsor URL,
+                  widget: string,
+                  required: false,
+                }
+          - {
+              name: acknowledgments,
+              label: Acknowledgments,
+              widget: markdown,
+              required: false,
+            }
+
+      - name: contact-links
+        label: Contact links
+        file: content/config/contact-links.md
+        fields:
+          - name: socialLinks
+            label: Social links
+            widget: list
+            summary: "{{fields.platform}}"
+            fields:
+              - name: platform
+                label: Platform
+                widget: select
+                options:
+                  - { label: Instagram, value: instagram }
+                  - { label: Twitter, value: twitter }
+                  - { label: LinkedIn, value: linkedin }
+                  - { label: Facebook, value: facebook }
+                  - { label: YouTube, value: youtube }
+                  - { label: Other, value: other }
+              - { name: url, label: URL, widget: string }
+              - {
+                  name: label,
+                  label: Label,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,40}$", "Max 40 characters"],
+                }
+          - {
+              name: primaryEmail,
+              label: Primary email,
+              widget: string,
+              pattern: ['^[^@\s]+@[^@\s]+\.[^@\s]+$', "Must be a valid email"],
+            }
+          - {
+              name: mailingAddress,
+              label: Mailing address,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,300}$", "Max 300 characters"],
+            }

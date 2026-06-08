@@ -35,13 +35,19 @@ var publicPaths = map[string]struct{}{
 }
 
 // Has the request path been listed as public? Also allows the plain
-// `/v1/health` HTTP probe.
+// `/v1/health` HTTP probe and the Decap CMS GitHub OAuth proxy routes
+// (CMS_CONTENT_MODEL.md §8.3) — those are mounted on the same mux but live
+// outside the Connect surface and have their own CSRF defense (HMAC-signed
+// state cookie).
 func isPublic(p string) bool {
 	if _, ok := publicPaths[p]; ok {
 		return true
 	}
 	switch p {
 	case "/v1/health", "/":
+		return true
+	}
+	if strings.HasPrefix(p, "/cms-oauth/") {
 		return true
 	}
 	return strings.HasPrefix(p, "/numun.v1.PublicService/")

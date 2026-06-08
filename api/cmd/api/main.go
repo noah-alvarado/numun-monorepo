@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
 	"github.com/numun/numun/api/internal/auth"
+	"github.com/numun/numun/api/internal/cmsoauth"
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 	"github.com/numun/numun/api/internal/handlers"
@@ -79,6 +80,13 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 
 	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
 	mux.HandleFunc("GET /v1/health", handleHealthHTTP)
+
+	// Decap CMS GitHub OAuth proxy — see docs/subsystems/CMS_CONTENT_MODEL.md §8.3.
+	// Mounted outside the Connect router and outside the auth middleware
+	// (the public-paths allowlist below carves out /cms-oauth/*).
+	cms := cmsoauth.New(context.Background(), logger)
+	mux.HandleFunc("GET /cms-oauth/auth", cms.Auth)
+	mux.HandleFunc("GET /cms-oauth/callback", cms.Callback)
 
 	validate, err := handlers.NewValidationInterceptor()
 	if err != nil {
