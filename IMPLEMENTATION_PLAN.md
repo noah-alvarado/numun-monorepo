@@ -332,6 +332,7 @@ These are items the design docs leave open, marked TBD, or that downstream choic
 13. **Privacy notice content (before launch).** SECURITY.md §10. Required before opening signups beyond seed users.
 14. **`security@numun.org` mailbox (any).** SECURITY.md §7.3 flags it. Operational, not a code decision.
 15. **Branch-protection-vs-Decap reconciliation specifics (M5).** Path-based exception requires the workaround in §13 of risks above; confirm exact GitHub config before relying on it.
+16. **Astro image optimization for CMS uploads (M11).** M5 ships plain `<img>` tags for CMS-hosted images. Upgrade path documented at https://docs.astro.build/en/guides/images/#using-images-from-a-cms-or-cdn: add `image.remotePatterns` (or `image.domains`) to `site/astro.config.mjs` and switch to `<Image>` for the perf win (WebP/AVIF, responsive `srcset`). Decide where binaries live for build-time access (symlink `site/public/uploads` → `../../content/uploads`, dedicated `aws s3 sync` step, or move to `assets.numun.org`). Revisit when galleries become content-heavy or Lighthouse flags it.
 
 ---
 
