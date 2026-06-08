@@ -36,6 +36,9 @@ func (s *DelegationService) ListDelegations(ctx context.Context, req *connect.Re
 	if conferenceID == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
 	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, conferenceID); err != nil {
+		return nil, mapScopeErr(err)
+	}
 	cursor, size := pageRequest(req.Msg.GetPage())
 
 	var dels []domain.Delegation
@@ -73,6 +76,9 @@ func (s *DelegationService) ListAllDelegations(ctx context.Context, req *connect
 	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
 	if conferenceID == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, conferenceID); err != nil {
+		return nil, mapScopeErr(err)
 	}
 	var dels []domain.Delegation
 	var err error
@@ -129,6 +135,9 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
 	if conferenceID == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, conferenceID); err != nil {
+		return nil, mapScopeErr(err)
 	}
 	school := strings.TrimSpace(req.Msg.GetSchool())
 	if school == "" {

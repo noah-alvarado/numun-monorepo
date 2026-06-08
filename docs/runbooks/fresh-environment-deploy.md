@@ -21,17 +21,17 @@ state), then run the Rebuild under `Env=test`.
 
 Set these once before running any commands; they're referenced throughout.
 
-| Variable | Description | Example (staging) |
-|---|---|---|
-| `ENV` | Environment qualifier — value of `Env` SAM parameter | `test` |
-| `ROOT_DOMAIN` | Apex registered domain | `numun.org` |
-| `ENV_SUBDOMAIN` | Subdomain between env and root (empty for prod) | `test` |
-| `APEX` | Effective apex (composed) | `test.numun.org` |
-| `AWS_PROFILE` | Local CLI profile that reaches the target account | `numun-prod` (for staging account) |
-| `AWS_REGION` | Primary region | `us-east-2` |
-| `ACCOUNT_ID` | Target AWS account id | `034083889387` |
-| `GH_REPO` | GitHub repository slug | `noah-alvarado/numun-monorepo` |
-| `GH_ENV` | GitHub environment name (= `$ENV`) | `test` |
+| Variable        | Description                                          | Example (staging)                  |
+| --------------- | ---------------------------------------------------- | ---------------------------------- |
+| `ENV`           | Environment qualifier — value of `Env` SAM parameter | `test`                             |
+| `ROOT_DOMAIN`   | Apex registered domain                               | `numun.org`                        |
+| `ENV_SUBDOMAIN` | Subdomain between env and root (empty for prod)      | `test`                             |
+| `APEX`          | Effective apex (composed)                            | `test.numun.org`                   |
+| `AWS_PROFILE`   | Local CLI profile that reaches the target account    | `numun-prod` (for staging account) |
+| `AWS_REGION`    | Primary region                                       | `us-east-2`                        |
+| `ACCOUNT_ID`    | Target AWS account id                                | `034083889387`                     |
+| `GH_REPO`       | GitHub repository slug                               | `noah-alvarado/numun-monorepo`     |
+| `GH_ENV`        | GitHub environment name (= `$ENV`)                   | `test`                             |
 
 ---
 
@@ -372,11 +372,11 @@ the new `sub`.
 ## Verification
 
 V1. `aws cloudformation list-stacks` shows five stacks named
-    `numun-${ENV}-*` (bootstrap, base-data, base-cdn, billing-alarms, api),
-    all `CREATE_COMPLETE` or `UPDATE_COMPLETE`.
+`numun-${ENV}-*` (bootstrap, base-data, base-cdn, billing-alarms, api),
+all `CREATE_COMPLETE` or `UPDATE_COMPLETE`.
 
 V2. `curl https://api.${APEX}/v1/health` returns 200 (or hit the API
-    Gateway invoke URL until DNS is live).
+Gateway invoke URL until DNS is live).
 
 V3. `scripts/verify-deploy.sh` succeeds end-to-end with the new admin:
 
@@ -391,7 +391,7 @@ ADMIN_EMAIL="$ADMIN_EMAIL" \
 ```
 
 V4. A no-op push to `main` triggers all four deploy workflows; each
-    completes cleanly against the new OIDC roles.
+completes cleanly against the new OIDC roles.
 
 ---
 

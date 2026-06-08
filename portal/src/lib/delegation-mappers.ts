@@ -1,10 +1,7 @@
 // Conversions between domain proto messages and the DelegationForm value shape.
 
 import { create } from "@bufbuild/protobuf";
-import {
-  AddressSchema,
-  type Address,
-} from "@/gen/numun/v1/common_pb";
+import { AddressSchema, type Address } from "@/gen/numun/v1/common_pb";
 import {
   CommitteePreferencesSchema,
   type Delegation,

@@ -98,9 +98,7 @@ export default function AdminDelegations() {
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">Pending Delegations</h1>
           <Show when={conference()}>
-            {(c) => (
-              <p class="mt-1 text-sm text-nu-purple-700">{c().name}</p>
-            )}
+            {(c) => <p class="mt-1 text-sm text-nu-purple-700">{c().name}</p>}
           </Show>
         </div>
         <div class="flex gap-2 text-sm">
@@ -130,9 +128,7 @@ export default function AdminDelegations() {
       <Show when={user()?.role === User_Role.STAFF_ADMIN}>
         <Show when={error()}>
           {(e) => (
-            <p class="mt-4 rounded bg-red-50 p-3 text-sm text-red-900">
-              {e()}
-            </p>
+            <p class="mt-4 rounded bg-red-50 p-3 text-sm text-red-900">{e()}</p>
           )}
         </Show>
 
@@ -162,8 +158,7 @@ export default function AdminDelegations() {
                           {(a) => (
                             <>
                               {a().city}
-                              {a().state ? `, ${a().state}` : ""}{" "}
-                              {a().country}
+                              {a().state ? `, ${a().state}` : ""} {a().country}
                             </>
                           )}
                         </Show>

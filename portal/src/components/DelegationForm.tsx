@@ -132,15 +132,31 @@ export default function DelegationForm(props: Props) {
         <p class="text-sm text-nu-purple-700">
           Indicate per-axis comfort. Used by the assignment algorithm.
         </p>
-        <PrefsRow name="prefs.typeCrisis" label="Crisis committees" Field={Field} />
+        <PrefsRow
+          name="prefs.typeCrisis"
+          label="Crisis committees"
+          Field={Field}
+        />
         <PrefsRow
           name="prefs.typeNonCrisis"
           label="Non-crisis committees"
           Field={Field}
         />
-        <PrefsRow name="prefs.sizeSmall" label="Small committees" Field={Field} />
-        <PrefsRow name="prefs.sizeMedium" label="Medium committees" Field={Field} />
-        <PrefsRow name="prefs.sizeLarge" label="Large committees" Field={Field} />
+        <PrefsRow
+          name="prefs.sizeSmall"
+          label="Small committees"
+          Field={Field}
+        />
+        <PrefsRow
+          name="prefs.sizeMedium"
+          label="Medium committees"
+          Field={Field}
+        />
+        <PrefsRow
+          name="prefs.sizeLarge"
+          label="Large committees"
+          Field={Field}
+        />
       </section>
 
       <div class="flex items-center justify-end gap-3">
