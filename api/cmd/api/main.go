@@ -80,7 +80,15 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
 	mux.HandleFunc("GET /v1/health", handleHealthHTTP)
 
-	healthPath, healthHandler := numunv1connect.NewHealthServiceHandler(&healthServer{})
+	validate, err := handlers.NewValidationInterceptor()
+	if err != nil {
+		logger.Error("init validation interceptor", "err", err)
+		os.Exit(1)
+	}
+	opts := connect.WithInterceptors(validate)
+	scoper := auth.NewScoper(st)
+
+	healthPath, healthHandler := numunv1connect.NewHealthServiceHandler(&healthServer{}, opts)
 	mux.Handle(healthPath, healthHandler)
 
 	authSvc := &handlers.AuthService{
@@ -89,7 +97,7 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 		Verifier: ver,
 		Logger:   logger,
 	}
-	authPath, authHandler := numunv1connect.NewAuthServiceHandler(authSvc)
+	authPath, authHandler := numunv1connect.NewAuthServiceHandler(authSvc, opts)
 	mux.Handle(authPath, authHandler)
 
 	userSvc := &handlers.UserService{
@@ -97,8 +105,20 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 		Cognito: cog,
 		Logger:  logger,
 	}
-	userPath, userHandler := numunv1connect.NewUserServiceHandler(userSvc)
+	userPath, userHandler := numunv1connect.NewUserServiceHandler(userSvc, opts)
 	mux.Handle(userPath, userHandler)
+
+	confSvc := &handlers.ConferenceService{Store: st, Scoper: scoper, Logger: logger}
+	confPath, confHandler := numunv1connect.NewConferenceServiceHandler(confSvc, opts)
+	mux.Handle(confPath, confHandler)
+
+	delSvc := &handlers.DelegationService{Store: st, Scoper: scoper, Logger: logger}
+	delPath, delHandler := numunv1connect.NewDelegationServiceHandler(delSvc, opts)
+	mux.Handle(delPath, delHandler)
+
+	pubSvc := &handlers.PublicService{Store: st, Logger: logger}
+	pubPath, pubHandler := numunv1connect.NewPublicServiceHandler(pubSvc, opts)
+	mux.Handle(pubPath, pubHandler)
 
 	mw := auth.New(auth.MiddlewareConfig{
 		Store:     st,

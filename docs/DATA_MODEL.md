@@ -74,7 +74,7 @@ Validation of "required for advisors / optional for staff" lives in the applicat
 
 ### 2.3 Delegation
 
-A school's registration for one Conference. May have **multiple advisors**; **exactly one** must hold `lead` status; **at least one** advisor is required (enforced at application layer).
+A school's registration for one Conference. May have **multiple advisors**; **at least one** must hold `lead` status (multiple leads are allowed); **at least one** advisor is required (enforced at application layer).
 
 - `id` — UUIDv7
 - `conferenceId`

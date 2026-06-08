@@ -1,0 +1,100 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// Conference is the top-level multi-year scope. See DATA_MODEL.md §2.1.
+message Conference {
+  string id = 1;
+  string name = 2;
+  int32 edition_number = 3;
+  int32 year = 4;
+  google.protobuf.Timestamp starts_at = 5;
+  google.protobuf.Timestamp ends_at = 6;
+  Status status = 7;
+  // Free-form theme/location/etc. Keys are camelCase strings; the portal
+  // renders only known keys.
+  map<string, string> metadata = 8;
+
+  int32 version = 9;
+  google.protobuf.Timestamp created_at = 10;
+  google.protobuf.Timestamp updated_at = 11;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_DRAFT = 1;
+    STATUS_OPEN_FOR_REGISTRATION = 2;
+    STATUS_CLOSED = 3;
+    STATUS_IN_PROGRESS = 4;
+    STATUS_ARCHIVED = 5;
+  }
+}
+
+// ConferenceService — see API.md §10.4.
+service ConferenceService {
+  rpc ListConferences(ListConferencesRequest) returns (ListConferencesResponse) {}
+  rpc ListAllConferences(ListAllConferencesRequest) returns (ListAllConferencesResponse) {}
+  rpc GetConference(GetConferenceRequest) returns (GetConferenceResponse) {}
+  rpc CreateConference(CreateConferenceRequest) returns (CreateConferenceResponse) {}
+  rpc UpdateConference(UpdateConferenceRequest) returns (UpdateConferenceResponse) {}
+}
+
+message ListConferencesRequest {
+  PageRequest page = 1;
+  // Optional status filter; empty = all.
+  Conference.Status status = 2;
+}
+message ListConferencesResponse {
+  repeated Conference items = 1;
+  Page page = 2;
+}
+
+message ListAllConferencesRequest {
+  Conference.Status status = 1;
+}
+message ListAllConferencesResponse {
+  repeated Conference items = 1;
+}
+
+message GetConferenceRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetConferenceResponse {
+  Conference conference = 1;
+}
+
+message CreateConferenceRequest {
+  string name = 1 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
+  int32 edition_number = 2 [(buf.validate.field).int32.gt = 0];
+  int32 year = 3 [(buf.validate.field).int32 = {gte: 2000, lte: 2100}];
+  google.protobuf.Timestamp starts_at = 4 [(buf.validate.field).required = true];
+  google.protobuf.Timestamp ends_at = 5 [(buf.validate.field).required = true];
+  // Initial status. Defaults to DRAFT when unspecified.
+  Conference.Status status = 6;
+  map<string, string> metadata = 7;
+}
+message CreateConferenceResponse {
+  Conference conference = 1;
+}
+
+message UpdateConferenceRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string name = 2;
+  optional int32 edition_number = 3;
+  optional int32 year = 4;
+  optional google.protobuf.Timestamp starts_at = 5;
+  optional google.protobuf.Timestamp ends_at = 6;
+  optional Conference.Status status = 7;
+  // Replaces metadata entirely when set (proto3 map presence is all-or-nothing
+  // at the message boundary; a non-nil map clears previous keys).
+  map<string, string> metadata = 8;
+  bool metadata_set = 9;
+
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateConferenceResponse {
+  Conference conference = 1;
+}

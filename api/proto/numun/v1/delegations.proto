@@ -1,0 +1,229 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// Trinary expresses positive/negative/neutral preferences along committee
+// axes (type and size). Consumed by the assignment algorithm. See
+// DATA_MODEL.md §2.3 and ASSIGNMENT_ALGORITHM.md §4.1.
+enum Trinary {
+  TRINARY_UNSPECIFIED = 0;
+  TRINARY_POSITIVE = 1;
+  TRINARY_NEGATIVE = 2;
+  TRINARY_NEUTRAL = 3;
+}
+
+// CommitteePreferences is the trinary per-axis preference matrix carried on
+// each Delegation. Wire shape mirrors the JSON example in DATA_MODEL.md §2.3.
+message CommitteePreferences {
+  message TypePrefs {
+    Trinary crisis = 1;
+    Trinary non_crisis = 2;
+  }
+  message SizePrefs {
+    Trinary small = 1;
+    Trinary medium = 2;
+    Trinary large = 3;
+  }
+  TypePrefs type = 1;
+  SizePrefs size = 2;
+}
+
+message EstimatedDelegates {
+  int32 total = 1 [(buf.validate.field).int32.gte = 0];
+  int32 financially_qualifying = 2 [(buf.validate.field).int32.gte = 0];
+}
+
+// Delegation — a school's registration for one Conference.
+// See DATA_MODEL.md §2.3 and API.md §10.5.
+message Delegation {
+  string id = 1;
+  string conference_id = 2;
+  string school = 3;
+  Address address = 4;
+  Status status = 5;
+  EstimatedDelegates estimated_delegates = 6;
+  CommitteePreferences committee_preferences = 7;
+
+  // Denormalized payment summary. Authoritative ledger lives in PaymentRecord.
+  Money balance_due = 8;
+  bool paid_in_full = 9;
+
+  google.protobuf.Timestamp approved_at = 10;
+  string approved_by = 11;
+
+  int32 version = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+
+  enum Status {
+    STATUS_UNSPECIFIED = 0;
+    STATUS_PENDING = 1;
+    STATUS_APPROVED = 2;
+    STATUS_REJECTED = 3;
+  }
+}
+
+// DelegationAdvisor — the User ↔ Delegation link entity. DATA_MODEL.md §2.5.
+message DelegationAdvisor {
+  string user_id = 1;
+  string delegation_id = 2;
+  string conference_id = 3;
+  Role role = 4;
+  int32 version = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp updated_at = 7;
+
+  enum Role {
+    ROLE_UNSPECIFIED = 0;
+    ROLE_LEAD = 1;
+    ROLE_SECONDARY = 2;
+  }
+}
+
+// DelegationService — see API.md §10.5.
+service DelegationService {
+  rpc ListDelegations(ListDelegationsRequest) returns (ListDelegationsResponse) {}
+  rpc ListAllDelegations(ListAllDelegationsRequest) returns (ListAllDelegationsResponse) {}
+  rpc GetDelegation(GetDelegationRequest) returns (GetDelegationResponse) {}
+  rpc CreateDelegation(CreateDelegationRequest) returns (CreateDelegationResponse) {}
+  rpc UpdateDelegation(UpdateDelegationRequest) returns (UpdateDelegationResponse) {}
+  rpc Approve(ApproveRequest) returns (ApproveResponse) {}
+  rpc Reject(RejectRequest) returns (RejectResponse) {}
+
+  rpc AddAdvisor(AddAdvisorRequest) returns (AddAdvisorResponse) {}
+  rpc RemoveAdvisor(RemoveAdvisorRequest) returns (RemoveAdvisorResponse) {}
+  rpc SetAdvisorRole(SetAdvisorRoleRequest) returns (SetAdvisorRoleResponse) {}
+  rpc ListAdvisors(ListAdvisorsRequest) returns (ListAdvisorsResponse) {}
+  rpc ListAllAdvisors(ListAllAdvisorsRequest) returns (ListAllAdvisorsResponse) {}
+
+  rpc AssignStaffer(AssignStafferRequest) returns (AssignStafferResponse) {}
+  rpc UnassignStaffer(UnassignStafferRequest) returns (UnassignStafferResponse) {}
+}
+
+message ListDelegationsRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  PageRequest page = 2;
+  // Optional status filter; UNSPECIFIED = all statuses.
+  Delegation.Status status = 3;
+}
+message ListDelegationsResponse {
+  repeated Delegation items = 1;
+  Page page = 2;
+}
+
+message ListAllDelegationsRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  Delegation.Status status = 2;
+}
+message ListAllDelegationsResponse {
+  repeated Delegation items = 1;
+}
+
+message GetDelegationRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetDelegationResponse {
+  Delegation delegation = 1;
+}
+
+// CreateDelegation — advisors create their own (becoming lead); admins may
+// create on behalf and the caller is *not* auto-attached as advisor.
+message CreateDelegationRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  string school = 2 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
+  Address address = 3 [(buf.validate.field).required = true];
+  EstimatedDelegates estimated_delegates = 4;
+  CommitteePreferences committee_preferences = 5;
+}
+message CreateDelegationResponse {
+  Delegation delegation = 1;
+}
+
+message UpdateDelegationRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string school = 2;
+  optional Address address = 3;
+  optional EstimatedDelegates estimated_delegates = 4;
+  optional CommitteePreferences committee_preferences = 5;
+
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateDelegationResponse {
+  Delegation delegation = 1;
+}
+
+message ApproveRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message ApproveResponse {
+  Delegation delegation = 1;
+}
+
+message RejectRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+  // Optional free-form reason recorded on the audit event metadata. Not
+  // persisted on the Delegation row.
+  string reason = 3;
+}
+message RejectResponse {
+  Delegation delegation = 1;
+}
+
+message AddAdvisorRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+  DelegationAdvisor.Role role = 3;
+}
+message AddAdvisorResponse {
+  DelegationAdvisor advisor = 1;
+}
+
+message RemoveAdvisorRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+message RemoveAdvisorResponse {}
+
+message SetAdvisorRoleRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+  DelegationAdvisor.Role role = 3;
+  int32 expected_version = 4 [(buf.validate.field).int32.gt = 0];
+}
+message SetAdvisorRoleResponse {
+  DelegationAdvisor advisor = 1;
+}
+
+message ListAdvisorsRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  PageRequest page = 2;
+}
+message ListAdvisorsResponse {
+  repeated DelegationAdvisor items = 1;
+  Page page = 2;
+}
+
+message ListAllAdvisorsRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListAllAdvisorsResponse {
+  repeated DelegationAdvisor items = 1;
+}
+
+message AssignStafferRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+message AssignStafferResponse {}
+
+message UnassignStafferRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+}
+message UnassignStafferResponse {}

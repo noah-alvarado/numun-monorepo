@@ -90,8 +90,8 @@ Goal: An advisor registers a delegation; a staff-admin approves it.
 - Handlers: `ConferenceService` (create/list/update — admin only), `DelegationService` (create/get/list/update/approve/reject/add-advisor/remove-advisor), `PublicService.GetActiveConference`.
 - Scope helpers stubs from M2 made real: read `DelegationAdvisor`, `StaffDelegationAssignment`, `StaffCommitteeAssignment` links. `not_found` vs `permission_denied` per AUTH.md §7.3.
 - `protovalidate` annotations on the protos for input validation; server emits `google.rpc.BadRequest`.
-- Idempotency-Key middleware (24h TTL) for mutating RPCs.
 - Audit-log writers for `delegation_approved`, `delegation_rejected`, `scope_granted`, `scope_revoked`.
+- (Idempotency-Key middleware deferred to M12 — see Hardening.)
 
 **Verification:** Seed an advisor; create a delegation; admin approves; advisor `GetDelegation` returns approved. Repeat using a wrong scope: returns `not_found`.
 
@@ -215,6 +215,7 @@ Goal: All the SECURITY.md operational controls actually exist.
 - SES sandbox-exit confirmed completed (should be done by now; verify).
 - govulncheck + pnpm audit gating in CI.
 - Backup verification: do a restore drill of DDB PITR into a side table.
+- **Idempotency-Key middleware** (24h TTL) for mutating RPCs. Deferred from M3 — pick the depth (in-flight lock vs. completed-status replay vs. full byte-for-byte replay per API.md §8) and implement. Open item; see plan ambiguity #12.
 
 **Verification:** Walk each runbook against a tabletop exercise; confirm alarms fire on injected failures.
 

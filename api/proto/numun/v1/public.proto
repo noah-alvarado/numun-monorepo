@@ -1,0 +1,48 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "google/protobuf/timestamp.proto";
+
+// PublicService is the unauthenticated, CORS-open, rate-limited surface
+// consumed by the static landing-page build pipeline (see CMS_CONTENT_MODEL.md
+// §9 and API.md §10.1b). Keep payloads to safe public subsets — never leak
+// administrative or financial fields here.
+service PublicService {
+  rpc GetActiveConference(GetActiveConferenceRequest) returns (GetActiveConferenceResponse) {}
+}
+
+// RegistrationStatus is the public-facing flag derived from the underlying
+// Conference.Status. We do not expose the internal status enum verbatim because
+// the public surface should be stable even if the internal state machine grows.
+enum RegistrationStatus {
+  REGISTRATION_STATUS_UNSPECIFIED = 0;
+  // Registration is open for new delegations.
+  REGISTRATION_STATUS_OPEN = 1;
+  // The conference is happening now; registration is closed.
+  REGISTRATION_STATUS_IN_PROGRESS = 2;
+}
+
+// ActiveConferenceSummary is the trimmed public subset returned by
+// GetActiveConference. Mirrors API.md §10.1b.
+message ActiveConferenceSummary {
+  string conference_id = 1;
+  string name = 2;
+  int32 edition_number = 3;
+  int32 year = 4;
+  google.protobuf.Timestamp starts_at = 5;
+  google.protobuf.Timestamp ends_at = 6;
+  RegistrationStatus registration_status = 7;
+  // Free-form theme/location metadata. Only known keys are rendered.
+  map<string, string> theme_metadata = 8;
+}
+
+message GetActiveConferenceRequest {}
+
+// GetActiveConferenceResponse — the conference field is unset when no
+// conference matches `open-for-registration` or `in-progress`. The server
+// returns `failed_precondition` if more than one matches (data-integrity
+// issue requiring staff intervention).
+message GetActiveConferenceResponse {
+  ActiveConferenceSummary conference = 1;
+}
