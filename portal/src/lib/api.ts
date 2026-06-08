@@ -12,6 +12,9 @@ import { createClient, type Interceptor } from "@connectrpc/connect";
 import { HealthService } from "@/gen/numun/v1/health_pb";
 import { AuthService } from "@/gen/numun/v1/auth_pb";
 import { UserService } from "@/gen/numun/v1/users_pb";
+import { ConferenceService } from "@/gen/numun/v1/conferences_pb";
+import { DelegationService } from "@/gen/numun/v1/delegations_pb";
+import { PublicService } from "@/gen/numun/v1/public_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -62,3 +65,6 @@ export const transport = createConnectTransport({
 export const healthClient = createClient(HealthService, transport);
 export const authClient = createClient(AuthService, transport);
 export const userClient = createClient(UserService, transport);
+export const conferenceClient = createClient(ConferenceService, transport);
+export const delegationClient = createClient(DelegationService, transport);
+export const publicClient = createClient(PublicService, transport);

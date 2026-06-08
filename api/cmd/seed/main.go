@@ -13,10 +13,15 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/numun/numun/api/internal/domain"
 	"github.com/numun/numun/api/internal/store"
 )
+
+// SeedConferenceID is pinned so portal flows can reference it deterministically
+// during local dev.
+const SeedConferenceID = "0190a000-0000-7000-9000-000000000001"
 
 // SeedUser is the seed-user catalog. Keep these IDs stable — the portal's
 // "Sign in as…" debug shortcut and the X-Dev-User-Id docs reference them
@@ -91,9 +96,38 @@ func main() {
 		}
 	}
 
+	// Seed one open-for-registration Conference so the portal's M4 flows have
+	// a target. Status flips can be driven through the admin UI later.
+	now := time.Now().UTC()
+	conf := domain.Conference{
+		ID:            SeedConferenceID,
+		Name:          "NUMUN XXIV (Seed)",
+		EditionNumber: 24,
+		Year:          now.Year(),
+		StartsAt:      now.AddDate(0, 1, 0),
+		EndsAt:        now.AddDate(0, 1, 3),
+		Status:        domain.ConferenceStatusOpenForRegistration,
+		Metadata: map[string]string{
+			"theme":    "Seed dataset",
+			"location": "Local development",
+		},
+	}
+	if _, err := c.CreateConference(ctx, conf); err != nil {
+		if errors.Is(err, store.ErrAlreadyExists) {
+			logger.Info("seed: conference exists", "id", conf.ID)
+		} else {
+			logger.Error("seed: create conference", "err", err)
+			os.Exit(1)
+		}
+	} else {
+		logger.Info("seed: created conference", "id", conf.ID, "name", conf.Name)
+	}
+
 	fmt.Println()
 	fmt.Println("Seed complete. Use these with `X-Dev-User-Id` when DEV_BYPASS_AUTH=true:")
 	for _, u := range Users {
 		fmt.Printf("  %-14s %s  (%s)\n", u.Role, u.ID, u.Email)
 	}
+	fmt.Println()
+	fmt.Printf("Active conference id: %s\n", SeedConferenceID)
 }

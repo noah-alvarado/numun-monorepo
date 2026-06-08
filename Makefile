@@ -53,7 +53,7 @@ seed: ## Populate DynamoDB Local with the seed dataset (see /docs/seed-users.md)
 
 proto: ## Run Buf code-gen for Go + TS (writes into /api/internal/gen and /portal/src/gen).
 	cd api/proto && buf lint
-	cd api/proto && buf generate
+	cd api/proto && buf generate --include-imports
 
 # ── IaC validation ────────────────────────────────────────────────────────────
 

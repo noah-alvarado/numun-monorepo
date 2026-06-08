@@ -11,6 +11,8 @@ import ForgotPassword from "@/routes/ForgotPassword";
 import ResetPassword from "@/routes/ResetPassword";
 import Dashboard from "@/routes/Dashboard";
 import AppShell from "@/routes/AppShell";
+import MyDelegation from "@/routes/MyDelegation";
+import AdminDelegations from "@/routes/AdminDelegations";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -31,6 +33,22 @@ render(
         component={() => (
           <AppShell>
             <Dashboard />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/delegation"
+        component={() => (
+          <AppShell>
+            <MyDelegation />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/admin/delegations"
+        component={() => (
+          <AppShell>
+            <AdminDelegations />
           </AppShell>
         )}
       />

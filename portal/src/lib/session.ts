@@ -4,15 +4,27 @@
 // reactively render.
 
 import { createSignal, type Signal } from "solid-js";
-import { userClient, authClient } from "./api";
+import { userClient, authClient, publicClient } from "./api";
 import type { User } from "@/gen/numun/v1/users_pb";
 import type { ExchangeRequest } from "@/gen/numun/v1/auth_pb";
+import type { ActiveConferenceSummary } from "@/gen/numun/v1/public_pb";
 
 const [currentUser, setCurrentUser] = createSignal<User | null>(null);
 const [loading, setLoading] = createSignal(false);
+const [activeConference, setActiveConference] =
+  createSignal<ActiveConferenceSummary | null>(null);
+const [activeConferenceLoaded, setActiveConferenceLoaded] = createSignal(false);
 
 export const userSignal: Signal<User | null> = [currentUser, setCurrentUser];
 export const loadingSignal: Signal<boolean> = [loading, setLoading];
+export const activeConferenceSignal: Signal<ActiveConferenceSummary | null> = [
+  activeConference,
+  setActiveConference,
+];
+export const activeConferenceLoadedSignal: Signal<boolean> = [
+  activeConferenceLoaded,
+  setActiveConferenceLoaded,
+];
 
 /**
  * loadCurrentUser hits UserService.GetMe and caches the result. Returns null
@@ -53,6 +65,21 @@ export async function exchange(
     rememberMe: req.rememberMe ?? false,
   });
   return loadCurrentUser();
+}
+
+/**
+ * loadActiveConference calls PublicService.GetActiveConference and caches the
+ * result. Safe to call repeatedly; the cached signal is the source of truth
+ * for advisor/admin screens needing to know "which conference are we in?".
+ */
+export async function loadActiveConference(): Promise<ActiveConferenceSummary | null> {
+  try {
+    const resp = await publicClient.getActiveConference({});
+    setActiveConference(resp.conference ?? null);
+    return resp.conference ?? null;
+  } finally {
+    setActiveConferenceLoaded(true);
+  }
 }
 
 export async function logout(): Promise<void> {

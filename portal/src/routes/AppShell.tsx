@@ -5,7 +5,12 @@
 import { onMount, Show, type JSX } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 
-import { loadCurrentUser, loadingSignal, userSignal } from "@/lib/session";
+import {
+  loadActiveConference,
+  loadCurrentUser,
+  loadingSignal,
+  userSignal,
+} from "@/lib/session";
 
 export default function AppShell(props: { children?: JSX.Element }) {
   const [user] = userSignal;
@@ -17,6 +22,15 @@ export default function AppShell(props: { children?: JSX.Element }) {
       const u = await loadCurrentUser();
       if (!u) {
         navigate("/sign-in", { replace: true });
+        return;
+      }
+      // Best-effort: cache the active conference for downstream screens.
+      // Failures here don't block render — the dependent screens surface
+      // their own "no active conference" state.
+      try {
+        await loadActiveConference();
+      } catch {
+        /* surfaced inline by dependent screens */
       }
     } catch {
       navigate("/sign-in", { replace: true });
