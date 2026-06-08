@@ -124,6 +124,14 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	delPath, delHandler := numunv1connect.NewDelegationServiceHandler(delSvc, opts)
 	mux.Handle(delPath, delHandler)
 
+	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Logger: logger}
+	delegatePath, delegateHandler := numunv1connect.NewDelegateServiceHandler(delegateSvc, opts)
+	mux.Handle(delegatePath, delegateHandler)
+
+	uploadSvc := &handlers.UploadService{Store: st, Logger: logger}
+	uploadPath, uploadHandler := numunv1connect.NewUploadServiceHandler(uploadSvc, opts)
+	mux.Handle(uploadPath, uploadHandler)
+
 	pubSvc := &handlers.PublicService{Store: st, Logger: logger}
 	pubPath, pubHandler := numunv1connect.NewPublicServiceHandler(pubSvc, opts)
 	mux.Handle(pubPath, pubHandler)

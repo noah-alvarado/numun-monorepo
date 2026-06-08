@@ -13,6 +13,9 @@ import Dashboard from "@/routes/Dashboard";
 import AppShell from "@/routes/AppShell";
 import MyDelegation from "@/routes/MyDelegation";
 import AdminDelegations from "@/routes/AdminDelegations";
+import DelegateImport from "@/routes/DelegateImport";
+import DelegateImportPreview from "@/routes/DelegateImportPreview";
+import DelegateImportResult from "@/routes/DelegateImportResult";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -49,6 +52,30 @@ render(
         component={() => (
           <AppShell>
             <AdminDelegations />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/delegations/:delegationId/delegates/import"
+        component={() => (
+          <AppShell>
+            <DelegateImport />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/delegations/:delegationId/delegates/import/preview"
+        component={() => (
+          <AppShell>
+            <DelegateImportPreview />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/delegations/:delegationId/delegates/import/result"
+        component={() => (
+          <AppShell>
+            <DelegateImportResult />
           </AppShell>
         )}
       />

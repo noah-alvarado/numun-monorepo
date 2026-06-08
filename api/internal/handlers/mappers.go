@@ -260,3 +260,45 @@ func tsOrNilFor(t time.Time) *timestamppb.Timestamp {
 	}
 	return timestamppb.New(t)
 }
+
+// ── Delegate ─────────────────────────────────────────────────────────────────
+
+func protoExperienceLevel(l domain.ExperienceLevel) v1.ExperienceLevel {
+	switch l {
+	case domain.ExperienceLevelNovice:
+		return v1.ExperienceLevel_EXPERIENCE_LEVEL_NOVICE
+	case domain.ExperienceLevelIntermediate:
+		return v1.ExperienceLevel_EXPERIENCE_LEVEL_INTERMEDIATE
+	case domain.ExperienceLevelAdvanced:
+		return v1.ExperienceLevel_EXPERIENCE_LEVEL_ADVANCED
+	}
+	return v1.ExperienceLevel_EXPERIENCE_LEVEL_UNSPECIFIED
+}
+
+func domainExperienceLevel(l v1.ExperienceLevel) domain.ExperienceLevel {
+	switch l {
+	case v1.ExperienceLevel_EXPERIENCE_LEVEL_NOVICE:
+		return domain.ExperienceLevelNovice
+	case v1.ExperienceLevel_EXPERIENCE_LEVEL_ADVANCED:
+		return domain.ExperienceLevelAdvanced
+	case v1.ExperienceLevel_EXPERIENCE_LEVEL_INTERMEDIATE, v1.ExperienceLevel_EXPERIENCE_LEVEL_UNSPECIFIED:
+		return domain.ExperienceLevelIntermediate
+	}
+	return domain.ExperienceLevelIntermediate
+}
+
+func delegateToProto(d domain.Delegate) *v1.Delegate {
+	return &v1.Delegate{
+		Id:              d.ID,
+		ConferenceId:    d.ConferenceID,
+		DelegationId:    d.DelegationID,
+		FirstName:       d.FirstName,
+		LastName:        d.LastName,
+		Email:           d.Email,
+		ExperienceLevel: protoExperienceLevel(d.ExperienceLevel),
+		CheckedInAt:     tsOrNilFor(d.CheckedInAt),
+		Version:         int32(d.Version),
+		CreatedAt:       tsOrNilFor(d.CreatedAt),
+		UpdatedAt:       tsOrNilFor(d.UpdatedAt),
+	}
+}

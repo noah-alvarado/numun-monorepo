@@ -1,0 +1,49 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// UploadPurpose — the only v1 use case is bulk-delegate roster uploads, but
+// the enum is open so future flows (e.g., committee background guides) can
+// reuse the same presign RPC. See BULK_IMPORT.md §7.1.
+enum UploadPurpose {
+  UPLOAD_PURPOSE_UNSPECIFIED = 0;
+  UPLOAD_PURPOSE_BULK_DELEGATES = 1;
+}
+
+// UploadService — returns presigned S3 PUT URLs that scope a single upload
+// to the caller. The S3 key shape is server-controlled; the portal only sees
+// it back via PresignResponse.upload_key. See SECURITY.md §2.8 and
+// BULK_IMPORT.md §7.1.
+service UploadService {
+  rpc Presign(PresignRequest) returns (PresignResponse) {}
+}
+
+message PresignRequest {
+  UploadPurpose purpose = 1;
+  // Original filename. Used only for extension validation; the server picks
+  // the actual S3 key.
+  string filename = 2 [(buf.validate.field).string = {min_len: 1, max_len: 255}];
+  // Content-Type the portal will send on the PUT. Server validates against
+  // the purpose's allowlist. For BULK_DELEGATES: text/csv,
+  // application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.
+  string content_type = 3 [(buf.validate.field).string.min_len = 1];
+  // Size in bytes the portal will send. Server enforces an upper bound per
+  // purpose (5 MB for BULK_DELEGATES) via the presign's Content-Length-Range
+  // condition.
+  int64 size_bytes = 4 [(buf.validate.field).int64.gt = 0];
+}
+
+message PresignResponse {
+  // The presigned PUT URL. TTL: 10 minutes.
+  string url = 1;
+  // The S3 key the file will land at. The portal echoes this back to
+  // PreviewUpsertDelegatesBulk.source.upload.upload_key.
+  string upload_key = 2;
+  // Required request headers for the PUT. The portal must set every header
+  // in this map verbatim or the signature won't match.
+  map<string, string> headers = 3;
+  google.protobuf.Timestamp expires_at = 4;
+}

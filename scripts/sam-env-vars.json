@@ -10,6 +10,7 @@
     "AWS_ENDPOINT_URL_SNS": "http://host.docker.internal:4566",
     "DEV_MODE": "true",
     "DEV_BYPASS_AUTH": "true",
-    "DDB_TABLE_NAME": "numun-test"
+    "DDB_TABLE_NAME": "numun-test",
+    "UPLOADS_BUCKET_NAME": "numun-test-uploads"
   }
 }

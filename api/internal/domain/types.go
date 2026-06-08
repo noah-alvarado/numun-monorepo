@@ -155,6 +155,97 @@ type Delegation struct {
 	UpdatedBy string
 }
 
+// ExperienceLevel — Delegate's experience level. See DATA_MODEL.md §2.4.
+type ExperienceLevel string
+
+const (
+	ExperienceLevelNovice       ExperienceLevel = "novice"
+	ExperienceLevelIntermediate ExperienceLevel = "intermediate"
+	ExperienceLevelAdvanced     ExperienceLevel = "advanced"
+)
+
+// Delegate — a student in a Delegation. No login; pure data record.
+// See DATA_MODEL.md §2.4.
+type Delegate struct {
+	ID              string
+	ConferenceID    string
+	DelegationID    string
+	FirstName       string
+	LastName        string
+	Email           string
+	ExperienceLevel ExperienceLevel
+	CheckedInAt     time.Time
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}
+
+// UpsertMode — bulk-import mode. See BULK_IMPORT.md §6.2.
+type UpsertMode string
+
+const (
+	UpsertModeAdditive UpsertMode = "additive"
+	UpsertModeFullSync UpsertMode = "full_sync"
+)
+
+// BulkImportSourceType — DATA_MODEL.md §2.17.
+type BulkImportSourceType string
+
+const (
+	BulkImportSourceCSV         BulkImportSourceType = "csv"
+	BulkImportSourceXLSX        BulkImportSourceType = "xlsx"
+	BulkImportSourceGoogleSheet BulkImportSourceType = "google_sheet"
+)
+
+// BulkImportPreview — short-lived parsed-row cache. DATA_MODEL.md §2.17 and
+// BULK_IMPORT.md §11.1. ParsedRows + Summary are stored as opaque JSON blobs
+// because the preview-row shape is a proto oneof; the store layer treats
+// them as []byte and the handler marshals/unmarshals to the generated type.
+type BulkImportPreview struct {
+	ID            string
+	UserID        string
+	DelegationID  string
+	ConferenceID  string
+	SourceType    BulkImportSourceType
+	SourceRef     string
+	TabName       string
+	ParsedRowsRaw []byte
+	SummaryRaw    []byte
+	CreatedAt     time.Time
+	ExpiresAt     time.Time
+}
+
+// BulkImportJobStatus — DATA_MODEL.md §2.18.
+type BulkImportJobStatus string
+
+const (
+	BulkImportJobApplying BulkImportJobStatus = "applying"
+	BulkImportJobComplete BulkImportJobStatus = "complete"
+	BulkImportJobFailed   BulkImportJobStatus = "failed"
+)
+
+// BulkImportJob — recovery / progress tracker for >100-op imports.
+// DATA_MODEL.md §2.18 and BULK_IMPORT.md §6.4.
+type BulkImportJob struct {
+	ID               string
+	UploadID         string
+	UserID           string
+	DelegationID     string
+	ConferenceID     string
+	Mode             UpsertMode
+	TotalBatches     int
+	CompletedBatches int
+	Status           BulkImportJobStatus
+	LastError        string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	ExpiresAt        time.Time
+}
+
 // AdvisorRole mirrors DelegationAdvisor.role from DATA_MODEL.md §2.5.
 type AdvisorRole string
 
@@ -225,6 +316,17 @@ const (
 	// Delegation lifecycle.
 	AuthEventDelegationApproved AuthAuditEventKind = "delegation_approved"
 	AuthEventDelegationRejected AuthAuditEventKind = "delegation_rejected"
+
+	// Bulk import (M6).
+	AuthEventBulkImportPreviewed  AuthAuditEventKind = "bulk_import_previewed"
+	AuthEventBulkImportCommitted  AuthAuditEventKind = "bulk_import_committed"
+	AuthEventBulkDelegatesPresign AuthAuditEventKind = "bulk_delegates_presigned"
+
+	// Delegate lifecycle (M6).
+	AuthEventDelegateCreated  AuthAuditEventKind = "delegate_created"
+	AuthEventDelegateUpdated  AuthAuditEventKind = "delegate_updated"
+	AuthEventDelegateDeleted  AuthAuditEventKind = "delegate_deleted"
+	AuthEventDelegateCheckedIn AuthAuditEventKind = "delegate_checked_in"
 )
 
 // AuthAuditEvent is the append-only auth audit row. See AUTH.md §13.2.

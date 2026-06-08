@@ -16,13 +16,20 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	ddbtypes "github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"github.com/aws/aws-sdk-go-v2/service/s3"
 )
 
 // Client holds the DynamoDB client + the resolved table name. Construct one
 // per process at startup and share across handlers.
+//
+// S3 + UploadsBucket are populated when UPLOADS_BUCKET_NAME is set; they
+// power PresignBulkDelegatesUpload (BULK_IMPORT.md §7.1). Tests that don't
+// touch uploads can leave UPLOADS_BUCKET_NAME unset and the fields stay nil.
 type Client struct {
-	DDB   *dynamodb.Client
-	Table string
+	DDB           *dynamodb.Client
+	Table         string
+	S3            *s3.Client
+	UploadsBucket string
 }
 
 // New builds a Client from the ambient AWS config. When AWS_ENDPOINT_URL_DYNAMODB
@@ -46,7 +53,17 @@ func New(ctx context.Context) (*Client, error) {
 	if tbl == "" {
 		return nil, fmt.Errorf("store: DDB_TABLE_NAME env var is required")
 	}
-	return &Client{DDB: ddb, Table: tbl}, nil
+	c := &Client{DDB: ddb, Table: tbl}
+	if bucket := os.Getenv("UPLOADS_BUCKET_NAME"); bucket != "" {
+		c.S3 = s3.NewFromConfig(cfg, func(o *s3.Options) {
+			if ep := os.Getenv("AWS_ENDPOINT_URL_S3"); ep != "" {
+				o.BaseEndpoint = aws.String(ep)
+				o.UsePathStyle = true // LocalStack / MinIO compatibility.
+			}
+		})
+		c.UploadsBucket = bucket
+	}
+	return c, nil
 }
 
 // ErrNotFound is returned by repositories when the requested row does not

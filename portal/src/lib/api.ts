@@ -14,6 +14,8 @@ import { AuthService } from "@/gen/numun/v1/auth_pb";
 import { UserService } from "@/gen/numun/v1/users_pb";
 import { ConferenceService } from "@/gen/numun/v1/conferences_pb";
 import { DelegationService } from "@/gen/numun/v1/delegations_pb";
+import { DelegateService } from "@/gen/numun/v1/delegates_pb";
+import { UploadService } from "@/gen/numun/v1/uploads_pb";
 import { PublicService } from "@/gen/numun/v1/public_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
@@ -67,4 +69,6 @@ export const authClient = createClient(AuthService, transport);
 export const userClient = createClient(UserService, transport);
 export const conferenceClient = createClient(ConferenceService, transport);
 export const delegationClient = createClient(DelegationService, transport);
+export const delegateClient = createClient(DelegateService, transport);
+export const uploadClient = createClient(UploadService, transport);
 export const publicClient = createClient(PublicService, transport);

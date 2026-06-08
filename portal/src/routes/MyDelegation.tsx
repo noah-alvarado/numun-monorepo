@@ -250,6 +250,12 @@ function EditBlock(props: {
         <span class="text-nu-purple-700">
           Version {props.delegation.version}
         </span>
+        <a
+          href={`/delegations/${props.delegation.id}/delegates/import`}
+          class="ml-auto rounded border border-nu-purple-300 px-3 py-1 text-xs text-nu-purple-700 hover:bg-nu-purple-50"
+        >
+          Bulk import delegates
+        </a>
       </div>
       <div class="rounded border border-nu-purple-200 bg-white p-6">
         <DelegationForm

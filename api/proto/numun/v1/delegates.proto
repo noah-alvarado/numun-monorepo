@@ -1,0 +1,272 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// ExperienceLevel — the algorithm input on Delegate. See DATA_MODEL.md §2.4
+// and ASSIGNMENT_ALGORITHM.md §4.1. Default is INTERMEDIATE.
+enum ExperienceLevel {
+  EXPERIENCE_LEVEL_UNSPECIFIED = 0;
+  EXPERIENCE_LEVEL_NOVICE = 1;
+  EXPERIENCE_LEVEL_INTERMEDIATE = 2;
+  EXPERIENCE_LEVEL_ADVANCED = 3;
+}
+
+// Delegate — a student in a Delegation. No login; pure data record.
+// See DATA_MODEL.md §2.4 and API.md §10.6.
+message Delegate {
+  string id = 1;
+  string conference_id = 2;
+  string delegation_id = 3;
+  string first_name = 4;
+  string last_name = 5;
+  // Optional. Empty string when absent.
+  string email = 6;
+  ExperienceLevel experience_level = 7;
+  // Optional. Set day-of by CheckIn.
+  google.protobuf.Timestamp checked_in_at = 8;
+
+  int32 version = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// DelegateInput — wire shape of a single delegate row, used in CreateDelegate,
+// UpdateDelegate, Preview-/Upsert-DelegatesBulk. Validation lives in handler
+// + parser layers; this message intentionally avoids buf.validate on text
+// fields so the parser can surface row-level errors with the field path.
+message DelegateInput {
+  string first_name = 1;
+  string last_name = 2;
+  string email = 3;
+  ExperienceLevel experience_level = 4;
+}
+
+// FieldViolation — per-row, per-field error surfaced in PreviewRow.errors.
+// Mirrors google.rpc.BadRequest.FieldViolation for portal symmetry.
+message FieldViolation {
+  string field = 1;
+  string message = 2;
+}
+
+// PreviewRow — one parsed row's preview entry. See BULK_IMPORT.md §4.1.
+message PreviewRow {
+  // 1-indexed source row, header excluded.
+  int32 row_number = 1;
+  DelegateInput input = 2;
+  repeated FieldViolation errors = 3;
+
+  // Match result. Exactly one of the three is set unless errors is non-empty,
+  // in which case match may be unset.
+  message CreateMatch {}
+  message UpdateMatch {
+    string existing_delegate_id = 1;
+    // Field name → before/after pair. JSON-encoded for wire-shape simplicity.
+    map<string, FieldDiff> diff = 2;
+  }
+  message ConflictMatch {
+    int32 with_row_number = 1;
+    string reason = 2;
+  }
+  oneof match {
+    CreateMatch create = 10;
+    UpdateMatch update = 11;
+    ConflictMatch conflict = 12;
+  }
+}
+
+message FieldDiff {
+  string old = 1;
+  string new = 2;
+}
+
+// PreviewSummary — counters returned with a PreviewUpsertDelegatesBulk
+// response. See BULK_IMPORT.md §4.1.
+message PreviewSummary {
+  int32 parsed_count = 1;
+  int32 valid_count = 2;
+  int32 error_count = 3;
+  int32 create_count = 4;
+  int32 update_count = 5;
+  int32 match_by_email = 6;
+  int32 match_by_name = 7;
+  repeated string ignored_columns = 8;
+  // Populated only for Full-sync mode previews on the commit response. Echoed
+  // on Preview for transparency when mode is fixed at preview time (it isn't
+  // in v1, so always 0 here).
+  int32 soft_delete_count = 9;
+}
+
+// UpsertMode — additive (default) vs. full-sync (destructive). See
+// BULK_IMPORT.md §6.2.
+enum UpsertMode {
+  UPSERT_MODE_UNSPECIFIED = 0;
+  UPSERT_MODE_ADDITIVE = 1;
+  UPSERT_MODE_FULL_SYNC = 2;
+}
+
+// CommitSummary — final counters returned by UpsertDelegatesBulk. Mirrors
+// PreviewSummary fields plus the job id for resumable large imports.
+message CommitSummary {
+  int32 create_count = 1;
+  int32 update_count = 2;
+  int32 soft_delete_count = 3;
+  // Set when the import exceeded 100 ops and ran via a BulkImportJob. Empty
+  // for small imports. See BULK_IMPORT.md §6.4.
+  string bulk_import_job_id = 4;
+  int32 total_batches = 5;
+  int32 completed_batches = 6;
+  // "applying" | "complete" | "failed". Empty for small (one-shot) imports.
+  string status = 7;
+  // Populated when a batch failed; the portal renders a resume affordance.
+  // See BULK_IMPORT.md §6.4.
+  string last_error = 8;
+}
+
+// DelegateService — see API.md §10.6 and BULK_IMPORT.md.
+service DelegateService {
+  rpc ListDelegates(ListDelegatesRequest) returns (ListDelegatesResponse) {}
+  rpc ListAllDelegates(ListAllDelegatesRequest) returns (ListAllDelegatesResponse) {}
+  rpc GetDelegate(GetDelegateRequest) returns (GetDelegateResponse) {}
+  rpc CreateDelegate(CreateDelegateRequest) returns (CreateDelegateResponse) {}
+  rpc UpdateDelegate(UpdateDelegateRequest) returns (UpdateDelegateResponse) {}
+  rpc DeleteDelegate(DeleteDelegateRequest) returns (DeleteDelegateResponse) {}
+  rpc CheckIn(CheckInRequest) returns (CheckInResponse) {}
+
+  rpc PreviewUpsertDelegatesBulk(PreviewUpsertDelegatesBulkRequest) returns (PreviewUpsertDelegatesBulkResponse) {}
+  rpc UpsertDelegatesBulk(UpsertDelegatesBulkRequest) returns (UpsertDelegatesBulkResponse) {}
+  rpc DeleteBulkImportPreview(DeleteBulkImportPreviewRequest) returns (DeleteBulkImportPreviewResponse) {}
+
+  // Resumes a previously-failed large import. Looks up the BulkImportJob,
+  // re-validates against the cache, and processes remaining batches.
+  // See BULK_IMPORT.md §6.4.
+  rpc ResumeBulkImport(ResumeBulkImportRequest) returns (ResumeBulkImportResponse) {}
+}
+
+message ListDelegatesRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  PageRequest page = 2;
+}
+message ListDelegatesResponse {
+  repeated Delegate items = 1;
+  Page page = 2;
+}
+
+message ListAllDelegatesRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListAllDelegatesResponse {
+  repeated Delegate items = 1;
+}
+
+message GetDelegateRequest {
+  string delegate_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetDelegateResponse {
+  Delegate delegate = 1;
+}
+
+message CreateDelegateRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  DelegateInput input = 2 [(buf.validate.field).required = true];
+}
+message CreateDelegateResponse {
+  Delegate delegate = 1;
+}
+
+message UpdateDelegateRequest {
+  string delegate_id = 1 [(buf.validate.field).string.min_len = 1];
+  // All fields optional; omitted == unchanged. Use proto3 field-presence on
+  // string/enum via explicit setters in handler.
+  optional string first_name = 2;
+  optional string last_name = 3;
+  optional string email = 4;
+  optional ExperienceLevel experience_level = 5;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateDelegateResponse {
+  Delegate delegate = 1;
+}
+
+message DeleteDelegateRequest {
+  string delegate_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message DeleteDelegateResponse {}
+
+message CheckInRequest {
+  string delegate_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message CheckInResponse {
+  Delegate delegate = 1;
+}
+
+// ── Bulk import ────────────────────────────────────────────────────────────
+
+// SourceFormat — the wire form of the underlying upload format. See
+// BULK_IMPORT.md §2.1.
+enum SourceFormat {
+  SOURCE_FORMAT_UNSPECIFIED = 0;
+  SOURCE_FORMAT_CSV = 1;
+  SOURCE_FORMAT_XLSX = 2;
+}
+
+// UploadSource — used when the file was uploaded via S3 presign.
+message UploadSource {
+  string upload_key = 1 [(buf.validate.field).string.min_len = 1];
+  SourceFormat format = 2;
+  // Optional. Required for XLSX with multiple tabs. Empty selects the only
+  // tab when there is exactly one.
+  string tab_name = 3;
+}
+
+// GoogleSheetSource — used for the paste-a-URL flow.
+message GoogleSheetSource {
+  string url = 1 [(buf.validate.field).string.min_len = 1];
+  // Optional. The `gid` URL parameter, if present, overrides this.
+  string tab_name = 2;
+}
+
+message PreviewUpsertDelegatesBulkRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  oneof source {
+    UploadSource upload = 2;
+    GoogleSheetSource google_sheet = 3;
+  }
+}
+
+message PreviewUpsertDelegatesBulkResponse {
+  string upload_id = 1;
+  // Populated only when the source had more than one tab and tab_name was
+  // empty. Portal renders a tab picker and re-invokes Preview.
+  repeated string available_tabs = 2;
+  repeated PreviewRow rows = 3;
+  PreviewSummary summary = 4;
+}
+
+message UpsertDelegatesBulkRequest {
+  string upload_id = 1 [(buf.validate.field).string.min_len = 1];
+  string delegation_id = 2 [(buf.validate.field).string.min_len = 1];
+  UpsertMode mode = 3;
+  // Final values, including any inline edits in the portal. The server
+  // re-validates and re-computes matches against the live roster.
+  repeated DelegateInput rows = 4;
+}
+message UpsertDelegatesBulkResponse {
+  CommitSummary summary = 1;
+}
+
+message DeleteBulkImportPreviewRequest {
+  string upload_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message DeleteBulkImportPreviewResponse {}
+
+message ResumeBulkImportRequest {
+  string bulk_import_job_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ResumeBulkImportResponse {
+  CommitSummary summary = 1;
+}

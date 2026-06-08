@@ -91,9 +91,7 @@ func (s *Scoper) MustHaveScopeOnDelegation(ctx context.Context, delegationID str
 
 // MustHaveScopeOnDelegate gates access to a Delegate id by resolving the
 // delegate's parent delegation and delegating to MustHaveScopeOnDelegation.
-// M3 stub note: Delegate repo lands in M6; until then this returns
-// ErrScopeDenied for non-admins.
-func (s *Scoper) MustHaveScopeOnDelegate(ctx context.Context, _ string) error {
+func (s *Scoper) MustHaveScopeOnDelegate(ctx context.Context, delegateID string) error {
 	c, ok := FromContext(ctx)
 	if !ok {
 		return ErrUnauthenticated
@@ -101,7 +99,17 @@ func (s *Scoper) MustHaveScopeOnDelegate(ctx context.Context, _ string) error {
 	if c.Role == domain.RoleStaffAdmin {
 		return nil
 	}
-	return ErrScopeDenied
+	if s == nil || s.Store == nil {
+		return ErrScopeDenied
+	}
+	d, err := s.Store.FindDelegateByID(ctx, delegateID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return ErrScopeDenied
+		}
+		return err
+	}
+	return s.MustHaveScopeOnDelegation(ctx, d.DelegationID)
 }
 
 // MustHaveScopeOnCommittee gates access to a Committee id. M3 wires the

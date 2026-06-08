@@ -124,6 +124,15 @@ Resources:
                   - cognito-idp:AdminUpdateUserAttributes
                 Resource:
                   - !Ref CognitoUserPoolArn
+              # M6 bulk-delegate uploads: presign PUTs + read uploaded files.
+              # Bucket-level ListBucket isn't needed; the API only reads the
+              # specific key it just presigned.
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:GetObject
+                Resource:
+                  - !Sub "arn:aws:s3:::numun-${Env}-uploads/*"
 
   # ── HTTP API ────────────────────────────────────────────────────────────────
   ApiFunction:
@@ -139,6 +148,7 @@ Resources:
         Variables:
           AWS_REGION_NAME: !Ref AWS::Region
           DDB_TABLE_NAME: !Sub "numun-${Env}"
+          UPLOADS_BUCKET_NAME: !Sub "numun-${Env}-uploads"
           COMMIT_SHA: !Ref CommitSha
           RELEASE_VERSION: !Ref ReleaseVersion
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
