@@ -43,6 +43,18 @@ const canonical = canonicalPath
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content={themeColor} />
+    <!--
+      Northwestern-blessed web typefaces from the brand guidelines:
+        - IBM Plex Sans → Akkurat Pro substitute, body sans (Tailwind `font-sans`)
+        - Poppins       → headlines / subheads on the web (Tailwind `font-display`)
+        - Noto Serif    → body text on the web (Tailwind `font-serif`)
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Poppins:wght@400;500;600;700&family=Noto+Serif:wght@400;700&display=swap"
+    />
     <title>{resolvedTitle}</title>
     <meta name="description" content={resolvedDescription} />
     <link rel="canonical" href={canonical} />
@@ -57,7 +69,13 @@ const canonical = canonicalPath
     <meta name="twitter:description" content={resolvedDescription} />
     {resolvedOg && <meta name="twitter:image" content={resolvedOg} />}
   </head>
-  <body class="bg-white text-nu-purple-900 font-sans">
+  <!--
+    Body default is the serif stack (Periódico / Noto Serif) per
+    Northwestern's typography guidance: "Periódico Text… meant to be used
+    for longer chunks of copy at smaller sizes." Headlines opt into
+    `font-display` / `font-sans` (Poppins / Campton) explicitly.
+  -->
+  <body class="bg-white text-nu-black-800 font-serif">
     <slot />
   </body>
 </html>
