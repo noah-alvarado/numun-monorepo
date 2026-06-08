@@ -10,7 +10,7 @@ For higher-level context, read [README.md](./README.md) and then [PROJECT.md](./
 
 ## 1. Codebase orientation
 
-The repo is a single monorepo at `/Users/<you>/numun-vClaude` (or wherever you cloned it). Top-level directories:
+The repo is a single monorepo at `/Users/<you>/numun-monorepo` (or wherever you cloned it). Top-level directories:
 
 ```
 /site/         — Astro static site (numun.org)
@@ -115,8 +115,8 @@ golangci-lint --version
 
 ```bash
 # Clone and enter the repo
-git clone <repo-url> numun-vClaude
-cd numun-vClaude
+git clone <repo-url> numun-monorepo
+cd numun-monorepo
 
 # Pin Node version
 fnm use   # reads .nvmrc → 24.16.0

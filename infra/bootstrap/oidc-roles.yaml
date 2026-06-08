@@ -23,7 +23,7 @@ Parameters:
     Description: GitHub organization or user that owns the NUMUN monorepo.
   GitHubRepo:
     Type: String
-    Description: Repository name within GitHubOrg (e.g., "numun-vClaude").
+    Description: Repository name within GitHubOrg (e.g., "numun-monorepo").
   GitHubEnvironment:
     Type: String
     Default: test
