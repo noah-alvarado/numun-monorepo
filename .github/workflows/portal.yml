@@ -27,7 +27,9 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment: test
+    environment:
+      name: test
+      url: https://portal.${{ vars.APEX_DOMAIN }}
     env:
       AWS_REGION: us-east-2
       BUCKET: numun-${{ vars.ENV_NAME }}-portal
