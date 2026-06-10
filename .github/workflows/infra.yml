@@ -6,6 +6,12 @@ name: deploy infra
 on:
   workflow_dispatch:
     inputs:
+      environment:
+        description: GitHub Environment to deploy to
+        required: false
+        default: test
+        type: choice
+        options: [test, prod]
       stack:
         description: Which stack to deploy
         required: true
@@ -29,7 +35,7 @@ jobs:
   base-data:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'base-data' }}
     runs-on: ubuntu-latest
-    environment: test
+    environment: ${{ inputs.environment || 'test' }}
     env:
       AWS_REGION: us-east-2
       STACK_NAME: numun-${{ vars.ENV_NAME }}-base-data
@@ -61,7 +67,7 @@ jobs:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'base-cdn' }}
     needs: [base-data]
     runs-on: ubuntu-latest
-    environment: test
+    environment: ${{ inputs.environment || 'test' }}
     env:
       AWS_REGION: us-east-2
       STACK_NAME: numun-${{ vars.ENV_NAME }}-base-cdn
@@ -93,7 +99,7 @@ jobs:
   billing-alarm:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'billing-alarm' }}
     runs-on: ubuntu-latest
-    environment: test
+    environment: ${{ inputs.environment || 'test' }}
     env:
       AWS_REGION: us-east-1
       STACK_NAME: numun-${{ vars.ENV_NAME }}-billing-alarm

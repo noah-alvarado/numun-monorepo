@@ -9,6 +9,12 @@ on:
       - ".github/workflows/api.yml"
   workflow_dispatch:
     inputs:
+      environment:
+        description: GitHub Environment to deploy to
+        required: false
+        default: test
+        type: choice
+        options: [test, prod]
       bump:
         description: Which semver component to bump
         required: false
@@ -28,7 +34,7 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     environment:
-      name: test
+      name: ${{ inputs.environment || 'test' }}
       url: https://api.${{ vars.APEX_DOMAIN }}
     env:
       AWS_REGION: us-east-2
