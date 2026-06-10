@@ -1,0 +1,120 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// AwardRecipientKind — what sort of entity is being honored. See
+// DATA_MODEL.md §2.14 and IMPLEMENTATION_PLAN.md M11. The original design only
+// modeled delegate/delegation; M11 expands to committee, user (covers both
+// staff-staffer and advisor), and conference. A "delegate-pair" is represented
+// as two recipients with kind=DELEGATE on the same Award.
+enum AwardRecipientKind {
+  AWARD_RECIPIENT_KIND_UNSPECIFIED = 0;
+  AWARD_RECIPIENT_KIND_DELEGATE = 1;
+  AWARD_RECIPIENT_KIND_DELEGATION = 2;
+  AWARD_RECIPIENT_KIND_COMMITTEE = 3;
+  AWARD_RECIPIENT_KIND_USER = 4;
+  AWARD_RECIPIENT_KIND_CONFERENCE = 5;
+}
+
+// AwardRecipient — one recipient of an Award.
+message AwardRecipient {
+  AwardRecipientKind kind = 1;
+  string id = 2 [(buf.validate.field).string.min_len = 1];
+  // Best-effort denormalized display name (delegate name, delegation school,
+  // committee name, user name, conference name). Set server-side at write
+  // time so the CMS/Astro side can render without re-fetching.
+  string display_name = 3;
+}
+
+// Award — DATA_MODEL.md §2.14 (expanded for M11).
+message Award {
+  string id = 1;
+  string conference_id = 2;
+  string name = 3;
+  string category = 4;
+  repeated AwardRecipient recipients = 5;
+  google.protobuf.Timestamp awarded_at = 6;
+  string awarded_by = 7;
+
+  int32 version = 10;
+  google.protobuf.Timestamp created_at = 11;
+  google.protobuf.Timestamp updated_at = 12;
+}
+
+// CmsSyncStatus reports the final state of the inline CMS-git sync that runs
+// after each mutating award RPC. DDB is the source of truth; this status only
+// tells the caller whether the public site was kept in sync. See
+// IMPLEMENTATION_PLAN.md M11 — "synchronous in the handler" with 3-attempt
+// exponential backoff.
+message CmsSyncStatus {
+  bool ok = 1;
+  int32 attempts = 2;
+  // Empty when ok=true. The final error message from the last attempt.
+  string final_error = 3;
+  // The git commit SHA for the resulting commit, when ok=true. Empty when
+  // the sync was a no-op (e.g., DEV_MODE stub).
+  string commit_sha = 4;
+}
+
+// AwardService — CRUD for awards. Reads available to any authenticated caller
+// with scope on the conference (matches public-archive visibility). Writes are
+// scoped by role: admin can target any recipient kind; staff-staffer can
+// target delegates/delegations/staffers tied to delegations they're assigned
+// to; advisors cannot write. See IMPLEMENTATION_PLAN.md M11.
+service AwardService {
+  rpc ListAwards(ListAwardsRequest) returns (ListAwardsResponse) {}
+  rpc GetAward(GetAwardRequest) returns (GetAwardResponse) {}
+  rpc CreateAward(CreateAwardRequest) returns (CreateAwardResponse) {}
+  rpc UpdateAward(UpdateAwardRequest) returns (UpdateAwardResponse) {}
+  rpc DeleteAward(DeleteAwardRequest) returns (DeleteAwardResponse) {}
+}
+
+message ListAwardsRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListAwardsResponse {
+  repeated Award items = 1;
+}
+
+message GetAwardRequest {
+  string award_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetAwardResponse {
+  Award award = 1;
+}
+
+message CreateAwardRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  string name = 2 [(buf.validate.field).string = {min_len: 1, max_len: 200}];
+  string category = 3 [(buf.validate.field).string.max_len = 200];
+  repeated AwardRecipient recipients = 4 [(buf.validate.field).repeated.min_items = 1];
+}
+message CreateAwardResponse {
+  Award award = 1;
+  CmsSyncStatus cms_sync = 2;
+}
+
+message UpdateAwardRequest {
+  string award_id = 1 [(buf.validate.field).string.min_len = 1];
+  optional string name = 2;
+  optional string category = 3;
+  // Replaces the full recipient list when present. Omit to leave unchanged.
+  repeated AwardRecipient recipients = 4;
+  bool recipients_set = 5;
+  int32 expected_version = 10 [(buf.validate.field).int32.gt = 0];
+}
+message UpdateAwardResponse {
+  Award award = 1;
+  CmsSyncStatus cms_sync = 2;
+}
+
+message DeleteAwardRequest {
+  string award_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message DeleteAwardResponse {
+  CmsSyncStatus cms_sync = 1;
+}

@@ -371,6 +371,29 @@ func domainPrestigeTier(p v1.PrestigeTier) domain.PrestigeTier {
 	return domain.PrestigeTierStandard
 }
 
+func awardToProto(a domain.Award) *v1.Award {
+	out := &v1.Award{
+		Id:           a.ID,
+		ConferenceId: a.ConferenceID,
+		Name:         a.Name,
+		Category:     a.Category,
+		AwardedBy:    a.AwardedBy,
+		AwardedAt:    tsOrNilFor(a.AwardedAt),
+		Version:      int32(a.Version),
+		CreatedAt:    tsOrNilFor(a.CreatedAt),
+		UpdatedAt:    tsOrNilFor(a.UpdatedAt),
+	}
+	out.Recipients = make([]*v1.AwardRecipient, 0, len(a.Recipients))
+	for _, r := range a.Recipients {
+		out.Recipients = append(out.Recipients, &v1.AwardRecipient{
+			Kind:        protoAwardRecipientKind(r.Kind),
+			Id:          r.ID,
+			DisplayName: r.DisplayName,
+		})
+	}
+	return out
+}
+
 func committeeToProto(c domain.Committee) *v1.Committee {
 	return &v1.Committee{
 		Id:                 c.ID,

@@ -17,23 +17,26 @@ import (
 // userItem is the on-the-wire DDB shape for a User row. Keep this separate
 // from domain.User so the storage layout stays decoupled from the domain.
 type userItem struct {
-	PK                 string            `dynamodbav:"PK"`
-	SK                 string            `dynamodbav:"SK"`
-	Entity             string            `dynamodbav:"entity"`
-	ID                 string            `dynamodbav:"id"`
-	Role               string            `dynamodbav:"role"`
-	Email              string            `dynamodbav:"email"`
-	Name               string            `dynamodbav:"name"`
-	Phone              string            `dynamodbav:"phone"`
-	EmailStatus        string            `dynamodbav:"emailStatus"`
-	AnnouncementsOptIn bool              `dynamodbav:"announcementsOptIn"`
-	IsDeleted          bool              `dynamodbav:"isDeleted"`
-	Version            int               `dynamodbav:"version"`
-	CreatedAt          string            `dynamodbav:"createdAt"`
-	UpdatedAt          string            `dynamodbav:"updatedAt"`
-	CreatedBy          string            `dynamodbav:"createdBy,omitempty"`
-	UpdatedBy          string            `dynamodbav:"updatedBy,omitempty"`
-	Extra              map[string]string `dynamodbav:"-"`
+	PK                 string `dynamodbav:"PK"`
+	SK                 string `dynamodbav:"SK"`
+	Entity             string `dynamodbav:"entity"`
+	ID                 string `dynamodbav:"id"`
+	Role               string `dynamodbav:"role"`
+	Email              string `dynamodbav:"email"`
+	Name               string `dynamodbav:"name"`
+	Phone              string `dynamodbav:"phone"`
+	EmailStatus        string `dynamodbav:"emailStatus"`
+	AnnouncementsOptIn bool   `dynamodbav:"announcementsOptIn"`
+	// DismissedAwardIDs stored as a DDB String Set (SS) so the AddDismissedAward
+	// ADD update is naturally idempotent. M11.
+	DismissedAwardIDs []string          `dynamodbav:"dismissedAwardIds,stringset,omitempty"`
+	IsDeleted         bool              `dynamodbav:"isDeleted"`
+	Version           int               `dynamodbav:"version"`
+	CreatedAt         string            `dynamodbav:"createdAt"`
+	UpdatedAt         string            `dynamodbav:"updatedAt"`
+	CreatedBy         string            `dynamodbav:"createdBy,omitempty"`
+	UpdatedBy         string            `dynamodbav:"updatedBy,omitempty"`
+	Extra             map[string]string `dynamodbav:"-"`
 }
 
 func userPK(id string) string { return "USER#" + id }
@@ -49,6 +52,7 @@ func userFromItem(it userItem) domain.User {
 		Phone:              it.Phone,
 		EmailStatus:        domain.EmailStatus(it.EmailStatus),
 		AnnouncementsOptIn: it.AnnouncementsOptIn,
+		DismissedAwardIDs:  it.DismissedAwardIDs,
 		IsDeleted:          it.IsDeleted,
 		Version:            it.Version,
 		CreatedBy:          it.CreatedBy,
@@ -214,6 +218,39 @@ func (c *Client) UpdateUser(ctx context.Context, id string, expectedVersion int,
 			return domain.User{}, ErrVersionMismatch
 		}
 		return domain.User{}, fmt.Errorf("update user: %w", err)
+	}
+	var it userItem
+	if err := attributevalue.UnmarshalMap(out.Attributes, &it); err != nil {
+		return domain.User{}, fmt.Errorf("unmarshal user: %w", err)
+	}
+	return userFromItem(it), nil
+}
+
+// AddDismissedAward appends awardID to the User's dismissedAwardIds set.
+// DDB's ADD on a String Set is naturally idempotent — calling it twice with
+// the same value is a no-op. Returns the refreshed User. M11.
+func (c *Client) AddDismissedAward(ctx context.Context, userID, awardID string) (domain.User, error) {
+	out, err := c.DDB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(c.Table),
+		Key: map[string]ddbtypes.AttributeValue{
+			"PK": &ddbtypes.AttributeValueMemberS{Value: userPK(userID)},
+			"SK": &ddbtypes.AttributeValueMemberS{Value: userSK},
+		},
+		UpdateExpression:    aws.String("ADD dismissedAwardIds :a SET updatedAt = :now"),
+		ConditionExpression: aws.String("attribute_exists(PK) AND isDeleted = :false"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":a":     &ddbtypes.AttributeValueMemberSS{Value: []string{awardID}},
+			":now":   &ddbtypes.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339Nano)},
+			":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+		},
+		ReturnValues: ddbtypes.ReturnValueAllNew,
+	})
+	if err != nil {
+		var ccf *ddbtypes.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return domain.User{}, ErrNotFound
+		}
+		return domain.User{}, fmt.Errorf("add dismissed award: %w", err)
 	}
 	var it userItem
 	if err := attributevalue.UnmarshalMap(out.Attributes, &it); err != nil {

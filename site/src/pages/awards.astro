@@ -1,0 +1,97 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "@/layouts/Layout.astro";
+
+const entries = await getCollection("awards-archive");
+
+// Sort by year DESC, then by awardName ASC. Entries without a year are
+// pushed to the bottom under an "Undated" header so the API can sync
+// partial frontmatter without breaking the page.
+const sorted = [...entries].sort((a, b) => {
+  const ay = a.data.year ?? -Infinity;
+  const by = b.data.year ?? -Infinity;
+  if (ay !== by) return by - ay;
+  return a.data.awardName.localeCompare(b.data.awardName);
+});
+
+// Group by year for headed sections.
+type Entry = (typeof sorted)[number];
+const groups: Array<{ label: string; items: Entry[] }> = [];
+let current: { label: string; items: Entry[] } | null = null;
+for (const e of sorted) {
+  const label = e.data.year ? String(e.data.year) : "Undated";
+  if (!current || current.label !== label) {
+    current = { label, items: [] };
+    groups.push(current);
+  }
+  current.items.push(e);
+}
+
+const kindLabels: Record<string, string> = {
+  delegate: "delegate",
+  delegation: "delegation",
+  committee: "committee",
+  user: "staffer/advisor",
+  conference: "conference",
+};
+---
+
+<Layout
+  title="Awards"
+  description="Notable awards from NUMUN conferences."
+  canonicalPath="/awards"
+>
+  <main class="mx-auto max-w-4xl px-6 py-16">
+    <h1 class="font-display text-4xl font-bold text-nu-purple">Awards</h1>
+    <p class="mt-2 text-nu-black-500">
+      Recognitions earned by delegates, delegations, committees, staffers, and
+      conferences.
+    </p>
+
+    {
+      groups.length === 0 && (
+        <p class="mt-10 text-nu-black-500">No awards have been recorded yet.</p>
+      )
+    }
+
+    {
+      groups.map((g) => (
+        <section class="mt-10">
+          <h2 class="font-display text-2xl font-semibold text-nu-purple border-b border-nu-purple-200 pb-1">
+            {g.label}
+          </h2>
+          <ul class="mt-4 space-y-4">
+            {g.items.map((e) => (
+              <li class="rounded border border-nu-purple-200 bg-white p-4">
+                <div class="flex flex-wrap items-baseline justify-between gap-2">
+                  <h3 class="font-display text-lg font-semibold text-nu-purple">
+                    {e.data.awardName}
+                  </h3>
+                  {e.data.category && (
+                    <span class="text-xs uppercase tracking-wide text-nu-black-500">
+                      {e.data.category}
+                    </span>
+                  )}
+                </div>
+                {e.data.recipients.length > 0 && (
+                  <ul class="mt-2 text-sm text-nu-black-500 space-y-0.5">
+                    {e.data.recipients.map((r) => (
+                      <li>
+                        <span class="font-medium text-nu-black-700">
+                          {r.displayName ?? r.id}
+                        </span>{" "}
+                        <span class="text-nu-black-400">
+                          ({kindLabels[r.kind] ?? r.kind})
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </main>
+</Layout>

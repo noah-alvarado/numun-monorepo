@@ -229,14 +229,34 @@ const pastConferences = defineCollection({
   }),
 });
 
+// Awards archive — API-synced by the Lambdalith from DDB as of M11. Schema
+// mirrors /cms/config.yml; the API writes the frontmatter and any manual
+// edits via Decap get overwritten on the next AwardService mutation.
 const awardsArchive = defineCollection({
   loader: glob({ pattern: "**/*.md", base: root("awards-archive") }),
   schema: z.object({
-    year: z.number().int(),
-    awardName: z.string().max(80),
-    recipientName: z.string().max(120),
-    recipientType: z.enum(["delegate", "delegation"]),
-    conferenceName: z.string().max(80).optional(),
+    awardId: z.string(),
+    conferenceId: z.string().optional(),
+    year: z.number().int().optional(),
+    awardName: z.string().max(200),
+    category: z.string().max(200).optional(),
+    recipients: z
+      .array(
+        z.object({
+          kind: z.enum([
+            "delegate",
+            "delegation",
+            "committee",
+            "user",
+            "conference",
+          ]),
+          id: z.string(),
+          displayName: z.string().optional(),
+        }),
+      )
+      .default([]),
+    awardedAt: z.coerce.date().optional(),
+    awardedBy: z.string().optional(),
   }),
 });
 

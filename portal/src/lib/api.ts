@@ -28,6 +28,7 @@ import {
 import { PaymentService } from "@/gen/numun/v1/payments_pb";
 import { AnnouncementService } from "@/gen/numun/v1/announcements_pb";
 import { EmailHealthService } from "@/gen/numun/v1/email_health_pb";
+import { AwardService } from "@/gen/numun/v1/awards_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -93,3 +94,19 @@ export const assignmentRunClient = createClient(
 export const paymentClient = createClient(PaymentService, transport);
 export const announcementClient = createClient(AnnouncementService, transport);
 export const emailHealthClient = createClient(EmailHealthService, transport);
+export const awardClient = createClient(AwardService, transport);
+
+// CSV download URL builders for the parallel non-Connect HTTP routes
+// (API.md §12). Use these from <a download> links or window.location.href
+// so the browser drives the download flow.
+export const exportUrls = {
+  assignmentsCsv(conferenceId: string): string {
+    return `${baseUrl}/v1/exports/assignments.csv?conference_id=${encodeURIComponent(conferenceId)}`;
+  },
+  delegatesCsv(conferenceId: string): string {
+    return `${baseUrl}/v1/exports/delegates.csv?conference_id=${encodeURIComponent(conferenceId)}`;
+  },
+  paymentsCsv(conferenceId: string): string {
+    return `${baseUrl}/v1/exports/payments.csv?conference_id=${encodeURIComponent(conferenceId)}`;
+  },
+};

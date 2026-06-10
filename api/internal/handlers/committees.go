@@ -432,4 +432,3 @@ func (s *PositionService) log() *slog.Logger {
 	}
 	return slog.Default()
 }
-

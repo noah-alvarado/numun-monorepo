@@ -220,6 +220,17 @@ Resources:
           # follow-up; it is the GitHub OAuth App registration walkthrough).
           # The existing IAM policy below already permits ssm:GetParameter on
           # the full /numun/${Env}/* tree, so no IAM change is needed.
+          #
+          # M11 — AwardService writes back to the CMS via a GitHub App
+          # (`numun-cms-bot`). The Lambdalith reads five params from SSM at
+          # cold-start:
+          #   /numun/${Env}/github_app/app_id           (String)
+          #   /numun/${Env}/github_app/installation_id  (String)
+          #   /numun/${Env}/github_app/private_key      (SecureString — PEM)
+          #   /numun/${Env}/github_app/repo             (String — "owner/name")
+          #   /numun/${Env}/github_app/branch           (String, optional; defaults "main")
+          # These also live under the same /numun/${Env}/* tree, so the
+          # existing IAM grant covers them. See docs/runbooks/github-app-setup.md.
       Events:
         AnyHttp:
           Type: HttpApi

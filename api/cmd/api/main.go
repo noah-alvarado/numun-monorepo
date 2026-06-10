@@ -22,6 +22,7 @@ import (
 	"github.com/awslabs/aws-lambda-go-api-proxy/httpadapter"
 
 	"github.com/numun/numun/api/internal/auth"
+	"github.com/numun/numun/api/internal/cms"
 	"github.com/numun/numun/api/internal/cmsoauth"
 	"github.com/numun/numun/api/internal/email"
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
@@ -67,7 +68,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	root := buildHandler(logger, st, cog, verifier, emailSvc)
+	// CMS git client (M11). When SSM credentials are missing — typical in
+	// `make dev` — fall back to a stub that reports ok without network I/O so
+	// award mutations still work locally; the public site won't update there.
+	cmsClient := buildCMSClient(ctx, logger)
+
+	root := buildHandler(logger, st, cog, verifier, emailSvc, cmsClient)
 
 	if os.Getenv("LOCAL_HTTP") == "true" {
 		addr := ":3000"
@@ -82,7 +88,27 @@ func main() {
 	lambda.Start(httpadapter.NewV2(root).ProxyWithContext)
 }
 
-func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver *auth.Verifier, emailSvc *email.Client) http.Handler {
+// buildCMSClient resolves the GitHub App config from SSM and constructs a
+// real cms.Client; on any failure it returns a stub so make dev keeps working
+// without GitHub App credentials. See IMPLEMENTATION_PLAN.md M11.
+func buildCMSClient(ctx context.Context, logger *slog.Logger) *cms.Client {
+	devMode := os.Getenv("DEV_MODE") == "true"
+	cfg, err := cms.LoadConfigFromSSM(ctx, logger)
+	if err != nil {
+		if !devMode {
+			logger.Warn("cms: SSM config missing in non-dev mode — award CMS sync disabled", "err", err)
+		}
+		return cms.NewStub(logger)
+	}
+	client, err := cms.New(cfg, logger)
+	if err != nil {
+		logger.Warn("cms: client init failed — using stub", "err", err)
+		return cms.NewStub(logger)
+	}
+	return client
+}
+
+func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver *auth.Verifier, emailSvc *email.Client, cmsClient *cms.Client) http.Handler {
 	mux := http.NewServeMux()
 
 	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
@@ -158,6 +184,10 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	paymentSvc := &handlers.PaymentService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
 	paymentPath, paymentHandler := numunv1connect.NewPaymentServiceHandler(paymentSvc, opts)
 	mux.Handle(paymentPath, paymentHandler)
+
+	awardSvc := &handlers.AwardService{Store: st, Scoper: scoper, CMS: cmsClient, Logger: logger}
+	awardPath, awardHandler := numunv1connect.NewAwardServiceHandler(awardSvc, opts)
+	mux.Handle(awardPath, awardHandler)
 
 	announcementSvc := &handlers.AnnouncementService{Store: st, Email: emailSvc, Logger: logger}
 	announcementPath, announcementHandler := numunv1connect.NewAnnouncementServiceHandler(announcementSvc, opts)

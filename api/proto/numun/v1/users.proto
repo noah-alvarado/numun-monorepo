@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package numun.v1;
 
+import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 
 // User is the application-side profile mirroring a Cognito user. Credentials
@@ -19,6 +20,10 @@ message User {
   int32 version = 8;
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // Award IDs the advisor has permanently dismissed from their congratulatory
+  // hero on /awards. Set server-side via UserService.DismissAward; surfaced on
+  // GetMe so the portal can hide already-dismissed cards on load. M11.
+  repeated string dismissed_award_ids = 11;
 
   enum Role {
     ROLE_UNSPECIFIED = 0;
@@ -50,6 +55,10 @@ service UserService {
   // Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
   // DDB written immediately). See AUTH.md §3.2.
   rpc InviteStaff(InviteStaffRequest) returns (InviteStaffResponse) {}
+
+  // DismissAward records that the caller has dismissed the given award from
+  // their congratulatory hero. Idempotent. M11.
+  rpc DismissAward(DismissAwardRequest) returns (DismissAwardResponse) {}
 }
 
 message GetMeRequest {}
@@ -88,5 +97,12 @@ message InviteStaffRequest {
 }
 message InviteStaffResponse {
   // The provisional User row written alongside Cognito AdminCreateUser.
+  User user = 1;
+}
+
+message DismissAwardRequest {
+  string award_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message DismissAwardResponse {
   User user = 1;
 }

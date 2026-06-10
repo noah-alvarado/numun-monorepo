@@ -41,6 +41,9 @@ const (
 	UserServiceUpdateUserProcedure = "/numun.v1.UserService/UpdateUser"
 	// UserServiceInviteStaffProcedure is the fully-qualified name of the UserService's InviteStaff RPC.
 	UserServiceInviteStaffProcedure = "/numun.v1.UserService/InviteStaff"
+	// UserServiceDismissAwardProcedure is the fully-qualified name of the UserService's DismissAward
+	// RPC.
+	UserServiceDismissAwardProcedure = "/numun.v1.UserService/DismissAward"
 )
 
 // UserServiceClient is a client for the numun.v1.UserService service.
@@ -55,6 +58,9 @@ type UserServiceClient interface {
 	// Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
 	// DDB written immediately). See AUTH.md §3.2.
 	InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error)
+	// DismissAward records that the caller has dismissed the given award from
+	// their congratulatory hero. Idempotent. M11.
+	DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error)
 }
 
 // NewUserServiceClient constructs a client for the numun.v1.UserService service. By default, it
@@ -92,15 +98,22 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("InviteStaff")),
 			connect.WithClientOptions(opts...),
 		),
+		dismissAward: connect.NewClient[v1.DismissAwardRequest, v1.DismissAwardResponse](
+			httpClient,
+			baseURL+UserServiceDismissAwardProcedure,
+			connect.WithSchema(userServiceMethods.ByName("DismissAward")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // userServiceClient implements UserServiceClient.
 type userServiceClient struct {
-	getMe       *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
-	getUser     *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
-	updateUser  *connect.Client[v1.UpdateUserRequest, v1.UpdateUserResponse]
-	inviteStaff *connect.Client[v1.InviteStaffRequest, v1.InviteStaffResponse]
+	getMe        *connect.Client[v1.GetMeRequest, v1.GetMeResponse]
+	getUser      *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
+	updateUser   *connect.Client[v1.UpdateUserRequest, v1.UpdateUserResponse]
+	inviteStaff  *connect.Client[v1.InviteStaffRequest, v1.InviteStaffResponse]
+	dismissAward *connect.Client[v1.DismissAwardRequest, v1.DismissAwardResponse]
 }
 
 // GetMe calls numun.v1.UserService.GetMe.
@@ -123,6 +136,11 @@ func (c *userServiceClient) InviteStaff(ctx context.Context, req *connect.Reques
 	return c.inviteStaff.CallUnary(ctx, req)
 }
 
+// DismissAward calls numun.v1.UserService.DismissAward.
+func (c *userServiceClient) DismissAward(ctx context.Context, req *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error) {
+	return c.dismissAward.CallUnary(ctx, req)
+}
+
 // UserServiceHandler is an implementation of the numun.v1.UserService service.
 type UserServiceHandler interface {
 	// Returns the caller's User row. The portal calls this on app-shell mount
@@ -135,6 +153,9 @@ type UserServiceHandler interface {
 	// Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
 	// DDB written immediately). See AUTH.md §3.2.
 	InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error)
+	// DismissAward records that the caller has dismissed the given award from
+	// their congratulatory hero. Idempotent. M11.
+	DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error)
 }
 
 // NewUserServiceHandler builds an HTTP handler from the service implementation. It returns the path
@@ -168,6 +189,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("InviteStaff")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceDismissAwardHandler := connect.NewUnaryHandler(
+		UserServiceDismissAwardProcedure,
+		svc.DismissAward,
+		connect.WithSchema(userServiceMethods.ByName("DismissAward")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/numun.v1.UserService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case UserServiceGetMeProcedure:
@@ -178,6 +205,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUpdateUserHandler.ServeHTTP(w, r)
 		case UserServiceInviteStaffProcedure:
 			userServiceInviteStaffHandler.ServeHTTP(w, r)
+		case UserServiceDismissAwardProcedure:
+			userServiceDismissAwardHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -201,4 +230,8 @@ func (UnimplementedUserServiceHandler) UpdateUser(context.Context, *connect.Requ
 
 func (UnimplementedUserServiceHandler) InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.UserService.InviteStaff is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.UserService.DismissAward is not implemented"))
 }

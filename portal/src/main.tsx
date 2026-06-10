@@ -20,6 +20,7 @@ import Committees from "@/routes/Committees";
 import AssignmentStudio from "@/routes/AssignmentStudio";
 import AdminEmailHealth from "@/routes/AdminEmailHealth";
 import AdminCheckIn from "@/routes/AdminCheckIn";
+import Awards from "@/routes/Awards";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -120,6 +121,14 @@ render(
         component={() => (
           <AppShell>
             <AdminCheckIn />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/awards"
+        component={() => (
+          <AppShell>
+            <Awards />
           </AppShell>
         )}
       />

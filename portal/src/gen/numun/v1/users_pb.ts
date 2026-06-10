@@ -4,6 +4,7 @@
 
 import type { GenEnum, GenFile, GenMessage, GenService } from "@bufbuild/protobuf/codegenv2";
 import { enumDesc, fileDesc, messageDesc, serviceDesc } from "@bufbuild/protobuf/codegenv2";
+import { file_buf_validate_validate } from "../../buf/validate/validate_pb";
 import type { Timestamp } from "@bufbuild/protobuf/wkt";
 import { file_google_protobuf_timestamp } from "@bufbuild/protobuf/wkt";
 import type { Message } from "@bufbuild/protobuf";
@@ -12,7 +13,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numun/v1/users.proto.
  */
 export const file_numun_v1_users: GenFile = /*@__PURE__*/
-  fileDesc("ChRudW11bi92MS91c2Vycy5wcm90bxIIbnVtdW4udjEi+QMKBFVzZXISCgoCaWQYASABKAkSIQoEcm9sZRgCIAEoDjITLm51bXVuLnYxLlVzZXIuUm9sZRINCgVlbWFpbBgDIAEoCRIMCgRuYW1lGAQgASgJEg0KBXBob25lGAUgASgJEjAKDGVtYWlsX3N0YXR1cxgGIAEoDjIaLm51bXVuLnYxLlVzZXIuRW1haWxTdGF0dXMSHAoUYW5ub3VuY2VtZW50c19vcHRfaW4YByABKAgSDwoHdmVyc2lvbhgIIAEoBRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcCJcCgRSb2xlEhQKEFJPTEVfVU5TUEVDSUZJRUQQABIQCgxST0xFX0FEVklTT1IQARIWChJST0xFX1NUQUZGX1NUQUZGRVIQAhIUChBST0xFX1NUQUZGX0FETUlOEAMidwoLRW1haWxTdGF0dXMSHAoYRU1BSUxfU1RBVFVTX1VOU1BFQ0lGSUVEEAASEwoPRU1BSUxfU1RBVFVTX09LEAESGAoURU1BSUxfU1RBVFVTX0JPVU5DRUQQAhIbChdFTUFJTF9TVEFUVVNfQ09NUExBSU5FRBADIg4KDEdldE1lUmVxdWVzdCItCg1HZXRNZVJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5udW11bi52MS5Vc2VyIiEKDkdldFVzZXJSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkiLwoPR2V0VXNlclJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5udW11bi52MS5Vc2VyIrQBChFVcGRhdGVVc2VyUmVxdWVzdBIPCgd1c2VyX2lkGAEgASgJEhEKBG5hbWUYAiABKAlIAIgBARISCgVwaG9uZRgDIAEoCUgBiAEBEiEKFGFubm91bmNlbWVudHNfb3B0X2luGAQgASgISAKIAQESGAoQZXhwZWN0ZWRfdmVyc2lvbhgFIAEoBUIHCgVfbmFtZUIICgZfcGhvbmVCFwoVX2Fubm91bmNlbWVudHNfb3B0X2luIjIKElVwZGF0ZVVzZXJSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubnVtdW4udjEuVXNlciJUChJJbnZpdGVTdGFmZlJlcXVlc3QSDQoFZW1haWwYASABKAkSDAoEbmFtZRgCIAEoCRIhCgRyb2xlGAMgASgOMhMubnVtdW4udjEuVXNlci5Sb2xlIjMKE0ludml0ZVN0YWZmUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm51bXVuLnYxLlVzZXIypAIKC1VzZXJTZXJ2aWNlEjoKBUdldE1lEhYubnVtdW4udjEuR2V0TWVSZXF1ZXN0GhcubnVtdW4udjEuR2V0TWVSZXNwb25zZSIAEkAKB0dldFVzZXISGC5udW11bi52MS5HZXRVc2VyUmVxdWVzdBoZLm51bXVuLnYxLkdldFVzZXJSZXNwb25zZSIAEkkKClVwZGF0ZVVzZXISGy5udW11bi52MS5VcGRhdGVVc2VyUmVxdWVzdBocLm51bXVuLnYxLlVwZGF0ZVVzZXJSZXNwb25zZSIAEkwKC0ludml0ZVN0YWZmEhwubnVtdW4udjEuSW52aXRlU3RhZmZSZXF1ZXN0Gh0ubnVtdW4udjEuSW52aXRlU3RhZmZSZXNwb25zZSIAQpUBCgxjb20ubnVtdW4udjFCClVzZXJzUHJvdG9QAVo4Z2l0aHViLmNvbS9udW11bi9udW11bi9hcGkvaW50ZXJuYWwvZ2VuL251bXVuL3YxO251bXVudjGiAgNOWFiqAghOdW11bi5WMcoCCE51bXVuXFYx4gIUTnVtdW5cVjFcR1BCTWV0YWRhdGHqAglOdW11bjo6VjFiBnByb3RvMw", [file_google_protobuf_timestamp]);
+  fileDesc("ChRudW11bi92MS91c2Vycy5wcm90bxIIbnVtdW4udjEilgQKBFVzZXISCgoCaWQYASABKAkSIQoEcm9sZRgCIAEoDjITLm51bXVuLnYxLlVzZXIuUm9sZRINCgVlbWFpbBgDIAEoCRIMCgRuYW1lGAQgASgJEg0KBXBob25lGAUgASgJEjAKDGVtYWlsX3N0YXR1cxgGIAEoDjIaLm51bXVuLnYxLlVzZXIuRW1haWxTdGF0dXMSHAoUYW5ub3VuY2VtZW50c19vcHRfaW4YByABKAgSDwoHdmVyc2lvbhgIIAEoBRIuCgpjcmVhdGVkX2F0GAkgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIuCgp1cGRhdGVkX2F0GAogASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIbChNkaXNtaXNzZWRfYXdhcmRfaWRzGAsgAygJIlwKBFJvbGUSFAoQUk9MRV9VTlNQRUNJRklFRBAAEhAKDFJPTEVfQURWSVNPUhABEhYKElJPTEVfU1RBRkZfU1RBRkZFUhACEhQKEFJPTEVfU1RBRkZfQURNSU4QAyJ3CgtFbWFpbFN0YXR1cxIcChhFTUFJTF9TVEFUVVNfVU5TUEVDSUZJRUQQABITCg9FTUFJTF9TVEFUVVNfT0sQARIYChRFTUFJTF9TVEFUVVNfQk9VTkNFRBACEhsKF0VNQUlMX1NUQVRVU19DT01QTEFJTkVEEAMiDgoMR2V0TWVSZXF1ZXN0Ii0KDUdldE1lUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm51bXVuLnYxLlVzZXIiIQoOR2V0VXNlclJlcXVlc3QSDwoHdXNlcl9pZBgBIAEoCSIvCg9HZXRVc2VyUmVzcG9uc2USHAoEdXNlchgBIAEoCzIOLm51bXVuLnYxLlVzZXIitAEKEVVwZGF0ZVVzZXJSZXF1ZXN0Eg8KB3VzZXJfaWQYASABKAkSEQoEbmFtZRgCIAEoCUgAiAEBEhIKBXBob25lGAMgASgJSAGIAQESIQoUYW5ub3VuY2VtZW50c19vcHRfaW4YBCABKAhIAogBARIYChBleHBlY3RlZF92ZXJzaW9uGAUgASgFQgcKBV9uYW1lQggKBl9waG9uZUIXChVfYW5ub3VuY2VtZW50c19vcHRfaW4iMgoSVXBkYXRlVXNlclJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5udW11bi52MS5Vc2VyIlQKEkludml0ZVN0YWZmUmVxdWVzdBINCgVlbWFpbBgBIAEoCRIMCgRuYW1lGAIgASgJEiEKBHJvbGUYAyABKA4yEy5udW11bi52MS5Vc2VyLlJvbGUiMwoTSW52aXRlU3RhZmZSZXNwb25zZRIcCgR1c2VyGAEgASgLMg4ubnVtdW4udjEuVXNlciIwChNEaXNtaXNzQXdhcmRSZXF1ZXN0EhkKCGF3YXJkX2lkGAEgASgJQge6SARyAhABIjQKFERpc21pc3NBd2FyZFJlc3BvbnNlEhwKBHVzZXIYASABKAsyDi5udW11bi52MS5Vc2VyMvUCCgtVc2VyU2VydmljZRI6CgVHZXRNZRIWLm51bXVuLnYxLkdldE1lUmVxdWVzdBoXLm51bXVuLnYxLkdldE1lUmVzcG9uc2UiABJACgdHZXRVc2VyEhgubnVtdW4udjEuR2V0VXNlclJlcXVlc3QaGS5udW11bi52MS5HZXRVc2VyUmVzcG9uc2UiABJJCgpVcGRhdGVVc2VyEhsubnVtdW4udjEuVXBkYXRlVXNlclJlcXVlc3QaHC5udW11bi52MS5VcGRhdGVVc2VyUmVzcG9uc2UiABJMCgtJbnZpdGVTdGFmZhIcLm51bXVuLnYxLkludml0ZVN0YWZmUmVxdWVzdBodLm51bXVuLnYxLkludml0ZVN0YWZmUmVzcG9uc2UiABJPCgxEaXNtaXNzQXdhcmQSHS5udW11bi52MS5EaXNtaXNzQXdhcmRSZXF1ZXN0Gh4ubnVtdW4udjEuRGlzbWlzc0F3YXJkUmVzcG9uc2UiAEKVAQoMY29tLm51bXVuLnYxQgpVc2Vyc1Byb3RvUAFaOGdpdGh1Yi5jb20vbnVtdW4vbnVtdW4vYXBpL2ludGVybmFsL2dlbi9udW11bi92MTtudW11bnYxogIDTlhYqgIITnVtdW4uVjHKAghOdW11blxWMeICFE51bXVuXFYxXEdQQk1ldGFkYXRh6gIJTnVtdW46OlYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp]);
 
 /**
  * User is the application-side profile mirroring a Cognito user. Credentials
@@ -73,6 +74,15 @@ export type User = Message<"numun.v1.User"> & {
    * @generated from field: google.protobuf.Timestamp updated_at = 10;
    */
   updatedAt?: Timestamp | undefined;
+
+  /**
+   * Award IDs the advisor has permanently dismissed from their congratulatory
+   * hero on /awards. Set server-side via UserService.DismissAward; surfaced on
+   * GetMe so the portal can hide already-dismissed cards on load. M11.
+   *
+   * @generated from field: repeated string dismissed_award_ids = 11;
+   */
+  dismissedAwardIds: string[];
 };
 
 /**
@@ -318,6 +328,40 @@ export const InviteStaffResponseSchema: GenMessage<InviteStaffResponse> = /*@__P
   messageDesc(file_numun_v1_users, 8);
 
 /**
+ * @generated from message numun.v1.DismissAwardRequest
+ */
+export type DismissAwardRequest = Message<"numun.v1.DismissAwardRequest"> & {
+  /**
+   * @generated from field: string award_id = 1;
+   */
+  awardId: string;
+};
+
+/**
+ * Describes the message numun.v1.DismissAwardRequest.
+ * Use `create(DismissAwardRequestSchema)` to create a new message.
+ */
+export const DismissAwardRequestSchema: GenMessage<DismissAwardRequest> = /*@__PURE__*/
+  messageDesc(file_numun_v1_users, 9);
+
+/**
+ * @generated from message numun.v1.DismissAwardResponse
+ */
+export type DismissAwardResponse = Message<"numun.v1.DismissAwardResponse"> & {
+  /**
+   * @generated from field: numun.v1.User user = 1;
+   */
+  user?: User | undefined;
+};
+
+/**
+ * Describes the message numun.v1.DismissAwardResponse.
+ * Use `create(DismissAwardResponseSchema)` to create a new message.
+ */
+export const DismissAwardResponseSchema: GenMessage<DismissAwardResponse> = /*@__PURE__*/
+  messageDesc(file_numun_v1_users, 10);
+
+/**
  * UserService — see API.md §10.3.
  *
  * @generated from service numun.v1.UserService
@@ -364,6 +408,17 @@ export const UserService: GenService<{
     methodKind: "unary";
     input: typeof InviteStaffRequestSchema;
     output: typeof InviteStaffResponseSchema;
+  },
+  /**
+   * DismissAward records that the caller has dismissed the given award from
+   * their congratulatory hero. Idempotent. M11.
+   *
+   * @generated from rpc numun.v1.UserService.DismissAward
+   */
+  dismissAward: {
+    methodKind: "unary";
+    input: typeof DismissAwardRequestSchema;
+    output: typeof DismissAwardResponseSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_numun_v1_users, 0);

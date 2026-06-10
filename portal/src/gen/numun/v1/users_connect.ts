@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { GetMeRequest, GetMeResponse, GetUserRequest, GetUserResponse, InviteStaffRequest, InviteStaffResponse, UpdateUserRequest, UpdateUserResponse } from "./users_pb.js";
+import { DismissAwardRequest, DismissAwardResponse, GetMeRequest, GetMeResponse, GetUserRequest, GetUserResponse, InviteStaffRequest, InviteStaffResponse, UpdateUserRequest, UpdateUserResponse } from "./users_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -58,6 +58,18 @@ export const UserService = {
       name: "InviteStaff",
       I: InviteStaffRequest,
       O: InviteStaffResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * DismissAward records that the caller has dismissed the given award from
+     * their congratulatory hero. Idempotent. M11.
+     *
+     * @generated from rpc numun.v1.UserService.DismissAward
+     */
+    dismissAward: {
+      name: "DismissAward",
+      I: DismissAwardRequest,
+      O: DismissAwardResponse,
       kind: MethodKind.Unary,
     },
   }

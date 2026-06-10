@@ -171,6 +171,28 @@ func (s *UserService) InviteStaff(ctx context.Context, req *connect.Request[user
 	return connect.NewResponse(&usersv1.InviteStaffResponse{User: userToProto(u)}), nil
 }
 
+// DismissAward records a permanent dismissal of the given award from the
+// caller's congratulatory hero on /awards. Idempotent. See M11.
+func (s *UserService) DismissAward(ctx context.Context, req *connect.Request[usersv1.DismissAwardRequest]) (*connect.Response[usersv1.DismissAwardResponse], error) {
+	c, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	awardID := strings.TrimSpace(req.Msg.GetAwardId())
+	if awardID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("award_id required"))
+	}
+	u, err := s.Store.AddDismissedAward(ctx, c.UserID, awardID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("user not found"))
+		}
+		s.logger().Error("DismissAward: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	return connect.NewResponse(&usersv1.DismissAwardResponse{User: userToProto(u)}), nil
+}
+
 func (s *UserService) logger() *slog.Logger {
 	if s.Logger != nil {
 		return s.Logger

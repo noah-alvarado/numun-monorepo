@@ -765,16 +765,33 @@ collections:
 
   # -------------------------------------------------------------------------
   # Awards archive — folder collection (CMS_CONTENT_MODEL.md §4.5)
+  #
+  # As of M11 this collection is API-synced from DDB. The Lambdalith writes
+  # entries via a GitHub App on every AwardService Create/Update/Delete; manual
+  # editor changes here will be overwritten on the next API write. Filenames
+  # use the immutable award UUID so renames don't lose history.
   # -------------------------------------------------------------------------
   - name: awards-archive
     label: Awards archive
     label_singular: Award entry
     folder: content/awards-archive
     create: true
-    slug: "{{year}}-{{slug}}"
+    slug: "{{fields.awardId}}"
     summary: "{{fields.year}} — {{fields.awardName}}"
     sortable_fields: [year, awardName]
     fields:
+      - {
+          name: awardId,
+          label: Award ID (DDB UUID — API-managed),
+          widget: string,
+          required: true,
+        }
+      - {
+          name: conferenceId,
+          label: Conference ID (API-managed),
+          widget: string,
+          required: false,
+        }
       - {
           name: year,
           label: Year,
@@ -790,30 +807,29 @@ collections:
           pattern: ["^.{1,80}$", "Max 80 characters"],
         }
       - {
-          name: recipientName,
-          label: Recipient name,
-          widget: string,
-          pattern: ["^.{1,120}$", "Max 120 characters"],
-        }
-      - name: recipientType
-        label: Recipient type
-        widget: select
-        options:
-          - { label: Delegate, value: delegate }
-          - { label: Delegation, value: delegation }
-      - {
-          name: conferenceName,
-          label: Conference name,
+          name: category,
+          label: Category,
           widget: string,
           required: false,
-          pattern: ["^.{0,80}$", "Max 80 characters"],
         }
-      - {
-          name: description,
-          label: Description,
-          widget: markdown,
-          required: false,
-        }
+      - name: recipients
+        label: Recipients
+        label_singular: Recipient
+        widget: list
+        fields:
+          - name: kind
+            label: Kind
+            widget: select
+            options:
+              - { label: Delegate, value: delegate }
+              - { label: Delegation, value: delegation }
+              - { label: Committee, value: committee }
+              - { label: User (staffer or advisor), value: user }
+              - { label: Conference, value: conference }
+          - { name: id, label: Recipient ID, widget: string }
+          - { name: displayName, label: Display name, widget: string, required: false }
+      - { name: awardedAt, label: Awarded at, widget: datetime, required: false }
+      - { name: awardedBy, label: Awarded by (user id), widget: string, required: false }
 
   # -------------------------------------------------------------------------
   # Background guides — folder collection (CMS_CONTENT_MODEL.md §4.6)

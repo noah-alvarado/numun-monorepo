@@ -240,20 +240,34 @@ One file per completed conference. NOT auto-generated from DDB Conference rows i
 
 Default sort: `editionNumber DESC`.
 
-### 4.5 Awards archive (folder collection)
+### 4.5 Awards archive (folder collection, API-synced)
 
-Curated highlights, one entry per notable award per year. May shift to a DDB-derived render in a future iteration (§13 open items).
+As of M11 this collection is **API-synced from DDB**. The Lambdalith
+authenticates as a GitHub App (`numun-cms-bot`) with `contents: write` and
+commits one markdown file per Award on every `AwardService.CreateAward` /
+`UpdateAward` / `DeleteAward` call. Files are named `<awardId>.md` (immutable
+DDB UUID) so renames don't lose history. Manual edits via Decap are
+permissible but will be overwritten on the next API write — treat the CMS UI
+as a forensic / read view for awards rather than the authoritative editor.
+
+Recipient kinds were expanded in M11 beyond `delegate` / `delegation` to also
+include committees, users (covers both staff-staffer and advisor), and
+conferences. A delegate-pair (two delegates sharing a dual-delegation
+position) is modeled as two recipients with `kind: delegate` on the same
+award.
 
 | Field | Widget | Notes |
 |---|---|---|
-| `year` | number | |
-| `awardName` | string (≤80) | |
-| `recipientName` | string (≤120) | |
-| `recipientType` | select | `delegate` / `delegation` |
-| `conferenceName` | string (≤80) | optional, e.g., `"NUMUN XXII"` |
-| `description` | markdown | optional |
+| `awardId` | string | DDB UUIDv7. API-managed; do not change. |
+| `conferenceId` | string | API-managed. |
+| `year` | number | derived from conference end-year |
+| `awardName` | string (≤200) | |
+| `category` | string (≤200) | optional, free-form |
+| `recipients` | list of object | each: `{ kind: delegate \| delegation \| committee \| user \| conference, id (string), displayName (string, optional) }` |
+| `awardedAt` | datetime | optional |
+| `awardedBy` | string | optional, user id of the staffer/admin who awarded it |
 
-Default sort: `year DESC`.
+Default sort on the public `/awards` page: `year DESC`, then `awardName ASC`.
 
 ### 4.6 Background guides (folder collection)
 

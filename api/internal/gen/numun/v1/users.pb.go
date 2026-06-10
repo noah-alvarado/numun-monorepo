@@ -7,6 +7,7 @@
 package numunv1
 
 import (
+	_ "buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go/buf/validate"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
@@ -142,8 +143,12 @@ type User struct {
 	Version            int32                  `protobuf:"varint,8,opt,name=version,proto3" json:"version,omitempty"`
 	CreatedAt          *timestamppb.Timestamp `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt          *timestamppb.Timestamp `protobuf:"bytes,10,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
-	unknownFields      protoimpl.UnknownFields
-	sizeCache          protoimpl.SizeCache
+	// Award IDs the advisor has permanently dismissed from their congratulatory
+	// hero on /awards. Set server-side via UserService.DismissAward; surfaced on
+	// GetMe so the portal can hide already-dismissed cards on load. M11.
+	DismissedAwardIds []string `protobuf:"bytes,11,rep,name=dismissed_award_ids,json=dismissedAwardIds,proto3" json:"dismissed_award_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *User) Reset() {
@@ -242,6 +247,13 @@ func (x *User) GetCreatedAt() *timestamppb.Timestamp {
 func (x *User) GetUpdatedAt() *timestamppb.Timestamp {
 	if x != nil {
 		return x.UpdatedAt
+	}
+	return nil
+}
+
+func (x *User) GetDismissedAwardIds() []string {
+	if x != nil {
+		return x.DismissedAwardIds
 	}
 	return nil
 }
@@ -645,11 +657,99 @@ func (x *InviteStaffResponse) GetUser() *User {
 	return nil
 }
 
+type DismissAwardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AwardId       string                 `protobuf:"bytes,1,opt,name=award_id,json=awardId,proto3" json:"award_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DismissAwardRequest) Reset() {
+	*x = DismissAwardRequest{}
+	mi := &file_numun_v1_users_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DismissAwardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DismissAwardRequest) ProtoMessage() {}
+
+func (x *DismissAwardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_users_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DismissAwardRequest.ProtoReflect.Descriptor instead.
+func (*DismissAwardRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *DismissAwardRequest) GetAwardId() string {
+	if x != nil {
+		return x.AwardId
+	}
+	return ""
+}
+
+type DismissAwardResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DismissAwardResponse) Reset() {
+	*x = DismissAwardResponse{}
+	mi := &file_numun_v1_users_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DismissAwardResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DismissAwardResponse) ProtoMessage() {}
+
+func (x *DismissAwardResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_users_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DismissAwardResponse.ProtoReflect.Descriptor instead.
+func (*DismissAwardResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *DismissAwardResponse) GetUser() *User {
+	if x != nil {
+		return x.User
+	}
+	return nil
+}
+
 var File_numun_v1_users_proto protoreflect.FileDescriptor
 
 const file_numun_v1_users_proto_rawDesc = "" +
 	"\n" +
-	"\x14numun/v1/users.proto\x12\bnumun.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xd7\x04\n" +
+	"\x14numun/v1/users.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x87\x05\n" +
 	"\x04User\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12'\n" +
 	"\x04role\x18\x02 \x01(\x0e2\x13.numun.v1.User.RoleR\x04role\x12\x14\n" +
@@ -663,7 +763,8 @@ const file_numun_v1_users_proto_rawDesc = "" +
 	"created_at\x18\t \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
 	"updated_at\x18\n" +
-	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\\\n" +
+	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12.\n" +
+	"\x13dismissed_award_ids\x18\v \x03(\tR\x11dismissedAwardIds\"\\\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fROLE_ADVISOR\x10\x01\x12\x16\n" +
@@ -697,13 +798,18 @@ const file_numun_v1_users_proto_rawDesc = "" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
 	"\x04role\x18\x03 \x01(\x0e2\x13.numun.v1.User.RoleR\x04role\"9\n" +
 	"\x13InviteStaffResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user2\xa4\x02\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user\"9\n" +
+	"\x13DismissAwardRequest\x12\"\n" +
+	"\baward_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\aawardId\":\n" +
+	"\x14DismissAwardResponse\x12\"\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user2\xf5\x02\n" +
 	"\vUserService\x12:\n" +
 	"\x05GetMe\x12\x16.numun.v1.GetMeRequest\x1a\x17.numun.v1.GetMeResponse\"\x00\x12@\n" +
 	"\aGetUser\x12\x18.numun.v1.GetUserRequest\x1a\x19.numun.v1.GetUserResponse\"\x00\x12I\n" +
 	"\n" +
 	"UpdateUser\x12\x1b.numun.v1.UpdateUserRequest\x1a\x1c.numun.v1.UpdateUserResponse\"\x00\x12L\n" +
-	"\vInviteStaff\x12\x1c.numun.v1.InviteStaffRequest\x1a\x1d.numun.v1.InviteStaffResponse\"\x00B\x95\x01\n" +
+	"\vInviteStaff\x12\x1c.numun.v1.InviteStaffRequest\x1a\x1d.numun.v1.InviteStaffResponse\"\x00\x12O\n" +
+	"\fDismissAward\x12\x1d.numun.v1.DismissAwardRequest\x1a\x1e.numun.v1.DismissAwardResponse\"\x00B\x95\x01\n" +
 	"\fcom.numun.v1B\n" +
 	"UsersProtoP\x01Z8github.com/numun/numun/api/internal/gen/numun/v1;numunv1\xa2\x02\x03NXX\xaa\x02\bNumun.V1\xca\x02\bNumun\\V1\xe2\x02\x14Numun\\V1\\GPBMetadata\xea\x02\tNumun::V1b\x06proto3"
 
@@ -720,7 +826,7 @@ func file_numun_v1_users_proto_rawDescGZIP() []byte {
 }
 
 var file_numun_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_numun_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_numun_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_numun_v1_users_proto_goTypes = []any{
 	(User_Role)(0),                // 0: numun.v1.User.Role
 	(User_EmailStatus)(0),         // 1: numun.v1.User.EmailStatus
@@ -733,31 +839,36 @@ var file_numun_v1_users_proto_goTypes = []any{
 	(*UpdateUserResponse)(nil),    // 8: numun.v1.UpdateUserResponse
 	(*InviteStaffRequest)(nil),    // 9: numun.v1.InviteStaffRequest
 	(*InviteStaffResponse)(nil),   // 10: numun.v1.InviteStaffResponse
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*DismissAwardRequest)(nil),   // 11: numun.v1.DismissAwardRequest
+	(*DismissAwardResponse)(nil),  // 12: numun.v1.DismissAwardResponse
+	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
 }
 var file_numun_v1_users_proto_depIdxs = []int32{
 	0,  // 0: numun.v1.User.role:type_name -> numun.v1.User.Role
 	1,  // 1: numun.v1.User.email_status:type_name -> numun.v1.User.EmailStatus
-	11, // 2: numun.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	11, // 3: numun.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	13, // 2: numun.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	13, // 3: numun.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 4: numun.v1.GetMeResponse.user:type_name -> numun.v1.User
 	2,  // 5: numun.v1.GetUserResponse.user:type_name -> numun.v1.User
 	2,  // 6: numun.v1.UpdateUserResponse.user:type_name -> numun.v1.User
 	0,  // 7: numun.v1.InviteStaffRequest.role:type_name -> numun.v1.User.Role
 	2,  // 8: numun.v1.InviteStaffResponse.user:type_name -> numun.v1.User
-	3,  // 9: numun.v1.UserService.GetMe:input_type -> numun.v1.GetMeRequest
-	5,  // 10: numun.v1.UserService.GetUser:input_type -> numun.v1.GetUserRequest
-	7,  // 11: numun.v1.UserService.UpdateUser:input_type -> numun.v1.UpdateUserRequest
-	9,  // 12: numun.v1.UserService.InviteStaff:input_type -> numun.v1.InviteStaffRequest
-	4,  // 13: numun.v1.UserService.GetMe:output_type -> numun.v1.GetMeResponse
-	6,  // 14: numun.v1.UserService.GetUser:output_type -> numun.v1.GetUserResponse
-	8,  // 15: numun.v1.UserService.UpdateUser:output_type -> numun.v1.UpdateUserResponse
-	10, // 16: numun.v1.UserService.InviteStaff:output_type -> numun.v1.InviteStaffResponse
-	13, // [13:17] is the sub-list for method output_type
-	9,  // [9:13] is the sub-list for method input_type
-	9,  // [9:9] is the sub-list for extension type_name
-	9,  // [9:9] is the sub-list for extension extendee
-	0,  // [0:9] is the sub-list for field type_name
+	2,  // 9: numun.v1.DismissAwardResponse.user:type_name -> numun.v1.User
+	3,  // 10: numun.v1.UserService.GetMe:input_type -> numun.v1.GetMeRequest
+	5,  // 11: numun.v1.UserService.GetUser:input_type -> numun.v1.GetUserRequest
+	7,  // 12: numun.v1.UserService.UpdateUser:input_type -> numun.v1.UpdateUserRequest
+	9,  // 13: numun.v1.UserService.InviteStaff:input_type -> numun.v1.InviteStaffRequest
+	11, // 14: numun.v1.UserService.DismissAward:input_type -> numun.v1.DismissAwardRequest
+	4,  // 15: numun.v1.UserService.GetMe:output_type -> numun.v1.GetMeResponse
+	6,  // 16: numun.v1.UserService.GetUser:output_type -> numun.v1.GetUserResponse
+	8,  // 17: numun.v1.UserService.UpdateUser:output_type -> numun.v1.UpdateUserResponse
+	10, // 18: numun.v1.UserService.InviteStaff:output_type -> numun.v1.InviteStaffResponse
+	12, // 19: numun.v1.UserService.DismissAward:output_type -> numun.v1.DismissAwardResponse
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_numun_v1_users_proto_init() }
@@ -772,7 +883,7 @@ func file_numun_v1_users_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numun_v1_users_proto_rawDesc), len(file_numun_v1_users_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

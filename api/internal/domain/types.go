@@ -32,12 +32,16 @@ type User struct {
 	Phone              string
 	EmailStatus        EmailStatus
 	AnnouncementsOptIn bool
-	IsDeleted          bool
-	Version            int
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
-	CreatedBy          string
-	UpdatedBy          string
+	// DismissedAwardIDs — award IDs the user has permanently dismissed from
+	// their congratulatory hero on /awards (advisors only in v1). Appended via
+	// store.AddDismissedAward; the slice is set-like (no duplicates).
+	DismissedAwardIDs []string
+	IsDeleted         bool
+	Version           int
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
+	CreatedBy         string
+	UpdatedBy         string
 }
 
 // Session is a server-side opaque session row keyed by the value placed in the
@@ -370,9 +374,9 @@ const (
 	AuthEventBulkDelegatesPresign AuthAuditEventKind = "bulk_delegates_presigned"
 
 	// Delegate lifecycle (M6).
-	AuthEventDelegateCreated  AuthAuditEventKind = "delegate_created"
-	AuthEventDelegateUpdated  AuthAuditEventKind = "delegate_updated"
-	AuthEventDelegateDeleted  AuthAuditEventKind = "delegate_deleted"
+	AuthEventDelegateCreated   AuthAuditEventKind = "delegate_created"
+	AuthEventDelegateUpdated   AuthAuditEventKind = "delegate_updated"
+	AuthEventDelegateDeleted   AuthAuditEventKind = "delegate_deleted"
 	AuthEventDelegateCheckedIn AuthAuditEventKind = "delegate_checked_in"
 
 	// Committee + position lifecycle (M7).
@@ -394,6 +398,11 @@ const (
 	AuthEventPaymentRecorded AuthAuditEventKind = "payment_recorded"
 	AuthEventPaymentUpdated  AuthAuditEventKind = "payment_updated"
 	AuthEventPaymentDeleted  AuthAuditEventKind = "payment_deleted"
+
+	// Award lifecycle (M11).
+	AuthEventAwardCreated  AuthAuditEventKind = "award_created"
+	AuthEventAwardModified AuthAuditEventKind = "award_modified"
+	AuthEventAwardDeleted  AuthAuditEventKind = "award_deleted"
 )
 
 // CommitteeType — DATA_MODEL.md §2.8.
@@ -541,14 +550,14 @@ type AuthAuditEvent struct {
 type EmailKind string
 
 const (
-	EmailKindDelegationApproved      EmailKind = "delegation_approved"
-	EmailKindDelegationRejected      EmailKind = "delegation_rejected"
-	EmailKindPaymentRecorded         EmailKind = "payment_recorded"
-	EmailKindBulkImportCommitted     EmailKind = "bulk_import_committed"
-	EmailKindAssignmentRunCompleted  EmailKind = "assignment_run_completed"
-	EmailKindScopeRoleChanged        EmailKind = "scope_role_changed"
-	EmailKindNewRegistrationSummary  EmailKind = "new_registration_summary"
-	EmailKindAnnouncement            EmailKind = "announcement"
+	EmailKindDelegationApproved     EmailKind = "delegation_approved"
+	EmailKindDelegationRejected     EmailKind = "delegation_rejected"
+	EmailKindPaymentRecorded        EmailKind = "payment_recorded"
+	EmailKindBulkImportCommitted    EmailKind = "bulk_import_committed"
+	EmailKindAssignmentRunCompleted EmailKind = "assignment_run_completed"
+	EmailKindScopeRoleChanged       EmailKind = "scope_role_changed"
+	EmailKindNewRegistrationSummary EmailKind = "new_registration_summary"
+	EmailKindAnnouncement           EmailKind = "announcement"
 
 	// Feedback / forensic rows (not user-visible).
 	EmailKindBounceReceived    EmailKind = "bounce_received"
@@ -560,12 +569,12 @@ const (
 type EmailEventStatus string
 
 const (
-	EmailEventStatusSent       EmailEventStatus = "sent"
-	EmailEventStatusFailed     EmailEventStatus = "failed"
-	EmailEventStatusSkipped    EmailEventStatus = "skipped"
-	EmailEventStatusBounce     EmailEventStatus = "bounce_received"
-	EmailEventStatusComplaint  EmailEventStatus = "complaint_received"
-	EmailEventStatusDelivery   EmailEventStatus = "delivery_confirmed"
+	EmailEventStatusSent      EmailEventStatus = "sent"
+	EmailEventStatusFailed    EmailEventStatus = "failed"
+	EmailEventStatusSkipped   EmailEventStatus = "skipped"
+	EmailEventStatusBounce    EmailEventStatus = "bounce_received"
+	EmailEventStatusComplaint EmailEventStatus = "complaint_received"
+	EmailEventStatusDelivery  EmailEventStatus = "delivery_confirmed"
 )
 
 // EmailEvent is the per-send audit row. 1-year TTL. EMAIL.md §8.

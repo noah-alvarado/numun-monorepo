@@ -65,6 +65,7 @@ func userToProto(u domain.User) *usersv1.User {
 		Phone:              u.Phone,
 		EmailStatus:        protoEmailStatus(u.EmailStatus),
 		AnnouncementsOptIn: u.AnnouncementsOptIn,
+		DismissedAwardIds:  append([]string(nil), u.DismissedAwardIDs...),
 		Version:            int32(u.Version),
 		CreatedAt:          tsOrNil(u.CreatedAt),
 		UpdatedAt:          tsOrNil(u.UpdatedAt),
