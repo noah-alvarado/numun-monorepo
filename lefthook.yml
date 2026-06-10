@@ -1,0 +1,32 @@
+# Pre-commit hooks. Install via `pnpm install` (runs lefthook install through
+# the root `prepare` script) or `lefthook install` directly.
+#
+# Commands run in parallel against staged files; auto-fixed files are re-staged
+# so the resulting commit reflects the fixes.
+
+pre-commit:
+  parallel: true
+  commands:
+    prettier:
+      glob: "*.{ts,tsx,js,jsx,astro,md,mdx,yml,yaml,json}"
+      run: pnpm exec prettier --write {staged_files}
+      stage_fixed: true
+
+    eslint:
+      root: "portal/"
+      glob: "*.{ts,tsx,js,jsx}"
+      run: pnpm exec eslint --fix {staged_files}
+      stage_fixed: true
+
+    gofmt:
+      glob: "*.go"
+      run: gofmt -w {staged_files}
+      stage_fixed: true
+
+    go-vet:
+      glob: "api/**/*.go"
+      run: bash -c "cd api && go vet ./..."
+
+    buf-lint:
+      glob: "api/proto/**/*.proto"
+      run: bash -c "cd api && buf lint"

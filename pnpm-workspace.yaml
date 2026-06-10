@@ -6,4 +6,5 @@ packages:
 
 allowBuilds:
   esbuild: true
+  lefthook: true
   sharp: true

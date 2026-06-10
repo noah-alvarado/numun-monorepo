@@ -13,9 +13,11 @@
     "test": "pnpm -r --if-present run test",
     "build": "pnpm -r --if-present run build",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\""
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\"",
+    "prepare": "lefthook install"
   },
   "devDependencies": {
+    "lefthook": "^1.7.15",
     "prettier": "^3.3.3",
     "prettier-plugin-astro": "^0.14.1"
   }

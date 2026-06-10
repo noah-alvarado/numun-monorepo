@@ -597,7 +597,7 @@ export default function AssignmentStudio() {
             conferenceId={conferenceId()}
             currentRun={currentRun()}
             disabled={runInFlight()}
-            onComplete={async (_resp, _mode) => {
+            onComplete={async () => {
               await refetchAssignments();
               await refetchCurrentRun();
               await refetchRuns();
