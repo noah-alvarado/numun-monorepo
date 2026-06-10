@@ -82,18 +82,21 @@ type Config struct {
 	QueueURL            string // SQS queue URL for the worker pipeline
 }
 
-// LoadConfigFromEnv resolves Config. Fails fast on UnsubscribeSecret in prod —
-// see Validate.
+// LoadConfigFromEnv resolves Config. Env-specific URLs (senders, portal,
+// assets, unsubscribe) are required — we refuse to bake apex defaults so a
+// misconfigured deploy doesn't silently send mail with prod URLs from a
+// test stack. SAM (infra/api/template.yaml) sets all required values;
+// make dev wires them through scripts/sam-env-vars.json.
 func LoadConfigFromEnv() Config {
 	return Config{
-		SenderTransactional: envOr("EMAIL_SENDER_TRANSACTIONAL", "noreply@mail.numun.org"),
-		SenderAnnouncements: envOr("EMAIL_SENDER_ANNOUNCEMENTS", "announcements@mail.numun.org"),
-		SenderCognito:       envOr("EMAIL_SENDER_COGNITO", "cognito@mail.numun.org"),
+		SenderTransactional: os.Getenv("EMAIL_SENDER_TRANSACTIONAL"),
+		SenderAnnouncements: os.Getenv("EMAIL_SENDER_ANNOUNCEMENTS"),
+		SenderCognito:       os.Getenv("EMAIL_SENDER_COGNITO"),
 		ReplyTo:             os.Getenv("EMAIL_REPLY_TO"),
-		UnsubscribeBaseURL:  envOr("EMAIL_UNSUBSCRIBE_BASE_URL", "https://api.numun.org/v1/email/unsubscribe"),
+		UnsubscribeBaseURL:  os.Getenv("EMAIL_UNSUBSCRIBE_BASE_URL"),
 		UnsubscribeSecret:   os.Getenv("EMAIL_UNSUBSCRIBE_SECRET"),
-		PortalBaseURL:       envOr("PORTAL_BASE_URL", "https://portal.numun.org"),
-		AssetsBaseURL:       envOr("ASSETS_BASE_URL", "https://assets.numun.org"),
+		PortalBaseURL:       os.Getenv("PORTAL_BASE_URL"),
+		AssetsBaseURL:       os.Getenv("ASSETS_BASE_URL"),
 		BrandColor:          envOr("EMAIL_BRAND_COLOR", "#4E2A84"),
 		ConfigurationSet:    os.Getenv("EMAIL_CONFIGURATION_SET"),
 		QueueURL:            os.Getenv("EMAIL_QUEUE_URL"),
@@ -105,6 +108,32 @@ func envOr(k, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// Validate refuses to start with empty env-specific URLs. Called from New()
+// outside DEV_MODE so prod / test deploys fail fast on a misconfigured SAM
+// stack rather than silently baking the wrong apex into outbound mail.
+func (c Config) Validate() error {
+	var missing []string
+	for _, kv := range []struct {
+		name string
+		val  string
+	}{
+		{"EMAIL_SENDER_TRANSACTIONAL", c.SenderTransactional},
+		{"EMAIL_SENDER_ANNOUNCEMENTS", c.SenderAnnouncements},
+		{"EMAIL_SENDER_COGNITO", c.SenderCognito},
+		{"EMAIL_UNSUBSCRIBE_BASE_URL", c.UnsubscribeBaseURL},
+		{"PORTAL_BASE_URL", c.PortalBaseURL},
+		{"ASSETS_BASE_URL", c.AssetsBaseURL},
+	} {
+		if kv.val == "" {
+			missing = append(missing, kv.name)
+		}
+	}
+	if len(missing) > 0 {
+		return fmt.Errorf("email: required env vars unset: %v", missing)
+	}
+	return nil
 }
 
 // Client is the production implementation of Service.
@@ -148,6 +177,11 @@ func New(ctx context.Context, st *store.Client, logger *slog.Logger) (*Client, e
 		return nil, fmt.Errorf("load templates: %w", err)
 	}
 	emailCfg := LoadConfigFromEnv()
+	if os.Getenv("DEV_MODE") != "true" {
+		if err := emailCfg.Validate(); err != nil {
+			return nil, err
+		}
+	}
 	if emailCfg.UnsubscribeSecret == "" && os.Getenv("DEV_MODE") != "true" {
 		// Attempt SSM read; missing-parameter is non-fatal — we'll just skip
 		// the List-Unsubscribe header.

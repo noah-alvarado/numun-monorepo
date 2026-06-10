@@ -40,8 +40,9 @@ jobs:
       name: ${{ inputs.environment || 'test' }}
       url: https://${{ vars.APEX_DOMAIN }}
     env:
-      AWS_REGION: us-east-2
-      BUCKET: numun-${{ vars.ENV_NAME }}-site
+      ENV: ${{ inputs.environment || 'test' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      BUCKET: numun-${{ inputs.environment || 'test' }}-site
       # Prefer an explicit override; otherwise derive from APEX_DOMAIN
       # (e.g. test.numun.org -> https://api.test.numun.org).
       API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || format('https://api.{0}', vars.APEX_DOMAIN) }}

@@ -254,7 +254,8 @@ aws cloudformation describe-stacks \
 Required before any deploy workflow can succeed:
 
 ```bash
-gh variable set ENV_NAME           --env "$GH_ENV" --body "$ENV"
+# Per-env infrastructure
+gh variable set AWS_REGION         --env "$GH_ENV" --body "$AWS_REGION"
 gh variable set ROOT_DOMAIN        --env "$GH_ENV" --body "$ROOT_DOMAIN"
 gh variable set ENV_SUBDOMAIN      --env "$GH_ENV" --body "$ENV_SUBDOMAIN"
 gh variable set APEX_DOMAIN        --env "$GH_ENV" --body "$APEX"
@@ -264,9 +265,18 @@ gh variable set DEPLOY_ROLE_API_ARN     --env "$GH_ENV" --body "<from R3 outputs
 gh variable set DEPLOY_ROLE_SITE_ARN    --env "$GH_ENV" --body "<from R3 outputs>"
 gh variable set DEPLOY_ROLE_PORTAL_ARN  --env "$GH_ENV" --body "<from R3 outputs>"
 gh variable set DEPLOY_ROLE_CMS_ARN     --env "$GH_ENV" --body "<from R3 outputs>"
+gh variable set DEPLOY_ROLE_INFRA_ARN   --env "$GH_ENV" --body "<from R3 outputs>"
 gh variable set API_CERTIFICATE_ARN     --env "$GH_ENV" --body "<from P1: us-east-2 cert ARN>"
-gh variable set CLOUDFRONT_CERTIFICATE_ARN --env "$GH_ENV" --body "<from P1: us-east-1 cert ARN>"
+gh variable set CDN_CERTIFICATE_ARN     --env "$GH_ENV" --body "<from P1: us-east-1 cert ARN>"
 ```
+
+Notes:
+
+- The env name itself (`test` / `prod`) is **not** a variable — it's the
+  GitHub Environment name and the workflows derive `ENV` from it directly.
+- The repo path is **not** a variable — the cms workflow substitutes
+  `__GITHUB_REPO__` in `cms/config.yml` from the `${{ github.repository }}`
+  workflow context.
 
 ### R5. Deploy base-data (under break-glass)
 

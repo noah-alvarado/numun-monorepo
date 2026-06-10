@@ -20,12 +20,11 @@ import (
 
 // portalBase resolves the portal URL used to build links in notification
 // emails. Mirrors email.Config.PortalBaseURL without dragging the email
-// Service into pure-data helpers.
+// Service into pure-data helpers. Returns "" if the env var is unset —
+// callers should treat that as "no link" rather than baking a prod apex.
+// email.Config.Validate enforces non-empty at boot in prod / test.
 func portalBase() string {
-	if v := os.Getenv("PORTAL_BASE_URL"); v != "" {
-		return v
-	}
-	return "https://portal.numun.org"
+	return os.Getenv("PORTAL_BASE_URL")
 }
 
 // DelegationService implements numunv1connect.DelegationServiceHandler.

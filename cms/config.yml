@@ -14,7 +14,9 @@
 
 backend:
   name: github
-  repo: noah-alvarado/numun-monorepo
+  # __GITHUB_REPO__ is substituted at deploy time by .github/workflows/cms.yml
+  # using `${{ github.repository }}`. Local edits should keep the placeholder.
+  repo: __GITHUB_REPO__
   branch: main
   # __APEX_DOMAIN__ is substituted at deploy time by .github/workflows/cms.yml
   # using `vars.APEX_DOMAIN` for the env. Local edits to this file should keep

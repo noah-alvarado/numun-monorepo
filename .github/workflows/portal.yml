@@ -37,8 +37,9 @@ jobs:
       name: ${{ inputs.environment || 'test' }}
       url: https://portal.${{ vars.APEX_DOMAIN }}
     env:
-      AWS_REGION: us-east-2
-      BUCKET: numun-${{ vars.ENV_NAME }}-portal
+      ENV: ${{ inputs.environment || 'test' }}
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      BUCKET: numun-${{ inputs.environment || 'test' }}-portal
     steps:
       - uses: actions/checkout@v4
       - name: compute version
