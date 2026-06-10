@@ -11,10 +11,17 @@ on:
       - "packages/tailwind-tokens/**"
       - ".github/workflows/site.yml"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Which semver component to bump
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
   id-token: write
-  contents: read
+  contents: write # push version tags
 
 concurrency:
   group: deploy-site
@@ -32,6 +39,13 @@ jobs:
       API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || format('https://api.{0}', vars.APEX_DOMAIN) }}
     steps:
       - uses: actions/checkout@v4
+      - name: compute version
+        id: version
+        uses: ./.github/actions/compute-version
+        with:
+          app: site
+          bump: ${{ inputs.bump || 'patch' }}
+          version-file: site/package.json
       - name: Fetch active conference
         # Calls PublicService.GetActiveConference and writes the result to
         # content/_generated/active-conference.json for the Astro build to
@@ -64,9 +78,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: build site
         # SITE_BASE flows into `Astro.site` so canonical URLs, sitemap.xml,
-        # and feed.xml carry the env's apex.
+        # and feed.xml carry the env's apex. PUBLIC_VERSION is the semver
+        # for this deploy; Astro exposes PUBLIC_*-prefixed env vars to the
+        # client bundle via import.meta.env.
         env:
           SITE_BASE: https://${{ vars.APEX_DOMAIN }}
+          PUBLIC_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -87,3 +104,9 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}" \
             --paths "/*"
+      - name: tag release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"

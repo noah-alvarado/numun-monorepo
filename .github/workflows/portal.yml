@@ -8,10 +8,17 @@ on:
       - "packages/tailwind-tokens/**"
       - ".github/workflows/portal.yml"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Which semver component to bump
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
   id-token: write
-  contents: read
+  contents: write # push version tags
 
 concurrency:
   group: deploy-portal
@@ -26,6 +33,13 @@ jobs:
       BUCKET: numun-${{ vars.ENV_NAME }}-portal
     steps:
       - uses: actions/checkout@v4
+      - name: compute version
+        id: version
+        uses: ./.github/actions/compute-version
+        with:
+          app: portal
+          bump: ${{ inputs.bump || 'patch' }}
+          version-file: portal/package.json
       - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
@@ -37,6 +51,7 @@ jobs:
           VITE_API_BASE_URL: https://api.${{ vars.APEX_DOMAIN }}
           VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          VITE_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm --filter @numun/portal build
       - uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -56,3 +71,9 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "${{ vars.PORTAL_DISTRIBUTION_ID }}" \
             --paths "/index.html"
+      - name: tag release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"

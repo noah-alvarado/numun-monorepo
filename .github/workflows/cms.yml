@@ -7,10 +7,17 @@ on:
       - "cms/**"
       - ".github/workflows/cms.yml"
   workflow_dispatch:
+    inputs:
+      bump:
+        description: Which semver component to bump
+        required: false
+        default: patch
+        type: choice
+        options: [patch, minor, major]
 
 permissions:
   id-token: write
-  contents: read
+  contents: write # push version tags
 
 concurrency:
   group: deploy-cms
@@ -25,6 +32,13 @@ jobs:
       BUCKET: numun-${{ vars.ENV_NAME }}-cms
     steps:
       - uses: actions/checkout@v4
+      - name: compute version
+        id: version
+        uses: ./.github/actions/compute-version
+        with:
+          app: cms
+          bump: ${{ inputs.bump || 'patch' }}
+          version-file: cms/package.json
       - name: Substitute env-specific domain in config.yml
         # config.yml is committed with `__APEX_DOMAIN__` tokens; we resolve them
         # here per env. APEX_DOMAIN is set on the env-scoped GitHub Environment
@@ -62,3 +76,9 @@ jobs:
           aws cloudfront create-invalidation \
             --distribution-id "${{ vars.CMS_DISTRIBUTION_ID }}" \
             --paths "/*"
+      - name: tag release
+        env:
+          TAG: ${{ steps.version.outputs.tag }}
+        run: |
+          git tag "$TAG" "$GITHUB_SHA"
+          git push origin "$TAG"

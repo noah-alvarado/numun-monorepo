@@ -1,6 +1,6 @@
 # NUMUN
 
-This repository holds the design, code (forthcoming), and operational docs for the **Northwestern University Model United Nations (NUMUN)** public website and conference-management portal.
+This repository holds the design, code, and operational docs for the **Northwestern University Model United Nations (NUMUN)** public website and conference-management portal.
 
 ## What this is
 

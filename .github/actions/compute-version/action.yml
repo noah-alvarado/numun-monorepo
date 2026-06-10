@@ -1,0 +1,115 @@
+name: compute-version
+description: |
+  Compute the next semver for a monorepo app. Reads the latest git tag
+  (<app>-v*) and an optional version file. If the file version is greater
+  than the tag version, the file wins (manual override). Otherwise the
+  tag is auto-bumped using the `bump` input.
+
+inputs:
+  app:
+    description: App name used as the tag prefix, e.g. "site" produces "site-v1.2.3".
+    required: true
+  bump:
+    description: Which semver component to auto-bump when the file version doesn't override.
+    required: false
+    default: patch
+  version-file:
+    description: |
+      Optional path to a version file. `.json` files are parsed with jq
+      (reads `.version`); anything else is read as plain text. If the
+      file version is greater than the latest tag, that exact value is
+      used and no bump is applied.
+    required: false
+    default: ""
+
+outputs:
+  version:
+    description: New version, e.g. "0.12.0".
+    value: ${{ steps.bump.outputs.version }}
+  tag:
+    description: New tag, e.g. "site-v0.12.0".
+    value: ${{ steps.bump.outputs.tag }}
+  previous:
+    description: Previous version (from the latest tag), or empty if none.
+    value: ${{ steps.bump.outputs.previous }}
+  source:
+    description: Where the version came from — "file" (manual override) or "auto-bump".
+    value: ${{ steps.bump.outputs.source }}
+
+runs:
+  using: composite
+  steps:
+    - id: bump
+      shell: bash
+      env:
+        APP: ${{ inputs.app }}
+        BUMP: ${{ inputs.bump }}
+        VERSION_FILE: ${{ inputs.version-file }}
+      run: |
+        set -euo pipefail
+
+        case "$BUMP" in
+          patch|minor|major) ;;
+          *) echo "invalid bump '$BUMP' (expected patch|minor|major)" >&2; exit 1 ;;
+        esac
+
+        # actions/checkout's shallow clone omits tags; fetch them explicitly.
+        git fetch --tags --force --quiet origin || true
+
+        latest=$(git tag --list "${APP}-v*" --sort=-v:refname | head -n1 || true)
+        if [[ -z "$latest" ]]; then
+          tag_ver=""
+        else
+          tag_ver="${latest#${APP}-v}"
+        fi
+
+        # Read file version if a file was provided and exists.
+        file_ver=""
+        if [[ -n "$VERSION_FILE" && -f "$VERSION_FILE" ]]; then
+          case "$VERSION_FILE" in
+            *.json)
+              file_ver=$(jq -r '.version // ""' "$VERSION_FILE")
+              ;;
+            *)
+              file_ver=$(tr -d '[:space:]' < "$VERSION_FILE")
+              ;;
+          esac
+        fi
+
+        # Returns 0 if $1 > $2 (strict greater) by semver ordering. Equal → 1.
+        higher() {
+          [[ "$1" != "$2" ]] && [[ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -n1)" == "$1" ]]
+        }
+
+        source="auto-bump"
+        if [[ -n "$file_ver" ]] && { [[ -z "$tag_ver" ]] || higher "$file_ver" "$tag_ver"; }; then
+          version="$file_ver"
+          source="file"
+        else
+          if [[ -z "$tag_ver" ]]; then
+            major=0; minor=0; patch=0
+          else
+            IFS=. read -r major minor patch <<<"$tag_ver"
+          fi
+          case "$BUMP" in
+            major) major=$((major + 1)); minor=0; patch=0 ;;
+            minor) minor=$((minor + 1)); patch=0 ;;
+            patch) patch=$((patch + 1)) ;;
+          esac
+          version="${major}.${minor}.${patch}"
+          # Warn if the file is present and lagging — informational only.
+          if [[ -n "$file_ver" && "$file_ver" != "$tag_ver" ]]; then
+            echo "::warning title=${APP} version file lagging::${VERSION_FILE} is ${file_ver}, last tag is ${tag_ver}. Auto-bumping anyway."
+          fi
+        fi
+
+        tag="${APP}-v${version}"
+
+        {
+          echo "previous=$tag_ver"
+          echo "version=$version"
+          echo "tag=$tag"
+          echo "source=$source"
+        } >> "$GITHUB_OUTPUT"
+
+        echo "::notice title=${APP} version::${tag_ver:-<none>} → ${version} (tag ${tag}, source ${source})"
