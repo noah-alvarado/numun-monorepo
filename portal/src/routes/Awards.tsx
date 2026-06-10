@@ -119,15 +119,9 @@ export default function Awards() {
     return list.filter((a) => {
       if (dismissed.has(a.id)) return false;
       return a.recipients.some((r) => {
-        if (
-          r.kind === AwardRecipientKind.DELEGATE &&
-          myDgIds.has(r.id)
-        )
+        if (r.kind === AwardRecipientKind.DELEGATE && myDgIds.has(r.id))
           return true;
-        if (
-          r.kind === AwardRecipientKind.DELEGATION &&
-          myDelIds.has(r.id)
-        )
+        if (r.kind === AwardRecipientKind.DELEGATION && myDelIds.has(r.id))
           return true;
         return false;
       });
@@ -370,9 +364,7 @@ export default function Awards() {
                       <td class="px-2 py-2 text-nu-purple-700">
                         <Show
                           when={a.category}
-                          fallback={
-                            <span class="text-nu-purple-300">—</span>
-                          }
+                          fallback={<span class="text-nu-purple-300">—</span>}
                         >
                           {a.category}
                         </Show>
@@ -569,9 +561,7 @@ function AwardModal(props: {
                   class="rounded border border-nu-purple-300 px-2 py-1"
                 >
                   <For each={props.allowedKinds}>
-                    {(k) => (
-                      <option value={String(k)}>{kindLabel(k)}</option>
-                    )}
+                    {(k) => <option value={String(k)}>{kindLabel(k)}</option>}
                   </For>
                 </select>
                 <input

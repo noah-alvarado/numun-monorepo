@@ -806,12 +806,7 @@ collections:
           widget: string,
           pattern: ["^.{1,80}$", "Max 80 characters"],
         }
-      - {
-          name: category,
-          label: Category,
-          widget: string,
-          required: false,
-        }
+      - { name: category, label: Category, widget: string, required: false }
       - name: recipients
         label: Recipients
         label_singular: Recipient
@@ -827,9 +822,24 @@ collections:
               - { label: User (staffer or advisor), value: user }
               - { label: Conference, value: conference }
           - { name: id, label: Recipient ID, widget: string }
-          - { name: displayName, label: Display name, widget: string, required: false }
-      - { name: awardedAt, label: Awarded at, widget: datetime, required: false }
-      - { name: awardedBy, label: Awarded by (user id), widget: string, required: false }
+          - {
+              name: displayName,
+              label: Display name,
+              widget: string,
+              required: false,
+            }
+      - {
+          name: awardedAt,
+          label: Awarded at,
+          widget: datetime,
+          required: false,
+        }
+      - {
+          name: awardedBy,
+          label: Awarded by (user id),
+          widget: string,
+          required: false,
+        }
 
   # -------------------------------------------------------------------------
   # Background guides — folder collection (CMS_CONTENT_MODEL.md §4.6)

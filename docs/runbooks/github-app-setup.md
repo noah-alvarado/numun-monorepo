@@ -109,9 +109,9 @@ When decommissioning the env:
 
 ## Failure modes
 
-| Symptom | Likely cause |
-|---|---|
-| `cmsSync.ok = false`, `final_error: "401 …"` | Bad / rotated private key. Step 5 of "Rotation". |
-| `cmsSync.ok = false`, `final_error: "404 …"` on upsert | App not installed on the repo. Step 3. |
-| `cmsSync.ok = false`, `final_error: "403 …"` | App lacks `contents: write`. Re-check Step 1.5. |
-| `make dev` sync attempts fail | Expected without SSM credentials; the Lambdalith falls back to the stub client and reports `ok=true` with zero attempts. |
+| Symptom                                                | Likely cause                                                                                                             |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
+| `cmsSync.ok = false`, `final_error: "401 …"`           | Bad / rotated private key. Step 5 of "Rotation".                                                                         |
+| `cmsSync.ok = false`, `final_error: "404 …"` on upsert | App not installed on the repo. Step 3.                                                                                   |
+| `cmsSync.ok = false`, `final_error: "403 …"`           | App lacks `contents: write`. Re-check Step 1.5.                                                                          |
+| `make dev` sync attempts fail                          | Expected without SSM credentials; the Lambdalith falls back to the stub client and reports `ok=true` with zero attempts. |

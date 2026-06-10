@@ -15,9 +15,9 @@ import (
 // Stateless: hitting the URL flips announcementsOptIn = false; no server-side
 // state needs to exist before the click.
 type UnsubscribeToken struct {
-	UserID    string `json:"u"`
-	Kind      string `json:"k"` // "announcements" in v1
-	IssuedAt  int64  `json:"t"`
+	UserID   string `json:"u"`
+	Kind     string `json:"k"` // "announcements" in v1
+	IssuedAt int64  `json:"t"`
 }
 
 // SignedUnsubscribeURL builds a URL whose query carries a base64-encoded

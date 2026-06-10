@@ -52,16 +52,16 @@ type handler struct {
 // We unmarshal only the fields we act on.
 
 type sesNotification struct {
-	NotificationType string         `json:"notificationType"`
-	Mail             sesMail        `json:"mail"`
-	Bounce           *sesBounce     `json:"bounce,omitempty"`
-	Complaint        *sesComplaint  `json:"complaint,omitempty"`
-	Delivery         *sesDelivery   `json:"delivery,omitempty"`
+	NotificationType string        `json:"notificationType"`
+	Mail             sesMail       `json:"mail"`
+	Bounce           *sesBounce    `json:"bounce,omitempty"`
+	Complaint        *sesComplaint `json:"complaint,omitempty"`
+	Delivery         *sesDelivery  `json:"delivery,omitempty"`
 }
 
 type sesMail struct {
-	MessageID string   `json:"messageId"`
-	Source    string   `json:"source"`
+	MessageID string `json:"messageId"`
+	Source    string `json:"source"`
 }
 
 type sesBouncedRecipient struct {
@@ -75,8 +75,8 @@ type sesBounce struct {
 }
 
 type sesComplaint struct {
-	ComplainedRecipients []sesBouncedRecipient `json:"complainedRecipients"`
-	ComplaintFeedbackType string               `json:"complaintFeedbackType,omitempty"`
+	ComplainedRecipients  []sesBouncedRecipient `json:"complainedRecipients"`
+	ComplaintFeedbackType string                `json:"complaintFeedbackType,omitempty"`
 }
 
 type sesDelivery struct {

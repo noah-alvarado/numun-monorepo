@@ -4,7 +4,6 @@ package numun.v1;
 
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
-import "numun/v1/common.proto";
 
 // CommitteeType — crisis vs non-crisis. See DATA_MODEL.md §2.8.
 enum CommitteeType {

@@ -201,7 +201,7 @@ func (c *Client) FindDelegateByID(ctx context.Context, id string) (domain.Delega
 // delegation. Soft-deleted rows are filtered out post-query.
 func (c *Client) ListDelegatesByDelegation(ctx context.Context, delegationID, cursor string, pageSize int32) ([]domain.Delegate, string, error) {
 	in := &dynamodb.QueryInput{
-		TableName: aws.String(c.Table),
+		TableName:              aws.String(c.Table),
 		KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 			":pk": &ddbtypes.AttributeValueMemberS{Value: delegatePK(delegationID)},
@@ -246,7 +246,7 @@ func (c *Client) ListAllDelegatesByDelegation(ctx context.Context, delegationID 
 	var startKey map[string]ddbtypes.AttributeValue
 	for {
 		in := &dynamodb.QueryInput{
-			TableName: aws.String(c.Table),
+			TableName:              aws.String(c.Table),
 			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :sk)"),
 			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 				":pk": &ddbtypes.AttributeValueMemberS{Value: delegatePK(delegationID)},

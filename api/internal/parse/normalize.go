@@ -20,9 +20,9 @@ const (
 // to its canonical column. See BULK_IMPORT.md §3.
 var aliasIndex = map[string]string{
 	// firstName
-	"firstname":  colFirstName,
-	"givenname":  colFirstName,
-	"first":      colFirstName,
+	"firstname": colFirstName,
+	"givenname": colFirstName,
+	"first":     colFirstName,
 	// lastName
 	"lastname":   colLastName,
 	"surname":    colLastName,

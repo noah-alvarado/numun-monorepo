@@ -37,7 +37,7 @@ type announcementItem struct {
 	UpdatedBy string `dynamodbav:"updatedBy,omitempty"`
 }
 
-func announcementPK() string         { return "ANNOUNCEMENT#all" }
+func announcementPK() string          { return "ANNOUNCEMENT#all" }
 func announcementSK(id string) string { return "ANNOUNCEMENT#" + id }
 
 // CreateAnnouncement persists the announcement record. The actual SES sends

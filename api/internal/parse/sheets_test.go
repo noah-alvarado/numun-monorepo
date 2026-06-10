@@ -158,4 +158,3 @@ func TestParseSheet_GidFragmentInURL(t *testing.T) {
 		t.Errorf("export should have received gid=42, got %q", seenGID)
 	}
 }
-

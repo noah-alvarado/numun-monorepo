@@ -36,10 +36,10 @@ var fixtures = map[string]map[string]any{
 		"mode":            "full_sync",
 	},
 	"assignment_run_completed": {
-		"conferenceName":   "NUMUN 2026",
-		"assignmentCount":  84,
-		"objective":        "1247.5",
-		"runLink":          "https://portal.numun.org/admin/assignments",
+		"conferenceName":  "NUMUN 2026",
+		"assignmentCount": 84,
+		"objective":       "1247.5",
+		"runLink":         "https://portal.numun.org/admin/assignments",
 	},
 	"scope_role_changed": {
 		"actorName":     "Maya Park",
