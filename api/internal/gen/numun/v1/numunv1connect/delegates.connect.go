@@ -53,6 +53,9 @@ const (
 	DelegateServiceDeleteDelegateProcedure = "/numun.v1.DelegateService/DeleteDelegate"
 	// DelegateServiceCheckInProcedure is the fully-qualified name of the DelegateService's CheckIn RPC.
 	DelegateServiceCheckInProcedure = "/numun.v1.DelegateService/CheckIn"
+	// DelegateServiceSearchDelegatesProcedure is the fully-qualified name of the DelegateService's
+	// SearchDelegates RPC.
+	DelegateServiceSearchDelegatesProcedure = "/numun.v1.DelegateService/SearchDelegates"
 	// DelegateServicePreviewUpsertDelegatesBulkProcedure is the fully-qualified name of the
 	// DelegateService's PreviewUpsertDelegatesBulk RPC.
 	DelegateServicePreviewUpsertDelegatesBulkProcedure = "/numun.v1.DelegateService/PreviewUpsertDelegatesBulk"
@@ -76,6 +79,10 @@ type DelegateServiceClient interface {
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
 	DeleteDelegate(context.Context, *connect.Request[v1.DeleteDelegateRequest]) (*connect.Response[v1.DeleteDelegateResponse], error)
 	CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error)
+	// SearchDelegates returns delegates whose first/last name matches the query
+	// (case-insensitive substring), scoped to the conference. Backs the day-of
+	// check-in screen; results are filtered to the caller's scope.
+	SearchDelegates(context.Context, *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error)
 	PreviewUpsertDelegatesBulk(context.Context, *connect.Request[v1.PreviewUpsertDelegatesBulkRequest]) (*connect.Response[v1.PreviewUpsertDelegatesBulkResponse], error)
 	UpsertDelegatesBulk(context.Context, *connect.Request[v1.UpsertDelegatesBulkRequest]) (*connect.Response[v1.UpsertDelegatesBulkResponse], error)
 	DeleteBulkImportPreview(context.Context, *connect.Request[v1.DeleteBulkImportPreviewRequest]) (*connect.Response[v1.DeleteBulkImportPreviewResponse], error)
@@ -138,6 +145,12 @@ func NewDelegateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(delegateServiceMethods.ByName("CheckIn")),
 			connect.WithClientOptions(opts...),
 		),
+		searchDelegates: connect.NewClient[v1.SearchDelegatesRequest, v1.SearchDelegatesResponse](
+			httpClient,
+			baseURL+DelegateServiceSearchDelegatesProcedure,
+			connect.WithSchema(delegateServiceMethods.ByName("SearchDelegates")),
+			connect.WithClientOptions(opts...),
+		),
 		previewUpsertDelegatesBulk: connect.NewClient[v1.PreviewUpsertDelegatesBulkRequest, v1.PreviewUpsertDelegatesBulkResponse](
 			httpClient,
 			baseURL+DelegateServicePreviewUpsertDelegatesBulkProcedure,
@@ -174,6 +187,7 @@ type delegateServiceClient struct {
 	updateDelegate             *connect.Client[v1.UpdateDelegateRequest, v1.UpdateDelegateResponse]
 	deleteDelegate             *connect.Client[v1.DeleteDelegateRequest, v1.DeleteDelegateResponse]
 	checkIn                    *connect.Client[v1.CheckInRequest, v1.CheckInResponse]
+	searchDelegates            *connect.Client[v1.SearchDelegatesRequest, v1.SearchDelegatesResponse]
 	previewUpsertDelegatesBulk *connect.Client[v1.PreviewUpsertDelegatesBulkRequest, v1.PreviewUpsertDelegatesBulkResponse]
 	upsertDelegatesBulk        *connect.Client[v1.UpsertDelegatesBulkRequest, v1.UpsertDelegatesBulkResponse]
 	deleteBulkImportPreview    *connect.Client[v1.DeleteBulkImportPreviewRequest, v1.DeleteBulkImportPreviewResponse]
@@ -215,6 +229,11 @@ func (c *delegateServiceClient) CheckIn(ctx context.Context, req *connect.Reques
 	return c.checkIn.CallUnary(ctx, req)
 }
 
+// SearchDelegates calls numun.v1.DelegateService.SearchDelegates.
+func (c *delegateServiceClient) SearchDelegates(ctx context.Context, req *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error) {
+	return c.searchDelegates.CallUnary(ctx, req)
+}
+
 // PreviewUpsertDelegatesBulk calls numun.v1.DelegateService.PreviewUpsertDelegatesBulk.
 func (c *delegateServiceClient) PreviewUpsertDelegatesBulk(ctx context.Context, req *connect.Request[v1.PreviewUpsertDelegatesBulkRequest]) (*connect.Response[v1.PreviewUpsertDelegatesBulkResponse], error) {
 	return c.previewUpsertDelegatesBulk.CallUnary(ctx, req)
@@ -244,6 +263,10 @@ type DelegateServiceHandler interface {
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
 	DeleteDelegate(context.Context, *connect.Request[v1.DeleteDelegateRequest]) (*connect.Response[v1.DeleteDelegateResponse], error)
 	CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error)
+	// SearchDelegates returns delegates whose first/last name matches the query
+	// (case-insensitive substring), scoped to the conference. Backs the day-of
+	// check-in screen; results are filtered to the caller's scope.
+	SearchDelegates(context.Context, *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error)
 	PreviewUpsertDelegatesBulk(context.Context, *connect.Request[v1.PreviewUpsertDelegatesBulkRequest]) (*connect.Response[v1.PreviewUpsertDelegatesBulkResponse], error)
 	UpsertDelegatesBulk(context.Context, *connect.Request[v1.UpsertDelegatesBulkRequest]) (*connect.Response[v1.UpsertDelegatesBulkResponse], error)
 	DeleteBulkImportPreview(context.Context, *connect.Request[v1.DeleteBulkImportPreviewRequest]) (*connect.Response[v1.DeleteBulkImportPreviewResponse], error)
@@ -302,6 +325,12 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 		connect.WithSchema(delegateServiceMethods.ByName("CheckIn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	delegateServiceSearchDelegatesHandler := connect.NewUnaryHandler(
+		DelegateServiceSearchDelegatesProcedure,
+		svc.SearchDelegates,
+		connect.WithSchema(delegateServiceMethods.ByName("SearchDelegates")),
+		connect.WithHandlerOptions(opts...),
+	)
 	delegateServicePreviewUpsertDelegatesBulkHandler := connect.NewUnaryHandler(
 		DelegateServicePreviewUpsertDelegatesBulkProcedure,
 		svc.PreviewUpsertDelegatesBulk,
@@ -342,6 +371,8 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 			delegateServiceDeleteDelegateHandler.ServeHTTP(w, r)
 		case DelegateServiceCheckInProcedure:
 			delegateServiceCheckInHandler.ServeHTTP(w, r)
+		case DelegateServiceSearchDelegatesProcedure:
+			delegateServiceSearchDelegatesHandler.ServeHTTP(w, r)
 		case DelegateServicePreviewUpsertDelegatesBulkProcedure:
 			delegateServicePreviewUpsertDelegatesBulkHandler.ServeHTTP(w, r)
 		case DelegateServiceUpsertDelegatesBulkProcedure:
@@ -385,6 +416,10 @@ func (UnimplementedDelegateServiceHandler) DeleteDelegate(context.Context, *conn
 
 func (UnimplementedDelegateServiceHandler) CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.CheckIn is not implemented"))
+}
+
+func (UnimplementedDelegateServiceHandler) SearchDelegates(context.Context, *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.SearchDelegates is not implemented"))
 }
 
 func (UnimplementedDelegateServiceHandler) PreviewUpsertDelegatesBulk(context.Context, *connect.Request[v1.PreviewUpsertDelegatesBulkRequest]) (*connect.Response[v1.PreviewUpsertDelegatesBulkResponse], error) {

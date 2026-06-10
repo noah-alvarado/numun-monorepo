@@ -1071,6 +1071,436 @@ func (x *ApproveAllResponse) GetApprovedCount() int32 {
 	return 0
 }
 
+// AssignmentMutation is a (id, expected_version) tuple — minimal info needed
+// to optimistic-lock one row in a bulk operation.
+type AssignmentMutation struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AssignmentId    string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	ExpectedVersion int32                  `protobuf:"varint,2,opt,name=expected_version,json=expectedVersion,proto3" json:"expected_version,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AssignmentMutation) Reset() {
+	*x = AssignmentMutation{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignmentMutation) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignmentMutation) ProtoMessage() {}
+
+func (x *AssignmentMutation) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignmentMutation.ProtoReflect.Descriptor instead.
+func (*AssignmentMutation) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AssignmentMutation) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+func (x *AssignmentMutation) GetExpectedVersion() int32 {
+	if x != nil {
+		return x.ExpectedVersion
+	}
+	return 0
+}
+
+// AssignmentMutationFailure surfaces a per-row failure when bulk operations
+// can't fully apply. Mirrors connect's error codes so the portal can dispatch
+// retry vs. reload vs. surface UX.
+type AssignmentMutationFailure struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	AssignmentId string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
+	// "aborted" | "not_found" | "failed_precondition" | "unavailable"
+	Code          string `protobuf:"bytes,2,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssignmentMutationFailure) Reset() {
+	*x = AssignmentMutationFailure{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssignmentMutationFailure) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssignmentMutationFailure) ProtoMessage() {}
+
+func (x *AssignmentMutationFailure) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssignmentMutationFailure.ProtoReflect.Descriptor instead.
+func (*AssignmentMutationFailure) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *AssignmentMutationFailure) GetAssignmentId() string {
+	if x != nil {
+		return x.AssignmentId
+	}
+	return ""
+}
+
+func (x *AssignmentMutationFailure) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *AssignmentMutationFailure) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+type ApproveByIdsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConferenceId  string                 `protobuf:"bytes,1,opt,name=conference_id,json=conferenceId,proto3" json:"conference_id,omitempty"`
+	Items         []*AssignmentMutation  `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveByIdsRequest) Reset() {
+	*x = ApproveByIdsRequest{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveByIdsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveByIdsRequest) ProtoMessage() {}
+
+func (x *ApproveByIdsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveByIdsRequest.ProtoReflect.Descriptor instead.
+func (*ApproveByIdsRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *ApproveByIdsRequest) GetConferenceId() string {
+	if x != nil {
+		return x.ConferenceId
+	}
+	return ""
+}
+
+func (x *ApproveByIdsRequest) GetItems() []*AssignmentMutation {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type ApproveByIdsResponse struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	ApprovedCount int32                        `protobuf:"varint,1,opt,name=approved_count,json=approvedCount,proto3" json:"approved_count,omitempty"`
+	Failures      []*AssignmentMutationFailure `protobuf:"bytes,2,rep,name=failures,proto3" json:"failures,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ApproveByIdsResponse) Reset() {
+	*x = ApproveByIdsResponse{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ApproveByIdsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ApproveByIdsResponse) ProtoMessage() {}
+
+func (x *ApproveByIdsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ApproveByIdsResponse.ProtoReflect.Descriptor instead.
+func (*ApproveByIdsResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *ApproveByIdsResponse) GetApprovedCount() int32 {
+	if x != nil {
+		return x.ApprovedCount
+	}
+	return 0
+}
+
+func (x *ApproveByIdsResponse) GetFailures() []*AssignmentMutationFailure {
+	if x != nil {
+		return x.Failures
+	}
+	return nil
+}
+
+type UnapproveByIdsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConferenceId  string                 `protobuf:"bytes,1,opt,name=conference_id,json=conferenceId,proto3" json:"conference_id,omitempty"`
+	Items         []*AssignmentMutation  `protobuf:"bytes,2,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnapproveByIdsRequest) Reset() {
+	*x = UnapproveByIdsRequest{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnapproveByIdsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnapproveByIdsRequest) ProtoMessage() {}
+
+func (x *UnapproveByIdsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnapproveByIdsRequest.ProtoReflect.Descriptor instead.
+func (*UnapproveByIdsRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *UnapproveByIdsRequest) GetConferenceId() string {
+	if x != nil {
+		return x.ConferenceId
+	}
+	return ""
+}
+
+func (x *UnapproveByIdsRequest) GetItems() []*AssignmentMutation {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+type UnapproveByIdsResponse struct {
+	state           protoimpl.MessageState       `protogen:"open.v1"`
+	UnapprovedCount int32                        `protobuf:"varint,1,opt,name=unapproved_count,json=unapprovedCount,proto3" json:"unapproved_count,omitempty"`
+	Failures        []*AssignmentMutationFailure `protobuf:"bytes,2,rep,name=failures,proto3" json:"failures,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *UnapproveByIdsResponse) Reset() {
+	*x = UnapproveByIdsResponse{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnapproveByIdsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnapproveByIdsResponse) ProtoMessage() {}
+
+func (x *UnapproveByIdsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnapproveByIdsResponse.ProtoReflect.Descriptor instead.
+func (*UnapproveByIdsResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *UnapproveByIdsResponse) GetUnapprovedCount() int32 {
+	if x != nil {
+		return x.UnapprovedCount
+	}
+	return 0
+}
+
+func (x *UnapproveByIdsResponse) GetFailures() []*AssignmentMutationFailure {
+	if x != nil {
+		return x.Failures
+	}
+	return nil
+}
+
+type SwapAssignmentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	A             *AssignmentMutation    `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
+	B             *AssignmentMutation    `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwapAssignmentsRequest) Reset() {
+	*x = SwapAssignmentsRequest{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwapAssignmentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwapAssignmentsRequest) ProtoMessage() {}
+
+func (x *SwapAssignmentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwapAssignmentsRequest.ProtoReflect.Descriptor instead.
+func (*SwapAssignmentsRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *SwapAssignmentsRequest) GetA() *AssignmentMutation {
+	if x != nil {
+		return x.A
+	}
+	return nil
+}
+
+func (x *SwapAssignmentsRequest) GetB() *AssignmentMutation {
+	if x != nil {
+		return x.B
+	}
+	return nil
+}
+
+type SwapAssignmentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	A             *Assignment            `protobuf:"bytes,1,opt,name=a,proto3" json:"a,omitempty"`
+	B             *Assignment            `protobuf:"bytes,2,opt,name=b,proto3" json:"b,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwapAssignmentsResponse) Reset() {
+	*x = SwapAssignmentsResponse{}
+	mi := &file_numun_v1_assignments_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwapAssignmentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwapAssignmentsResponse) ProtoMessage() {}
+
+func (x *SwapAssignmentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_assignments_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwapAssignmentsResponse.ProtoReflect.Descriptor instead.
+func (*SwapAssignmentsResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SwapAssignmentsResponse) GetA() *Assignment {
+	if x != nil {
+		return x.A
+	}
+	return nil
+}
+
+func (x *SwapAssignmentsResponse) GetB() *Assignment {
+	if x != nil {
+		return x.B
+	}
+	return nil
+}
+
 type UpdateAssignmentRequest struct {
 	state        protoimpl.MessageState `protogen:"open.v1"`
 	AssignmentId string                 `protobuf:"bytes,1,opt,name=assignment_id,json=assignmentId,proto3" json:"assignment_id,omitempty"`
@@ -1085,7 +1515,7 @@ type UpdateAssignmentRequest struct {
 
 func (x *UpdateAssignmentRequest) Reset() {
 	*x = UpdateAssignmentRequest{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[14]
+	mi := &file_numun_v1_assignments_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1097,7 +1527,7 @@ func (x *UpdateAssignmentRequest) String() string {
 func (*UpdateAssignmentRequest) ProtoMessage() {}
 
 func (x *UpdateAssignmentRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[14]
+	mi := &file_numun_v1_assignments_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1110,7 +1540,7 @@ func (x *UpdateAssignmentRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssignmentRequest.ProtoReflect.Descriptor instead.
 func (*UpdateAssignmentRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{14}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *UpdateAssignmentRequest) GetAssignmentId() string {
@@ -1150,7 +1580,7 @@ type UpdateAssignmentResponse struct {
 
 func (x *UpdateAssignmentResponse) Reset() {
 	*x = UpdateAssignmentResponse{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[15]
+	mi := &file_numun_v1_assignments_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1162,7 +1592,7 @@ func (x *UpdateAssignmentResponse) String() string {
 func (*UpdateAssignmentResponse) ProtoMessage() {}
 
 func (x *UpdateAssignmentResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[15]
+	mi := &file_numun_v1_assignments_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1175,7 +1605,7 @@ func (x *UpdateAssignmentResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateAssignmentResponse.ProtoReflect.Descriptor instead.
 func (*UpdateAssignmentResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{15}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UpdateAssignmentResponse) GetAssignment() *Assignment {
@@ -1195,7 +1625,7 @@ type ListAssignmentRunsRequest struct {
 
 func (x *ListAssignmentRunsRequest) Reset() {
 	*x = ListAssignmentRunsRequest{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[16]
+	mi := &file_numun_v1_assignments_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1207,7 +1637,7 @@ func (x *ListAssignmentRunsRequest) String() string {
 func (*ListAssignmentRunsRequest) ProtoMessage() {}
 
 func (x *ListAssignmentRunsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[16]
+	mi := &file_numun_v1_assignments_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1220,7 +1650,7 @@ func (x *ListAssignmentRunsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssignmentRunsRequest.ProtoReflect.Descriptor instead.
 func (*ListAssignmentRunsRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{16}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *ListAssignmentRunsRequest) GetConferenceId() string {
@@ -1247,7 +1677,7 @@ type ListAssignmentRunsResponse struct {
 
 func (x *ListAssignmentRunsResponse) Reset() {
 	*x = ListAssignmentRunsResponse{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[17]
+	mi := &file_numun_v1_assignments_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1259,7 +1689,7 @@ func (x *ListAssignmentRunsResponse) String() string {
 func (*ListAssignmentRunsResponse) ProtoMessage() {}
 
 func (x *ListAssignmentRunsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[17]
+	mi := &file_numun_v1_assignments_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1272,7 +1702,7 @@ func (x *ListAssignmentRunsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssignmentRunsResponse.ProtoReflect.Descriptor instead.
 func (*ListAssignmentRunsResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{17}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *ListAssignmentRunsResponse) GetItems() []*AssignmentRun {
@@ -1298,7 +1728,7 @@ type GetCurrentRunRequest struct {
 
 func (x *GetCurrentRunRequest) Reset() {
 	*x = GetCurrentRunRequest{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[18]
+	mi := &file_numun_v1_assignments_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1310,7 +1740,7 @@ func (x *GetCurrentRunRequest) String() string {
 func (*GetCurrentRunRequest) ProtoMessage() {}
 
 func (x *GetCurrentRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[18]
+	mi := &file_numun_v1_assignments_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1323,7 +1753,7 @@ func (x *GetCurrentRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentRunRequest.ProtoReflect.Descriptor instead.
 func (*GetCurrentRunRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{18}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *GetCurrentRunRequest) GetConferenceId() string {
@@ -1343,7 +1773,7 @@ type GetCurrentRunResponse struct {
 
 func (x *GetCurrentRunResponse) Reset() {
 	*x = GetCurrentRunResponse{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[19]
+	mi := &file_numun_v1_assignments_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1355,7 +1785,7 @@ func (x *GetCurrentRunResponse) String() string {
 func (*GetCurrentRunResponse) ProtoMessage() {}
 
 func (x *GetCurrentRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[19]
+	mi := &file_numun_v1_assignments_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1368,7 +1798,7 @@ func (x *GetCurrentRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetCurrentRunResponse.ProtoReflect.Descriptor instead.
 func (*GetCurrentRunResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{19}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *GetCurrentRunResponse) GetRun() *AssignmentRun {
@@ -1387,7 +1817,7 @@ type GetAssignmentRunRequest struct {
 
 func (x *GetAssignmentRunRequest) Reset() {
 	*x = GetAssignmentRunRequest{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[20]
+	mi := &file_numun_v1_assignments_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1399,7 +1829,7 @@ func (x *GetAssignmentRunRequest) String() string {
 func (*GetAssignmentRunRequest) ProtoMessage() {}
 
 func (x *GetAssignmentRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[20]
+	mi := &file_numun_v1_assignments_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1412,7 +1842,7 @@ func (x *GetAssignmentRunRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssignmentRunRequest.ProtoReflect.Descriptor instead.
 func (*GetAssignmentRunRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{20}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *GetAssignmentRunRequest) GetRunId() string {
@@ -1431,7 +1861,7 @@ type GetAssignmentRunResponse struct {
 
 func (x *GetAssignmentRunResponse) Reset() {
 	*x = GetAssignmentRunResponse{}
-	mi := &file_numun_v1_assignments_proto_msgTypes[21]
+	mi := &file_numun_v1_assignments_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1443,7 +1873,7 @@ func (x *GetAssignmentRunResponse) String() string {
 func (*GetAssignmentRunResponse) ProtoMessage() {}
 
 func (x *GetAssignmentRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_assignments_proto_msgTypes[21]
+	mi := &file_numun_v1_assignments_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1456,7 +1886,7 @@ func (x *GetAssignmentRunResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAssignmentRunResponse.ProtoReflect.Descriptor instead.
 func (*GetAssignmentRunResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{21}
+	return file_numun_v1_assignments_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetAssignmentRunResponse) GetRun() *AssignmentRun {
@@ -1555,7 +1985,32 @@ const file_numun_v1_assignments_proto_rawDesc = "" +
 	"\rconference_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fconferenceId\x12\x15\n" +
 	"\x06run_id\x18\x02 \x01(\tR\x05runId\";\n" +
 	"\x12ApproveAllResponse\x12%\n" +
-	"\x0eapproved_count\x18\x01 \x01(\x05R\rapprovedCount\"\xe7\x01\n" +
+	"\x0eapproved_count\x18\x01 \x01(\x05R\rapprovedCount\"v\n" +
+	"\x12AssignmentMutation\x12,\n" +
+	"\rassignment_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fassignmentId\x122\n" +
+	"\x10expected_version\x18\x02 \x01(\x05B\a\xbaH\x04\x1a\x02 \x00R\x0fexpectedVersion\"n\n" +
+	"\x19AssignmentMutationFailure\x12#\n" +
+	"\rassignment_id\x18\x01 \x01(\tR\fassignmentId\x12\x12\n" +
+	"\x04code\x18\x02 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\"\x81\x01\n" +
+	"\x13ApproveByIdsRequest\x12,\n" +
+	"\rconference_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fconferenceId\x12<\n" +
+	"\x05items\x18\x02 \x03(\v2\x1c.numun.v1.AssignmentMutationB\b\xbaH\x05\x92\x01\x02\b\x01R\x05items\"~\n" +
+	"\x14ApproveByIdsResponse\x12%\n" +
+	"\x0eapproved_count\x18\x01 \x01(\x05R\rapprovedCount\x12?\n" +
+	"\bfailures\x18\x02 \x03(\v2#.numun.v1.AssignmentMutationFailureR\bfailures\"\x83\x01\n" +
+	"\x15UnapproveByIdsRequest\x12,\n" +
+	"\rconference_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fconferenceId\x12<\n" +
+	"\x05items\x18\x02 \x03(\v2\x1c.numun.v1.AssignmentMutationB\b\xbaH\x05\x92\x01\x02\b\x01R\x05items\"\x84\x01\n" +
+	"\x16UnapproveByIdsResponse\x12)\n" +
+	"\x10unapproved_count\x18\x01 \x01(\x05R\x0funapprovedCount\x12?\n" +
+	"\bfailures\x18\x02 \x03(\v2#.numun.v1.AssignmentMutationFailureR\bfailures\"\x80\x01\n" +
+	"\x16SwapAssignmentsRequest\x122\n" +
+	"\x01a\x18\x01 \x01(\v2\x1c.numun.v1.AssignmentMutationB\x06\xbaH\x03\xc8\x01\x01R\x01a\x122\n" +
+	"\x01b\x18\x02 \x01(\v2\x1c.numun.v1.AssignmentMutationB\x06\xbaH\x03\xc8\x01\x01R\x01b\"a\n" +
+	"\x17SwapAssignmentsResponse\x12\"\n" +
+	"\x01a\x18\x01 \x01(\v2\x14.numun.v1.AssignmentR\x01a\x12\"\n" +
+	"\x01b\x18\x02 \x01(\v2\x14.numun.v1.AssignmentR\x01b\"\xe7\x01\n" +
 	"\x17UpdateAssignmentRequest\x12,\n" +
 	"\rassignment_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fassignmentId\x12$\n" +
 	"\vdelegate_id\x18\x02 \x01(\tH\x00R\n" +
@@ -1592,7 +2047,7 @@ const file_numun_v1_assignments_proto_rawDesc = "" +
 	"!ASSIGNMENT_RUN_STATUS_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dASSIGNMENT_RUN_STATUS_RUNNING\x10\x01\x12\x1e\n" +
 	"\x1aASSIGNMENT_RUN_STATUS_DONE\x10\x02\x12 \n" +
-	"\x1cASSIGNMENT_RUN_STATUS_FAILED\x10\x032\xf9\x04\n" +
+	"\x1cASSIGNMENT_RUN_STATUS_FAILED\x10\x032\xfb\x06\n" +
 	"\x11AssignmentService\x12X\n" +
 	"\x0fListAssignments\x12 .numun.v1.ListAssignmentsRequest\x1a!.numun.v1.ListAssignmentsResponse\"\x00\x12R\n" +
 	"\rGetAssignment\x12\x1e.numun.v1.GetAssignmentRequest\x1a\x1f.numun.v1.GetAssignmentResponse\"\x00\x12@\n" +
@@ -1600,7 +2055,10 @@ const file_numun_v1_assignments_proto_rawDesc = "" +
 	"\aApprove\x12).numun.v1.AssignmentServiceApproveRequest\x1a*.numun.v1.AssignmentServiceApproveResponse\"\x00\x12h\n" +
 	"\tUnapprove\x12+.numun.v1.AssignmentServiceUnapproveRequest\x1a,.numun.v1.AssignmentServiceUnapproveResponse\"\x00\x12I\n" +
 	"\n" +
-	"ApproveAll\x12\x1b.numun.v1.ApproveAllRequest\x1a\x1c.numun.v1.ApproveAllResponse\"\x00\x12[\n" +
+	"ApproveAll\x12\x1b.numun.v1.ApproveAllRequest\x1a\x1c.numun.v1.ApproveAllResponse\"\x00\x12O\n" +
+	"\fApproveByIds\x12\x1d.numun.v1.ApproveByIdsRequest\x1a\x1e.numun.v1.ApproveByIdsResponse\"\x00\x12U\n" +
+	"\x0eUnapproveByIds\x12\x1f.numun.v1.UnapproveByIdsRequest\x1a .numun.v1.UnapproveByIdsResponse\"\x00\x12X\n" +
+	"\x0fSwapAssignments\x12 .numun.v1.SwapAssignmentsRequest\x1a!.numun.v1.SwapAssignmentsResponse\"\x00\x12[\n" +
 	"\x10UpdateAssignment\x12!.numun.v1.UpdateAssignmentRequest\x1a\".numun.v1.UpdateAssignmentResponse\"\x002\xaa\x02\n" +
 	"\x14AssignmentRunService\x12a\n" +
 	"\x12ListAssignmentRuns\x12#.numun.v1.ListAssignmentRunsRequest\x1a$.numun.v1.ListAssignmentRunsResponse\"\x00\x12R\n" +
@@ -1621,7 +2079,7 @@ func file_numun_v1_assignments_proto_rawDescGZIP() []byte {
 }
 
 var file_numun_v1_assignments_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_numun_v1_assignments_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
+var file_numun_v1_assignments_proto_msgTypes = make([]protoimpl.MessageInfo, 30)
 var file_numun_v1_assignments_proto_goTypes = []any{
 	(AssignmentStatus)(0),                      // 0: numun.v1.AssignmentStatus
 	(AssignmentRunStatus)(0),                   // 1: numun.v1.AssignmentRunStatus
@@ -1639,67 +2097,89 @@ var file_numun_v1_assignments_proto_goTypes = []any{
 	(*AssignmentServiceUnapproveResponse)(nil), // 13: numun.v1.AssignmentServiceUnapproveResponse
 	(*ApproveAllRequest)(nil),                  // 14: numun.v1.ApproveAllRequest
 	(*ApproveAllResponse)(nil),                 // 15: numun.v1.ApproveAllResponse
-	(*UpdateAssignmentRequest)(nil),            // 16: numun.v1.UpdateAssignmentRequest
-	(*UpdateAssignmentResponse)(nil),           // 17: numun.v1.UpdateAssignmentResponse
-	(*ListAssignmentRunsRequest)(nil),          // 18: numun.v1.ListAssignmentRunsRequest
-	(*ListAssignmentRunsResponse)(nil),         // 19: numun.v1.ListAssignmentRunsResponse
-	(*GetCurrentRunRequest)(nil),               // 20: numun.v1.GetCurrentRunRequest
-	(*GetCurrentRunResponse)(nil),              // 21: numun.v1.GetCurrentRunResponse
-	(*GetAssignmentRunRequest)(nil),            // 22: numun.v1.GetAssignmentRunRequest
-	(*GetAssignmentRunResponse)(nil),           // 23: numun.v1.GetAssignmentRunResponse
-	(*timestamppb.Timestamp)(nil),              // 24: google.protobuf.Timestamp
-	(*PageRequest)(nil),                        // 25: numun.v1.PageRequest
-	(*Page)(nil),                               // 26: numun.v1.Page
+	(*AssignmentMutation)(nil),                 // 16: numun.v1.AssignmentMutation
+	(*AssignmentMutationFailure)(nil),          // 17: numun.v1.AssignmentMutationFailure
+	(*ApproveByIdsRequest)(nil),                // 18: numun.v1.ApproveByIdsRequest
+	(*ApproveByIdsResponse)(nil),               // 19: numun.v1.ApproveByIdsResponse
+	(*UnapproveByIdsRequest)(nil),              // 20: numun.v1.UnapproveByIdsRequest
+	(*UnapproveByIdsResponse)(nil),             // 21: numun.v1.UnapproveByIdsResponse
+	(*SwapAssignmentsRequest)(nil),             // 22: numun.v1.SwapAssignmentsRequest
+	(*SwapAssignmentsResponse)(nil),            // 23: numun.v1.SwapAssignmentsResponse
+	(*UpdateAssignmentRequest)(nil),            // 24: numun.v1.UpdateAssignmentRequest
+	(*UpdateAssignmentResponse)(nil),           // 25: numun.v1.UpdateAssignmentResponse
+	(*ListAssignmentRunsRequest)(nil),          // 26: numun.v1.ListAssignmentRunsRequest
+	(*ListAssignmentRunsResponse)(nil),         // 27: numun.v1.ListAssignmentRunsResponse
+	(*GetCurrentRunRequest)(nil),               // 28: numun.v1.GetCurrentRunRequest
+	(*GetCurrentRunResponse)(nil),              // 29: numun.v1.GetCurrentRunResponse
+	(*GetAssignmentRunRequest)(nil),            // 30: numun.v1.GetAssignmentRunRequest
+	(*GetAssignmentRunResponse)(nil),           // 31: numun.v1.GetAssignmentRunResponse
+	(*timestamppb.Timestamp)(nil),              // 32: google.protobuf.Timestamp
+	(*PageRequest)(nil),                        // 33: numun.v1.PageRequest
+	(*Page)(nil),                               // 34: numun.v1.Page
 }
 var file_numun_v1_assignments_proto_depIdxs = []int32{
 	0,  // 0: numun.v1.Assignment.status:type_name -> numun.v1.AssignmentStatus
-	24, // 1: numun.v1.Assignment.approved_at:type_name -> google.protobuf.Timestamp
-	24, // 2: numun.v1.Assignment.proposed_at:type_name -> google.protobuf.Timestamp
-	24, // 3: numun.v1.Assignment.created_at:type_name -> google.protobuf.Timestamp
-	24, // 4: numun.v1.Assignment.updated_at:type_name -> google.protobuf.Timestamp
-	24, // 5: numun.v1.AssignmentRun.triggered_at:type_name -> google.protobuf.Timestamp
-	24, // 6: numun.v1.AssignmentRun.completed_at:type_name -> google.protobuf.Timestamp
+	32, // 1: numun.v1.Assignment.approved_at:type_name -> google.protobuf.Timestamp
+	32, // 2: numun.v1.Assignment.proposed_at:type_name -> google.protobuf.Timestamp
+	32, // 3: numun.v1.Assignment.created_at:type_name -> google.protobuf.Timestamp
+	32, // 4: numun.v1.Assignment.updated_at:type_name -> google.protobuf.Timestamp
+	32, // 5: numun.v1.AssignmentRun.triggered_at:type_name -> google.protobuf.Timestamp
+	32, // 6: numun.v1.AssignmentRun.completed_at:type_name -> google.protobuf.Timestamp
 	1,  // 7: numun.v1.AssignmentRun.status:type_name -> numun.v1.AssignmentRunStatus
 	0,  // 8: numun.v1.ListAssignmentsRequest.status:type_name -> numun.v1.AssignmentStatus
-	25, // 9: numun.v1.ListAssignmentsRequest.page:type_name -> numun.v1.PageRequest
+	33, // 9: numun.v1.ListAssignmentsRequest.page:type_name -> numun.v1.PageRequest
 	2,  // 10: numun.v1.ListAssignmentsResponse.items:type_name -> numun.v1.Assignment
-	26, // 11: numun.v1.ListAssignmentsResponse.page:type_name -> numun.v1.Page
+	34, // 11: numun.v1.ListAssignmentsResponse.page:type_name -> numun.v1.Page
 	2,  // 12: numun.v1.GetAssignmentResponse.assignment:type_name -> numun.v1.Assignment
 	3,  // 13: numun.v1.ProposeResponse.run:type_name -> numun.v1.AssignmentRun
 	2,  // 14: numun.v1.ProposeResponse.assignments:type_name -> numun.v1.Assignment
 	2,  // 15: numun.v1.AssignmentServiceApproveResponse.assignment:type_name -> numun.v1.Assignment
 	2,  // 16: numun.v1.AssignmentServiceUnapproveResponse.assignment:type_name -> numun.v1.Assignment
-	2,  // 17: numun.v1.UpdateAssignmentResponse.assignment:type_name -> numun.v1.Assignment
-	25, // 18: numun.v1.ListAssignmentRunsRequest.page:type_name -> numun.v1.PageRequest
-	3,  // 19: numun.v1.ListAssignmentRunsResponse.items:type_name -> numun.v1.AssignmentRun
-	26, // 20: numun.v1.ListAssignmentRunsResponse.page:type_name -> numun.v1.Page
-	3,  // 21: numun.v1.GetCurrentRunResponse.run:type_name -> numun.v1.AssignmentRun
-	3,  // 22: numun.v1.GetAssignmentRunResponse.run:type_name -> numun.v1.AssignmentRun
-	4,  // 23: numun.v1.AssignmentService.ListAssignments:input_type -> numun.v1.ListAssignmentsRequest
-	6,  // 24: numun.v1.AssignmentService.GetAssignment:input_type -> numun.v1.GetAssignmentRequest
-	8,  // 25: numun.v1.AssignmentService.Propose:input_type -> numun.v1.ProposeRequest
-	10, // 26: numun.v1.AssignmentService.Approve:input_type -> numun.v1.AssignmentServiceApproveRequest
-	12, // 27: numun.v1.AssignmentService.Unapprove:input_type -> numun.v1.AssignmentServiceUnapproveRequest
-	14, // 28: numun.v1.AssignmentService.ApproveAll:input_type -> numun.v1.ApproveAllRequest
-	16, // 29: numun.v1.AssignmentService.UpdateAssignment:input_type -> numun.v1.UpdateAssignmentRequest
-	18, // 30: numun.v1.AssignmentRunService.ListAssignmentRuns:input_type -> numun.v1.ListAssignmentRunsRequest
-	20, // 31: numun.v1.AssignmentRunService.GetCurrentRun:input_type -> numun.v1.GetCurrentRunRequest
-	22, // 32: numun.v1.AssignmentRunService.GetAssignmentRun:input_type -> numun.v1.GetAssignmentRunRequest
-	5,  // 33: numun.v1.AssignmentService.ListAssignments:output_type -> numun.v1.ListAssignmentsResponse
-	7,  // 34: numun.v1.AssignmentService.GetAssignment:output_type -> numun.v1.GetAssignmentResponse
-	9,  // 35: numun.v1.AssignmentService.Propose:output_type -> numun.v1.ProposeResponse
-	11, // 36: numun.v1.AssignmentService.Approve:output_type -> numun.v1.AssignmentServiceApproveResponse
-	13, // 37: numun.v1.AssignmentService.Unapprove:output_type -> numun.v1.AssignmentServiceUnapproveResponse
-	15, // 38: numun.v1.AssignmentService.ApproveAll:output_type -> numun.v1.ApproveAllResponse
-	17, // 39: numun.v1.AssignmentService.UpdateAssignment:output_type -> numun.v1.UpdateAssignmentResponse
-	19, // 40: numun.v1.AssignmentRunService.ListAssignmentRuns:output_type -> numun.v1.ListAssignmentRunsResponse
-	21, // 41: numun.v1.AssignmentRunService.GetCurrentRun:output_type -> numun.v1.GetCurrentRunResponse
-	23, // 42: numun.v1.AssignmentRunService.GetAssignmentRun:output_type -> numun.v1.GetAssignmentRunResponse
-	33, // [33:43] is the sub-list for method output_type
-	23, // [23:33] is the sub-list for method input_type
-	23, // [23:23] is the sub-list for extension type_name
-	23, // [23:23] is the sub-list for extension extendee
-	0,  // [0:23] is the sub-list for field type_name
+	16, // 17: numun.v1.ApproveByIdsRequest.items:type_name -> numun.v1.AssignmentMutation
+	17, // 18: numun.v1.ApproveByIdsResponse.failures:type_name -> numun.v1.AssignmentMutationFailure
+	16, // 19: numun.v1.UnapproveByIdsRequest.items:type_name -> numun.v1.AssignmentMutation
+	17, // 20: numun.v1.UnapproveByIdsResponse.failures:type_name -> numun.v1.AssignmentMutationFailure
+	16, // 21: numun.v1.SwapAssignmentsRequest.a:type_name -> numun.v1.AssignmentMutation
+	16, // 22: numun.v1.SwapAssignmentsRequest.b:type_name -> numun.v1.AssignmentMutation
+	2,  // 23: numun.v1.SwapAssignmentsResponse.a:type_name -> numun.v1.Assignment
+	2,  // 24: numun.v1.SwapAssignmentsResponse.b:type_name -> numun.v1.Assignment
+	2,  // 25: numun.v1.UpdateAssignmentResponse.assignment:type_name -> numun.v1.Assignment
+	33, // 26: numun.v1.ListAssignmentRunsRequest.page:type_name -> numun.v1.PageRequest
+	3,  // 27: numun.v1.ListAssignmentRunsResponse.items:type_name -> numun.v1.AssignmentRun
+	34, // 28: numun.v1.ListAssignmentRunsResponse.page:type_name -> numun.v1.Page
+	3,  // 29: numun.v1.GetCurrentRunResponse.run:type_name -> numun.v1.AssignmentRun
+	3,  // 30: numun.v1.GetAssignmentRunResponse.run:type_name -> numun.v1.AssignmentRun
+	4,  // 31: numun.v1.AssignmentService.ListAssignments:input_type -> numun.v1.ListAssignmentsRequest
+	6,  // 32: numun.v1.AssignmentService.GetAssignment:input_type -> numun.v1.GetAssignmentRequest
+	8,  // 33: numun.v1.AssignmentService.Propose:input_type -> numun.v1.ProposeRequest
+	10, // 34: numun.v1.AssignmentService.Approve:input_type -> numun.v1.AssignmentServiceApproveRequest
+	12, // 35: numun.v1.AssignmentService.Unapprove:input_type -> numun.v1.AssignmentServiceUnapproveRequest
+	14, // 36: numun.v1.AssignmentService.ApproveAll:input_type -> numun.v1.ApproveAllRequest
+	18, // 37: numun.v1.AssignmentService.ApproveByIds:input_type -> numun.v1.ApproveByIdsRequest
+	20, // 38: numun.v1.AssignmentService.UnapproveByIds:input_type -> numun.v1.UnapproveByIdsRequest
+	22, // 39: numun.v1.AssignmentService.SwapAssignments:input_type -> numun.v1.SwapAssignmentsRequest
+	24, // 40: numun.v1.AssignmentService.UpdateAssignment:input_type -> numun.v1.UpdateAssignmentRequest
+	26, // 41: numun.v1.AssignmentRunService.ListAssignmentRuns:input_type -> numun.v1.ListAssignmentRunsRequest
+	28, // 42: numun.v1.AssignmentRunService.GetCurrentRun:input_type -> numun.v1.GetCurrentRunRequest
+	30, // 43: numun.v1.AssignmentRunService.GetAssignmentRun:input_type -> numun.v1.GetAssignmentRunRequest
+	5,  // 44: numun.v1.AssignmentService.ListAssignments:output_type -> numun.v1.ListAssignmentsResponse
+	7,  // 45: numun.v1.AssignmentService.GetAssignment:output_type -> numun.v1.GetAssignmentResponse
+	9,  // 46: numun.v1.AssignmentService.Propose:output_type -> numun.v1.ProposeResponse
+	11, // 47: numun.v1.AssignmentService.Approve:output_type -> numun.v1.AssignmentServiceApproveResponse
+	13, // 48: numun.v1.AssignmentService.Unapprove:output_type -> numun.v1.AssignmentServiceUnapproveResponse
+	15, // 49: numun.v1.AssignmentService.ApproveAll:output_type -> numun.v1.ApproveAllResponse
+	19, // 50: numun.v1.AssignmentService.ApproveByIds:output_type -> numun.v1.ApproveByIdsResponse
+	21, // 51: numun.v1.AssignmentService.UnapproveByIds:output_type -> numun.v1.UnapproveByIdsResponse
+	23, // 52: numun.v1.AssignmentService.SwapAssignments:output_type -> numun.v1.SwapAssignmentsResponse
+	25, // 53: numun.v1.AssignmentService.UpdateAssignment:output_type -> numun.v1.UpdateAssignmentResponse
+	27, // 54: numun.v1.AssignmentRunService.ListAssignmentRuns:output_type -> numun.v1.ListAssignmentRunsResponse
+	29, // 55: numun.v1.AssignmentRunService.GetCurrentRun:output_type -> numun.v1.GetCurrentRunResponse
+	31, // 56: numun.v1.AssignmentRunService.GetAssignmentRun:output_type -> numun.v1.GetAssignmentRunResponse
+	44, // [44:57] is the sub-list for method output_type
+	31, // [31:44] is the sub-list for method input_type
+	31, // [31:31] is the sub-list for extension type_name
+	31, // [31:31] is the sub-list for extension extendee
+	0,  // [0:31] is the sub-list for field type_name
 }
 
 func init() { file_numun_v1_assignments_proto_init() }
@@ -1709,14 +2189,14 @@ func file_numun_v1_assignments_proto_init() {
 	}
 	file_numun_v1_common_proto_init()
 	file_numun_v1_assignments_proto_msgTypes[6].OneofWrappers = []any{}
-	file_numun_v1_assignments_proto_msgTypes[14].OneofWrappers = []any{}
+	file_numun_v1_assignments_proto_msgTypes[22].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numun_v1_assignments_proto_rawDesc), len(file_numun_v1_assignments_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   22,
+			NumMessages:   30,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

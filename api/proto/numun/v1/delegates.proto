@@ -136,6 +136,11 @@ service DelegateService {
   rpc DeleteDelegate(DeleteDelegateRequest) returns (DeleteDelegateResponse) {}
   rpc CheckIn(CheckInRequest) returns (CheckInResponse) {}
 
+  // SearchDelegates returns delegates whose first/last name matches the query
+  // (case-insensitive substring), scoped to the conference. Backs the day-of
+  // check-in screen; results are filtered to the caller's scope.
+  rpc SearchDelegates(SearchDelegatesRequest) returns (SearchDelegatesResponse) {}
+
   rpc PreviewUpsertDelegatesBulk(PreviewUpsertDelegatesBulkRequest) returns (PreviewUpsertDelegatesBulkResponse) {}
   rpc UpsertDelegatesBulk(UpsertDelegatesBulkRequest) returns (UpsertDelegatesBulkResponse) {}
   rpc DeleteBulkImportPreview(DeleteBulkImportPreviewRequest) returns (DeleteBulkImportPreviewResponse) {}
@@ -202,6 +207,26 @@ message CheckInRequest {
 }
 message CheckInResponse {
   Delegate delegate = 1;
+}
+
+// SearchDelegatesRequest — conference-wide name search. `query` is at least
+// two characters; the server normalizes case + trims whitespace.
+message SearchDelegatesRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  string query = 2 [(buf.validate.field).string.min_len = 2];
+  // Default 50, max 200. Server clamps when exceeded.
+  int32 limit = 3;
+}
+message SearchDelegatesResponse {
+  // Each hit carries the delegate plus the parent delegation's school so the
+  // check-in screen can show "Lastname, Firstname — Westside HS".
+  message Hit {
+    Delegate delegate = 1;
+    string delegation_school = 2;
+  }
+  repeated Hit items = 1;
+  // Whether the result set was truncated to `limit`.
+  bool truncated = 2;
 }
 
 // ── Bulk import ────────────────────────────────────────────────────────────

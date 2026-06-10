@@ -294,6 +294,81 @@ func (s *DelegateService) CheckIn(ctx context.Context, req *connect.Request[v1.C
 	return connect.NewResponse(&v1.CheckInResponse{Delegate: delegateToProto(updated)}), nil
 }
 
+// SearchDelegates returns delegates whose first/last name (case-insensitive)
+// contains the query string, conference-wide. Results are filtered to the
+// caller's scope: advisors see only delegates of delegations they advise;
+// staff-staffers see their direct-oversight delegations plus any committee-
+// linked delegations (case c, resolved via assignment → committee membership).
+// Staff-admins see everything in the conference.
+func (s *DelegateService) SearchDelegates(ctx context.Context, req *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error) {
+	caller, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
+	if conferenceID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, conferenceID); err != nil {
+		return nil, mapScopeErr(err)
+	}
+	query := strings.TrimSpace(req.Msg.GetQuery())
+	if len(query) < 2 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("query must be at least 2 characters"))
+	}
+	limit := int(req.Msg.GetLimit())
+	if limit <= 0 {
+		limit = 50
+	}
+	if limit > 200 {
+		limit = 200
+	}
+
+	rows, truncated, err := s.Store.SearchDelegatesByConference(ctx, conferenceID, query, limit)
+	if err != nil {
+		s.log().Error("SearchDelegates: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+
+	// Scope-filter results. Admin short-circuits to "all"; otherwise check each
+	// row's delegation. Cache the per-delegation decision to avoid N scope
+	// resolutions for delegates from the same delegation.
+	allowed := map[string]bool{}
+	denied := map[string]bool{}
+	delegations := map[string]domain.Delegation{}
+	out := &v1.SearchDelegatesResponse{
+		Items:     make([]*v1.SearchDelegatesResponse_Hit, 0, len(rows)),
+		Truncated: truncated,
+	}
+	for _, d := range rows {
+		if caller.Role != domain.RoleStaffAdmin {
+			if denied[d.DelegationID] {
+				continue
+			}
+			if !allowed[d.DelegationID] {
+				if err := s.Scoper.MustHaveScopeOnDelegation(ctx, d.DelegationID); err != nil {
+					denied[d.DelegationID] = true
+					continue
+				}
+				allowed[d.DelegationID] = true
+			}
+		}
+		parent, ok := delegations[d.DelegationID]
+		if !ok {
+			loaded, err := s.Store.FindDelegationByID(ctx, d.DelegationID)
+			if err == nil {
+				delegations[d.DelegationID] = loaded
+				parent = loaded
+			}
+		}
+		out.Items = append(out.Items, &v1.SearchDelegatesResponse_Hit{
+			Delegate:         delegateToProto(d),
+			DelegationSchool: parent.School,
+		})
+	}
+	return connect.NewResponse(out), nil
+}
+
 func (s *DelegateService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 	if err := s.Store.RecordAuthEvent(ctx, e); err != nil {
 		s.log().Warn("audit write failed", "kind", e.Kind, "err", err)

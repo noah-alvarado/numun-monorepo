@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { ApproveAllRequest, ApproveAllResponse, AssignmentServiceApproveRequest, AssignmentServiceApproveResponse, AssignmentServiceUnapproveRequest, AssignmentServiceUnapproveResponse, GetAssignmentRequest, GetAssignmentResponse, GetAssignmentRunRequest, GetAssignmentRunResponse, GetCurrentRunRequest, GetCurrentRunResponse, ListAssignmentRunsRequest, ListAssignmentRunsResponse, ListAssignmentsRequest, ListAssignmentsResponse, ProposeRequest, ProposeResponse, UpdateAssignmentRequest, UpdateAssignmentResponse } from "./assignments_pb.js";
+import { ApproveAllRequest, ApproveAllResponse, ApproveByIdsRequest, ApproveByIdsResponse, AssignmentServiceApproveRequest, AssignmentServiceApproveResponse, AssignmentServiceUnapproveRequest, AssignmentServiceUnapproveResponse, GetAssignmentRequest, GetAssignmentResponse, GetAssignmentRunRequest, GetAssignmentRunResponse, GetCurrentRunRequest, GetCurrentRunResponse, ListAssignmentRunsRequest, ListAssignmentRunsResponse, ListAssignmentsRequest, ListAssignmentsResponse, ProposeRequest, ProposeResponse, SwapAssignmentsRequest, SwapAssignmentsResponse, UnapproveByIdsRequest, UnapproveByIdsResponse, UpdateAssignmentRequest, UpdateAssignmentResponse } from "./assignments_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -78,6 +78,44 @@ export const AssignmentService = {
       name: "ApproveAll",
       I: ApproveAllRequest,
       O: ApproveAllResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * ApproveByIds approves a caller-selected subset. Best-effort over the set;
+     * rows that fail individually do not roll back the rest. Per-row failures
+     * come back in `failures`.
+     *
+     * @generated from rpc numun.v1.AssignmentService.ApproveByIds
+     */
+    approveByIds: {
+      name: "ApproveByIds",
+      I: ApproveByIdsRequest,
+      O: ApproveByIdsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * UnapproveByIds is the symmetric un-approve for a selected set.
+     *
+     * @generated from rpc numun.v1.AssignmentService.UnapproveByIds
+     */
+    unapproveByIds: {
+      name: "UnapproveByIds",
+      I: UnapproveByIdsRequest,
+      O: UnapproveByIdsResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * SwapAssignments atomically swaps two delegates between their respective
+     * positions. Used for the last-minute swap UX. Both assignments must be in
+     * the same conference. Fails if either row was edited since the caller
+     * loaded it (optimistic-lock via expected_version pair).
+     *
+     * @generated from rpc numun.v1.AssignmentService.SwapAssignments
+     */
+    swapAssignments: {
+      name: "SwapAssignments",
+      I: SwapAssignmentsRequest,
+      O: SwapAssignmentsResponse,
       kind: MethodKind.Unary,
     },
     /**

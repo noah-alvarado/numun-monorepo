@@ -276,6 +276,68 @@ func (c *Client) ListAllDelegatesByDelegation(ctx context.Context, delegationID 
 	return all, nil
 }
 
+// SearchDelegatesByConference returns Delegate rows in `conferenceId` whose
+// first or last name (case-insensitive) contains `query`. Query'd via GSI2
+// (PK = CONF#<id>#DELEGATE_NAME), filtered in-app. v1 NUMUN scale tops out
+// in the low thousands — acceptable to scan-then-filter. Caller clamps
+// the result count.
+func (c *Client) SearchDelegatesByConference(ctx context.Context, conferenceID, query string, limit int) ([]domain.Delegate, bool, error) {
+	q := strings.ToLower(strings.TrimSpace(query))
+	if q == "" {
+		return nil, false, nil
+	}
+	if limit <= 0 {
+		limit = 50
+	}
+	var hits []domain.Delegate
+	var startKey map[string]ddbtypes.AttributeValue
+	truncated := false
+	for {
+		in := &dynamodb.QueryInput{
+			TableName:              aws.String(c.Table),
+			IndexName:              aws.String("GSI2"),
+			KeyConditionExpression: aws.String("GSI2PK = :pk"),
+			FilterExpression:       aws.String("isDeleted = :false"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":pk":    &ddbtypes.AttributeValueMemberS{Value: delegateNameGSI2PK(conferenceID)},
+				":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+			},
+			ExclusiveStartKey: startKey,
+		}
+		out, err := c.DDB.Query(ctx, in)
+		if err != nil {
+			return nil, false, fmt.Errorf("search delegates: %w", err)
+		}
+		for _, raw := range out.Items {
+			var it delegateItem
+			if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
+				return nil, false, fmt.Errorf("unmarshal delegate: %w", err)
+			}
+			if it.IsDeleted {
+				continue
+			}
+			if !nameContains(it.FirstName, it.LastName, q) {
+				continue
+			}
+			hits = append(hits, delegateFromItem(it))
+			if len(hits) >= limit {
+				truncated = true
+				return hits, truncated, nil
+			}
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			break
+		}
+		startKey = out.LastEvaluatedKey
+	}
+	return hits, truncated, nil
+}
+
+func nameContains(firstName, lastName, lowerQuery string) bool {
+	return strings.Contains(strings.ToLower(firstName), lowerQuery) ||
+		strings.Contains(strings.ToLower(lastName), lowerQuery)
+}
+
 // UpdateDelegatePatch carries optional fields for partial updates.
 type UpdateDelegatePatch struct {
 	FirstName       *string

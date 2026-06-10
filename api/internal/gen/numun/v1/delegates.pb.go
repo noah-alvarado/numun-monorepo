@@ -1511,6 +1511,122 @@ func (x *CheckInResponse) GetDelegate() *Delegate {
 	return nil
 }
 
+// SearchDelegatesRequest — conference-wide name search. `query` is at least
+// two characters; the server normalizes case + trims whitespace.
+type SearchDelegatesRequest struct {
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ConferenceId string                 `protobuf:"bytes,1,opt,name=conference_id,json=conferenceId,proto3" json:"conference_id,omitempty"`
+	Query        string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	// Default 50, max 200. Server clamps when exceeded.
+	Limit         int32 `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchDelegatesRequest) Reset() {
+	*x = SearchDelegatesRequest{}
+	mi := &file_numun_v1_delegates_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchDelegatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchDelegatesRequest) ProtoMessage() {}
+
+func (x *SearchDelegatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_delegates_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchDelegatesRequest.ProtoReflect.Descriptor instead.
+func (*SearchDelegatesRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *SearchDelegatesRequest) GetConferenceId() string {
+	if x != nil {
+		return x.ConferenceId
+	}
+	return ""
+}
+
+func (x *SearchDelegatesRequest) GetQuery() string {
+	if x != nil {
+		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchDelegatesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type SearchDelegatesResponse struct {
+	state protoimpl.MessageState         `protogen:"open.v1"`
+	Items []*SearchDelegatesResponse_Hit `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	// Whether the result set was truncated to `limit`.
+	Truncated     bool `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SearchDelegatesResponse) Reset() {
+	*x = SearchDelegatesResponse{}
+	mi := &file_numun_v1_delegates_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchDelegatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchDelegatesResponse) ProtoMessage() {}
+
+func (x *SearchDelegatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_delegates_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchDelegatesResponse.ProtoReflect.Descriptor instead.
+func (*SearchDelegatesResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *SearchDelegatesResponse) GetItems() []*SearchDelegatesResponse_Hit {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *SearchDelegatesResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
 // UploadSource — used when the file was uploaded via S3 presign.
 type UploadSource struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
@@ -1525,7 +1641,7 @@ type UploadSource struct {
 
 func (x *UploadSource) Reset() {
 	*x = UploadSource{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[21]
+	mi := &file_numun_v1_delegates_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1537,7 +1653,7 @@ func (x *UploadSource) String() string {
 func (*UploadSource) ProtoMessage() {}
 
 func (x *UploadSource) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[21]
+	mi := &file_numun_v1_delegates_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1550,7 +1666,7 @@ func (x *UploadSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UploadSource.ProtoReflect.Descriptor instead.
 func (*UploadSource) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{21}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *UploadSource) GetUploadKey() string {
@@ -1586,7 +1702,7 @@ type GoogleSheetSource struct {
 
 func (x *GoogleSheetSource) Reset() {
 	*x = GoogleSheetSource{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[22]
+	mi := &file_numun_v1_delegates_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1598,7 +1714,7 @@ func (x *GoogleSheetSource) String() string {
 func (*GoogleSheetSource) ProtoMessage() {}
 
 func (x *GoogleSheetSource) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[22]
+	mi := &file_numun_v1_delegates_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1611,7 +1727,7 @@ func (x *GoogleSheetSource) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GoogleSheetSource.ProtoReflect.Descriptor instead.
 func (*GoogleSheetSource) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{22}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *GoogleSheetSource) GetUrl() string {
@@ -1642,7 +1758,7 @@ type PreviewUpsertDelegatesBulkRequest struct {
 
 func (x *PreviewUpsertDelegatesBulkRequest) Reset() {
 	*x = PreviewUpsertDelegatesBulkRequest{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[23]
+	mi := &file_numun_v1_delegates_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1654,7 +1770,7 @@ func (x *PreviewUpsertDelegatesBulkRequest) String() string {
 func (*PreviewUpsertDelegatesBulkRequest) ProtoMessage() {}
 
 func (x *PreviewUpsertDelegatesBulkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[23]
+	mi := &file_numun_v1_delegates_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1667,7 +1783,7 @@ func (x *PreviewUpsertDelegatesBulkRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use PreviewUpsertDelegatesBulkRequest.ProtoReflect.Descriptor instead.
 func (*PreviewUpsertDelegatesBulkRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{23}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *PreviewUpsertDelegatesBulkRequest) GetDelegationId() string {
@@ -1732,7 +1848,7 @@ type PreviewUpsertDelegatesBulkResponse struct {
 
 func (x *PreviewUpsertDelegatesBulkResponse) Reset() {
 	*x = PreviewUpsertDelegatesBulkResponse{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[24]
+	mi := &file_numun_v1_delegates_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1744,7 +1860,7 @@ func (x *PreviewUpsertDelegatesBulkResponse) String() string {
 func (*PreviewUpsertDelegatesBulkResponse) ProtoMessage() {}
 
 func (x *PreviewUpsertDelegatesBulkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[24]
+	mi := &file_numun_v1_delegates_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1757,7 +1873,7 @@ func (x *PreviewUpsertDelegatesBulkResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use PreviewUpsertDelegatesBulkResponse.ProtoReflect.Descriptor instead.
 func (*PreviewUpsertDelegatesBulkResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{24}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *PreviewUpsertDelegatesBulkResponse) GetUploadId() string {
@@ -1802,7 +1918,7 @@ type UpsertDelegatesBulkRequest struct {
 
 func (x *UpsertDelegatesBulkRequest) Reset() {
 	*x = UpsertDelegatesBulkRequest{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[25]
+	mi := &file_numun_v1_delegates_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1814,7 +1930,7 @@ func (x *UpsertDelegatesBulkRequest) String() string {
 func (*UpsertDelegatesBulkRequest) ProtoMessage() {}
 
 func (x *UpsertDelegatesBulkRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[25]
+	mi := &file_numun_v1_delegates_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1827,7 +1943,7 @@ func (x *UpsertDelegatesBulkRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertDelegatesBulkRequest.ProtoReflect.Descriptor instead.
 func (*UpsertDelegatesBulkRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{25}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *UpsertDelegatesBulkRequest) GetUploadId() string {
@@ -1867,7 +1983,7 @@ type UpsertDelegatesBulkResponse struct {
 
 func (x *UpsertDelegatesBulkResponse) Reset() {
 	*x = UpsertDelegatesBulkResponse{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[26]
+	mi := &file_numun_v1_delegates_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1879,7 +1995,7 @@ func (x *UpsertDelegatesBulkResponse) String() string {
 func (*UpsertDelegatesBulkResponse) ProtoMessage() {}
 
 func (x *UpsertDelegatesBulkResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[26]
+	mi := &file_numun_v1_delegates_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1892,7 +2008,7 @@ func (x *UpsertDelegatesBulkResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpsertDelegatesBulkResponse.ProtoReflect.Descriptor instead.
 func (*UpsertDelegatesBulkResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{26}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *UpsertDelegatesBulkResponse) GetSummary() *CommitSummary {
@@ -1911,7 +2027,7 @@ type DeleteBulkImportPreviewRequest struct {
 
 func (x *DeleteBulkImportPreviewRequest) Reset() {
 	*x = DeleteBulkImportPreviewRequest{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[27]
+	mi := &file_numun_v1_delegates_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1923,7 +2039,7 @@ func (x *DeleteBulkImportPreviewRequest) String() string {
 func (*DeleteBulkImportPreviewRequest) ProtoMessage() {}
 
 func (x *DeleteBulkImportPreviewRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[27]
+	mi := &file_numun_v1_delegates_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1936,7 +2052,7 @@ func (x *DeleteBulkImportPreviewRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBulkImportPreviewRequest.ProtoReflect.Descriptor instead.
 func (*DeleteBulkImportPreviewRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{27}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *DeleteBulkImportPreviewRequest) GetUploadId() string {
@@ -1954,7 +2070,7 @@ type DeleteBulkImportPreviewResponse struct {
 
 func (x *DeleteBulkImportPreviewResponse) Reset() {
 	*x = DeleteBulkImportPreviewResponse{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[28]
+	mi := &file_numun_v1_delegates_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1966,7 +2082,7 @@ func (x *DeleteBulkImportPreviewResponse) String() string {
 func (*DeleteBulkImportPreviewResponse) ProtoMessage() {}
 
 func (x *DeleteBulkImportPreviewResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[28]
+	mi := &file_numun_v1_delegates_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1979,7 +2095,7 @@ func (x *DeleteBulkImportPreviewResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBulkImportPreviewResponse.ProtoReflect.Descriptor instead.
 func (*DeleteBulkImportPreviewResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{28}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{30}
 }
 
 type ResumeBulkImportRequest struct {
@@ -1991,7 +2107,7 @@ type ResumeBulkImportRequest struct {
 
 func (x *ResumeBulkImportRequest) Reset() {
 	*x = ResumeBulkImportRequest{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[29]
+	mi := &file_numun_v1_delegates_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2003,7 +2119,7 @@ func (x *ResumeBulkImportRequest) String() string {
 func (*ResumeBulkImportRequest) ProtoMessage() {}
 
 func (x *ResumeBulkImportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[29]
+	mi := &file_numun_v1_delegates_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2016,7 +2132,7 @@ func (x *ResumeBulkImportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeBulkImportRequest.ProtoReflect.Descriptor instead.
 func (*ResumeBulkImportRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{29}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ResumeBulkImportRequest) GetBulkImportJobId() string {
@@ -2035,7 +2151,7 @@ type ResumeBulkImportResponse struct {
 
 func (x *ResumeBulkImportResponse) Reset() {
 	*x = ResumeBulkImportResponse{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[30]
+	mi := &file_numun_v1_delegates_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2047,7 +2163,7 @@ func (x *ResumeBulkImportResponse) String() string {
 func (*ResumeBulkImportResponse) ProtoMessage() {}
 
 func (x *ResumeBulkImportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[30]
+	mi := &file_numun_v1_delegates_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2060,7 +2176,7 @@ func (x *ResumeBulkImportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResumeBulkImportResponse.ProtoReflect.Descriptor instead.
 func (*ResumeBulkImportResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{30}
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ResumeBulkImportResponse) GetSummary() *CommitSummary {
@@ -2080,7 +2196,7 @@ type PreviewRow_CreateMatch struct {
 
 func (x *PreviewRow_CreateMatch) Reset() {
 	*x = PreviewRow_CreateMatch{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[31]
+	mi := &file_numun_v1_delegates_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2092,7 +2208,7 @@ func (x *PreviewRow_CreateMatch) String() string {
 func (*PreviewRow_CreateMatch) ProtoMessage() {}
 
 func (x *PreviewRow_CreateMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[31]
+	mi := &file_numun_v1_delegates_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2119,7 +2235,7 @@ type PreviewRow_UpdateMatch struct {
 
 func (x *PreviewRow_UpdateMatch) Reset() {
 	*x = PreviewRow_UpdateMatch{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[32]
+	mi := &file_numun_v1_delegates_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2131,7 +2247,7 @@ func (x *PreviewRow_UpdateMatch) String() string {
 func (*PreviewRow_UpdateMatch) ProtoMessage() {}
 
 func (x *PreviewRow_UpdateMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[32]
+	mi := &file_numun_v1_delegates_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2171,7 +2287,7 @@ type PreviewRow_ConflictMatch struct {
 
 func (x *PreviewRow_ConflictMatch) Reset() {
 	*x = PreviewRow_ConflictMatch{}
-	mi := &file_numun_v1_delegates_proto_msgTypes[33]
+	mi := &file_numun_v1_delegates_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2183,7 +2299,7 @@ func (x *PreviewRow_ConflictMatch) String() string {
 func (*PreviewRow_ConflictMatch) ProtoMessage() {}
 
 func (x *PreviewRow_ConflictMatch) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegates_proto_msgTypes[33]
+	mi := &file_numun_v1_delegates_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2209,6 +2325,60 @@ func (x *PreviewRow_ConflictMatch) GetWithRowNumber() int32 {
 func (x *PreviewRow_ConflictMatch) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+// Each hit carries the delegate plus the parent delegation's school so the
+// check-in screen can show "Lastname, Firstname — Westside HS".
+type SearchDelegatesResponse_Hit struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Delegate         *Delegate              `protobuf:"bytes,1,opt,name=delegate,proto3" json:"delegate,omitempty"`
+	DelegationSchool string                 `protobuf:"bytes,2,opt,name=delegation_school,json=delegationSchool,proto3" json:"delegation_school,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *SearchDelegatesResponse_Hit) Reset() {
+	*x = SearchDelegatesResponse_Hit{}
+	mi := &file_numun_v1_delegates_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SearchDelegatesResponse_Hit) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SearchDelegatesResponse_Hit) ProtoMessage() {}
+
+func (x *SearchDelegatesResponse_Hit) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_delegates_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SearchDelegatesResponse_Hit.ProtoReflect.Descriptor instead.
+func (*SearchDelegatesResponse_Hit) Descriptor() ([]byte, []int) {
+	return file_numun_v1_delegates_proto_rawDescGZIP(), []int{22, 0}
+}
+
+func (x *SearchDelegatesResponse_Hit) GetDelegate() *Delegate {
+	if x != nil {
+		return x.Delegate
+	}
+	return nil
+}
+
+func (x *SearchDelegatesResponse_Hit) GetDelegationSchool() string {
+	if x != nil {
+		return x.DelegationSchool
 	}
 	return ""
 }
@@ -2335,7 +2505,17 @@ const file_numun_v1_delegates_proto_rawDesc = "" +
 	"\vdelegate_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\n" +
 	"delegateId\"A\n" +
 	"\x0fCheckInResponse\x12.\n" +
-	"\bdelegate\x18\x01 \x01(\v2\x12.numun.v1.DelegateR\bdelegate\"\x81\x01\n" +
+	"\bdelegate\x18\x01 \x01(\v2\x12.numun.v1.DelegateR\bdelegate\"{\n" +
+	"\x16SearchDelegatesRequest\x12,\n" +
+	"\rconference_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fconferenceId\x12\x1d\n" +
+	"\x05query\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x02R\x05query\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"\xd8\x01\n" +
+	"\x17SearchDelegatesResponse\x12;\n" +
+	"\x05items\x18\x01 \x03(\v2%.numun.v1.SearchDelegatesResponse.HitR\x05items\x12\x1c\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\x1ab\n" +
+	"\x03Hit\x12.\n" +
+	"\bdelegate\x18\x01 \x01(\v2\x12.numun.v1.DelegateR\bdelegate\x12+\n" +
+	"\x11delegation_school\x18\x02 \x01(\tR\x10delegationSchool\"\x81\x01\n" +
 	"\fUploadSource\x12&\n" +
 	"\n" +
 	"upload_key\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\tuploadKey\x12.\n" +
@@ -2381,7 +2561,7 @@ const file_numun_v1_delegates_proto_rawDesc = "" +
 	"\fSourceFormat\x12\x1d\n" +
 	"\x19SOURCE_FORMAT_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11SOURCE_FORMAT_CSV\x10\x01\x12\x16\n" +
-	"\x12SOURCE_FORMAT_XLSX\x10\x022\x87\b\n" +
+	"\x12SOURCE_FORMAT_XLSX\x10\x022\xe1\b\n" +
 	"\x0fDelegateService\x12R\n" +
 	"\rListDelegates\x12\x1e.numun.v1.ListDelegatesRequest\x1a\x1f.numun.v1.ListDelegatesResponse\"\x00\x12[\n" +
 	"\x10ListAllDelegates\x12!.numun.v1.ListAllDelegatesRequest\x1a\".numun.v1.ListAllDelegatesResponse\"\x00\x12L\n" +
@@ -2389,7 +2569,8 @@ const file_numun_v1_delegates_proto_rawDesc = "" +
 	"\x0eCreateDelegate\x12\x1f.numun.v1.CreateDelegateRequest\x1a .numun.v1.CreateDelegateResponse\"\x00\x12U\n" +
 	"\x0eUpdateDelegate\x12\x1f.numun.v1.UpdateDelegateRequest\x1a .numun.v1.UpdateDelegateResponse\"\x00\x12U\n" +
 	"\x0eDeleteDelegate\x12\x1f.numun.v1.DeleteDelegateRequest\x1a .numun.v1.DeleteDelegateResponse\"\x00\x12@\n" +
-	"\aCheckIn\x12\x18.numun.v1.CheckInRequest\x1a\x19.numun.v1.CheckInResponse\"\x00\x12y\n" +
+	"\aCheckIn\x12\x18.numun.v1.CheckInRequest\x1a\x19.numun.v1.CheckInResponse\"\x00\x12X\n" +
+	"\x0fSearchDelegates\x12 .numun.v1.SearchDelegatesRequest\x1a!.numun.v1.SearchDelegatesResponse\"\x00\x12y\n" +
 	"\x1aPreviewUpsertDelegatesBulk\x12+.numun.v1.PreviewUpsertDelegatesBulkRequest\x1a,.numun.v1.PreviewUpsertDelegatesBulkResponse\"\x00\x12d\n" +
 	"\x13UpsertDelegatesBulk\x12$.numun.v1.UpsertDelegatesBulkRequest\x1a%.numun.v1.UpsertDelegatesBulkResponse\"\x00\x12p\n" +
 	"\x17DeleteBulkImportPreview\x12(.numun.v1.DeleteBulkImportPreviewRequest\x1a).numun.v1.DeleteBulkImportPreviewResponse\"\x00\x12[\n" +
@@ -2409,7 +2590,7 @@ func file_numun_v1_delegates_proto_rawDescGZIP() []byte {
 }
 
 var file_numun_v1_delegates_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_numun_v1_delegates_proto_msgTypes = make([]protoimpl.MessageInfo, 35)
+var file_numun_v1_delegates_proto_msgTypes = make([]protoimpl.MessageInfo, 38)
 var file_numun_v1_delegates_proto_goTypes = []any{
 	(ExperienceLevel)(0),                       // 0: numun.v1.ExperienceLevel
 	(UpsertMode)(0),                            // 1: numun.v1.UpsertMode
@@ -2435,38 +2616,41 @@ var file_numun_v1_delegates_proto_goTypes = []any{
 	(*DeleteDelegateResponse)(nil),             // 21: numun.v1.DeleteDelegateResponse
 	(*CheckInRequest)(nil),                     // 22: numun.v1.CheckInRequest
 	(*CheckInResponse)(nil),                    // 23: numun.v1.CheckInResponse
-	(*UploadSource)(nil),                       // 24: numun.v1.UploadSource
-	(*GoogleSheetSource)(nil),                  // 25: numun.v1.GoogleSheetSource
-	(*PreviewUpsertDelegatesBulkRequest)(nil),  // 26: numun.v1.PreviewUpsertDelegatesBulkRequest
-	(*PreviewUpsertDelegatesBulkResponse)(nil), // 27: numun.v1.PreviewUpsertDelegatesBulkResponse
-	(*UpsertDelegatesBulkRequest)(nil),         // 28: numun.v1.UpsertDelegatesBulkRequest
-	(*UpsertDelegatesBulkResponse)(nil),        // 29: numun.v1.UpsertDelegatesBulkResponse
-	(*DeleteBulkImportPreviewRequest)(nil),     // 30: numun.v1.DeleteBulkImportPreviewRequest
-	(*DeleteBulkImportPreviewResponse)(nil),    // 31: numun.v1.DeleteBulkImportPreviewResponse
-	(*ResumeBulkImportRequest)(nil),            // 32: numun.v1.ResumeBulkImportRequest
-	(*ResumeBulkImportResponse)(nil),           // 33: numun.v1.ResumeBulkImportResponse
-	(*PreviewRow_CreateMatch)(nil),             // 34: numun.v1.PreviewRow.CreateMatch
-	(*PreviewRow_UpdateMatch)(nil),             // 35: numun.v1.PreviewRow.UpdateMatch
-	(*PreviewRow_ConflictMatch)(nil),           // 36: numun.v1.PreviewRow.ConflictMatch
-	nil,                                        // 37: numun.v1.PreviewRow.UpdateMatch.DiffEntry
-	(*timestamppb.Timestamp)(nil),              // 38: google.protobuf.Timestamp
-	(*PageRequest)(nil),                        // 39: numun.v1.PageRequest
-	(*Page)(nil),                               // 40: numun.v1.Page
+	(*SearchDelegatesRequest)(nil),             // 24: numun.v1.SearchDelegatesRequest
+	(*SearchDelegatesResponse)(nil),            // 25: numun.v1.SearchDelegatesResponse
+	(*UploadSource)(nil),                       // 26: numun.v1.UploadSource
+	(*GoogleSheetSource)(nil),                  // 27: numun.v1.GoogleSheetSource
+	(*PreviewUpsertDelegatesBulkRequest)(nil),  // 28: numun.v1.PreviewUpsertDelegatesBulkRequest
+	(*PreviewUpsertDelegatesBulkResponse)(nil), // 29: numun.v1.PreviewUpsertDelegatesBulkResponse
+	(*UpsertDelegatesBulkRequest)(nil),         // 30: numun.v1.UpsertDelegatesBulkRequest
+	(*UpsertDelegatesBulkResponse)(nil),        // 31: numun.v1.UpsertDelegatesBulkResponse
+	(*DeleteBulkImportPreviewRequest)(nil),     // 32: numun.v1.DeleteBulkImportPreviewRequest
+	(*DeleteBulkImportPreviewResponse)(nil),    // 33: numun.v1.DeleteBulkImportPreviewResponse
+	(*ResumeBulkImportRequest)(nil),            // 34: numun.v1.ResumeBulkImportRequest
+	(*ResumeBulkImportResponse)(nil),           // 35: numun.v1.ResumeBulkImportResponse
+	(*PreviewRow_CreateMatch)(nil),             // 36: numun.v1.PreviewRow.CreateMatch
+	(*PreviewRow_UpdateMatch)(nil),             // 37: numun.v1.PreviewRow.UpdateMatch
+	(*PreviewRow_ConflictMatch)(nil),           // 38: numun.v1.PreviewRow.ConflictMatch
+	nil,                                        // 39: numun.v1.PreviewRow.UpdateMatch.DiffEntry
+	(*SearchDelegatesResponse_Hit)(nil),        // 40: numun.v1.SearchDelegatesResponse.Hit
+	(*timestamppb.Timestamp)(nil),              // 41: google.protobuf.Timestamp
+	(*PageRequest)(nil),                        // 42: numun.v1.PageRequest
+	(*Page)(nil),                               // 43: numun.v1.Page
 }
 var file_numun_v1_delegates_proto_depIdxs = []int32{
 	0,  // 0: numun.v1.Delegate.experience_level:type_name -> numun.v1.ExperienceLevel
-	38, // 1: numun.v1.Delegate.checked_in_at:type_name -> google.protobuf.Timestamp
-	38, // 2: numun.v1.Delegate.created_at:type_name -> google.protobuf.Timestamp
-	38, // 3: numun.v1.Delegate.updated_at:type_name -> google.protobuf.Timestamp
+	41, // 1: numun.v1.Delegate.checked_in_at:type_name -> google.protobuf.Timestamp
+	41, // 2: numun.v1.Delegate.created_at:type_name -> google.protobuf.Timestamp
+	41, // 3: numun.v1.Delegate.updated_at:type_name -> google.protobuf.Timestamp
 	0,  // 4: numun.v1.DelegateInput.experience_level:type_name -> numun.v1.ExperienceLevel
 	4,  // 5: numun.v1.PreviewRow.input:type_name -> numun.v1.DelegateInput
 	5,  // 6: numun.v1.PreviewRow.errors:type_name -> numun.v1.FieldViolation
-	34, // 7: numun.v1.PreviewRow.create:type_name -> numun.v1.PreviewRow.CreateMatch
-	35, // 8: numun.v1.PreviewRow.update:type_name -> numun.v1.PreviewRow.UpdateMatch
-	36, // 9: numun.v1.PreviewRow.conflict:type_name -> numun.v1.PreviewRow.ConflictMatch
-	39, // 10: numun.v1.ListDelegatesRequest.page:type_name -> numun.v1.PageRequest
+	36, // 7: numun.v1.PreviewRow.create:type_name -> numun.v1.PreviewRow.CreateMatch
+	37, // 8: numun.v1.PreviewRow.update:type_name -> numun.v1.PreviewRow.UpdateMatch
+	38, // 9: numun.v1.PreviewRow.conflict:type_name -> numun.v1.PreviewRow.ConflictMatch
+	42, // 10: numun.v1.ListDelegatesRequest.page:type_name -> numun.v1.PageRequest
 	3,  // 11: numun.v1.ListDelegatesResponse.items:type_name -> numun.v1.Delegate
-	40, // 12: numun.v1.ListDelegatesResponse.page:type_name -> numun.v1.Page
+	43, // 12: numun.v1.ListDelegatesResponse.page:type_name -> numun.v1.Page
 	3,  // 13: numun.v1.ListAllDelegatesResponse.items:type_name -> numun.v1.Delegate
 	3,  // 14: numun.v1.GetDelegateResponse.delegate:type_name -> numun.v1.Delegate
 	4,  // 15: numun.v1.CreateDelegateRequest.input:type_name -> numun.v1.DelegateInput
@@ -2474,44 +2658,48 @@ var file_numun_v1_delegates_proto_depIdxs = []int32{
 	0,  // 17: numun.v1.UpdateDelegateRequest.experience_level:type_name -> numun.v1.ExperienceLevel
 	3,  // 18: numun.v1.UpdateDelegateResponse.delegate:type_name -> numun.v1.Delegate
 	3,  // 19: numun.v1.CheckInResponse.delegate:type_name -> numun.v1.Delegate
-	2,  // 20: numun.v1.UploadSource.format:type_name -> numun.v1.SourceFormat
-	24, // 21: numun.v1.PreviewUpsertDelegatesBulkRequest.upload:type_name -> numun.v1.UploadSource
-	25, // 22: numun.v1.PreviewUpsertDelegatesBulkRequest.google_sheet:type_name -> numun.v1.GoogleSheetSource
-	6,  // 23: numun.v1.PreviewUpsertDelegatesBulkResponse.rows:type_name -> numun.v1.PreviewRow
-	8,  // 24: numun.v1.PreviewUpsertDelegatesBulkResponse.summary:type_name -> numun.v1.PreviewSummary
-	1,  // 25: numun.v1.UpsertDelegatesBulkRequest.mode:type_name -> numun.v1.UpsertMode
-	4,  // 26: numun.v1.UpsertDelegatesBulkRequest.rows:type_name -> numun.v1.DelegateInput
-	9,  // 27: numun.v1.UpsertDelegatesBulkResponse.summary:type_name -> numun.v1.CommitSummary
-	9,  // 28: numun.v1.ResumeBulkImportResponse.summary:type_name -> numun.v1.CommitSummary
-	37, // 29: numun.v1.PreviewRow.UpdateMatch.diff:type_name -> numun.v1.PreviewRow.UpdateMatch.DiffEntry
-	7,  // 30: numun.v1.PreviewRow.UpdateMatch.DiffEntry.value:type_name -> numun.v1.FieldDiff
-	10, // 31: numun.v1.DelegateService.ListDelegates:input_type -> numun.v1.ListDelegatesRequest
-	12, // 32: numun.v1.DelegateService.ListAllDelegates:input_type -> numun.v1.ListAllDelegatesRequest
-	14, // 33: numun.v1.DelegateService.GetDelegate:input_type -> numun.v1.GetDelegateRequest
-	16, // 34: numun.v1.DelegateService.CreateDelegate:input_type -> numun.v1.CreateDelegateRequest
-	18, // 35: numun.v1.DelegateService.UpdateDelegate:input_type -> numun.v1.UpdateDelegateRequest
-	20, // 36: numun.v1.DelegateService.DeleteDelegate:input_type -> numun.v1.DeleteDelegateRequest
-	22, // 37: numun.v1.DelegateService.CheckIn:input_type -> numun.v1.CheckInRequest
-	26, // 38: numun.v1.DelegateService.PreviewUpsertDelegatesBulk:input_type -> numun.v1.PreviewUpsertDelegatesBulkRequest
-	28, // 39: numun.v1.DelegateService.UpsertDelegatesBulk:input_type -> numun.v1.UpsertDelegatesBulkRequest
-	30, // 40: numun.v1.DelegateService.DeleteBulkImportPreview:input_type -> numun.v1.DeleteBulkImportPreviewRequest
-	32, // 41: numun.v1.DelegateService.ResumeBulkImport:input_type -> numun.v1.ResumeBulkImportRequest
-	11, // 42: numun.v1.DelegateService.ListDelegates:output_type -> numun.v1.ListDelegatesResponse
-	13, // 43: numun.v1.DelegateService.ListAllDelegates:output_type -> numun.v1.ListAllDelegatesResponse
-	15, // 44: numun.v1.DelegateService.GetDelegate:output_type -> numun.v1.GetDelegateResponse
-	17, // 45: numun.v1.DelegateService.CreateDelegate:output_type -> numun.v1.CreateDelegateResponse
-	19, // 46: numun.v1.DelegateService.UpdateDelegate:output_type -> numun.v1.UpdateDelegateResponse
-	21, // 47: numun.v1.DelegateService.DeleteDelegate:output_type -> numun.v1.DeleteDelegateResponse
-	23, // 48: numun.v1.DelegateService.CheckIn:output_type -> numun.v1.CheckInResponse
-	27, // 49: numun.v1.DelegateService.PreviewUpsertDelegatesBulk:output_type -> numun.v1.PreviewUpsertDelegatesBulkResponse
-	29, // 50: numun.v1.DelegateService.UpsertDelegatesBulk:output_type -> numun.v1.UpsertDelegatesBulkResponse
-	31, // 51: numun.v1.DelegateService.DeleteBulkImportPreview:output_type -> numun.v1.DeleteBulkImportPreviewResponse
-	33, // 52: numun.v1.DelegateService.ResumeBulkImport:output_type -> numun.v1.ResumeBulkImportResponse
-	42, // [42:53] is the sub-list for method output_type
-	31, // [31:42] is the sub-list for method input_type
-	31, // [31:31] is the sub-list for extension type_name
-	31, // [31:31] is the sub-list for extension extendee
-	0,  // [0:31] is the sub-list for field type_name
+	40, // 20: numun.v1.SearchDelegatesResponse.items:type_name -> numun.v1.SearchDelegatesResponse.Hit
+	2,  // 21: numun.v1.UploadSource.format:type_name -> numun.v1.SourceFormat
+	26, // 22: numun.v1.PreviewUpsertDelegatesBulkRequest.upload:type_name -> numun.v1.UploadSource
+	27, // 23: numun.v1.PreviewUpsertDelegatesBulkRequest.google_sheet:type_name -> numun.v1.GoogleSheetSource
+	6,  // 24: numun.v1.PreviewUpsertDelegatesBulkResponse.rows:type_name -> numun.v1.PreviewRow
+	8,  // 25: numun.v1.PreviewUpsertDelegatesBulkResponse.summary:type_name -> numun.v1.PreviewSummary
+	1,  // 26: numun.v1.UpsertDelegatesBulkRequest.mode:type_name -> numun.v1.UpsertMode
+	4,  // 27: numun.v1.UpsertDelegatesBulkRequest.rows:type_name -> numun.v1.DelegateInput
+	9,  // 28: numun.v1.UpsertDelegatesBulkResponse.summary:type_name -> numun.v1.CommitSummary
+	9,  // 29: numun.v1.ResumeBulkImportResponse.summary:type_name -> numun.v1.CommitSummary
+	39, // 30: numun.v1.PreviewRow.UpdateMatch.diff:type_name -> numun.v1.PreviewRow.UpdateMatch.DiffEntry
+	7,  // 31: numun.v1.PreviewRow.UpdateMatch.DiffEntry.value:type_name -> numun.v1.FieldDiff
+	3,  // 32: numun.v1.SearchDelegatesResponse.Hit.delegate:type_name -> numun.v1.Delegate
+	10, // 33: numun.v1.DelegateService.ListDelegates:input_type -> numun.v1.ListDelegatesRequest
+	12, // 34: numun.v1.DelegateService.ListAllDelegates:input_type -> numun.v1.ListAllDelegatesRequest
+	14, // 35: numun.v1.DelegateService.GetDelegate:input_type -> numun.v1.GetDelegateRequest
+	16, // 36: numun.v1.DelegateService.CreateDelegate:input_type -> numun.v1.CreateDelegateRequest
+	18, // 37: numun.v1.DelegateService.UpdateDelegate:input_type -> numun.v1.UpdateDelegateRequest
+	20, // 38: numun.v1.DelegateService.DeleteDelegate:input_type -> numun.v1.DeleteDelegateRequest
+	22, // 39: numun.v1.DelegateService.CheckIn:input_type -> numun.v1.CheckInRequest
+	24, // 40: numun.v1.DelegateService.SearchDelegates:input_type -> numun.v1.SearchDelegatesRequest
+	28, // 41: numun.v1.DelegateService.PreviewUpsertDelegatesBulk:input_type -> numun.v1.PreviewUpsertDelegatesBulkRequest
+	30, // 42: numun.v1.DelegateService.UpsertDelegatesBulk:input_type -> numun.v1.UpsertDelegatesBulkRequest
+	32, // 43: numun.v1.DelegateService.DeleteBulkImportPreview:input_type -> numun.v1.DeleteBulkImportPreviewRequest
+	34, // 44: numun.v1.DelegateService.ResumeBulkImport:input_type -> numun.v1.ResumeBulkImportRequest
+	11, // 45: numun.v1.DelegateService.ListDelegates:output_type -> numun.v1.ListDelegatesResponse
+	13, // 46: numun.v1.DelegateService.ListAllDelegates:output_type -> numun.v1.ListAllDelegatesResponse
+	15, // 47: numun.v1.DelegateService.GetDelegate:output_type -> numun.v1.GetDelegateResponse
+	17, // 48: numun.v1.DelegateService.CreateDelegate:output_type -> numun.v1.CreateDelegateResponse
+	19, // 49: numun.v1.DelegateService.UpdateDelegate:output_type -> numun.v1.UpdateDelegateResponse
+	21, // 50: numun.v1.DelegateService.DeleteDelegate:output_type -> numun.v1.DeleteDelegateResponse
+	23, // 51: numun.v1.DelegateService.CheckIn:output_type -> numun.v1.CheckInResponse
+	25, // 52: numun.v1.DelegateService.SearchDelegates:output_type -> numun.v1.SearchDelegatesResponse
+	29, // 53: numun.v1.DelegateService.PreviewUpsertDelegatesBulk:output_type -> numun.v1.PreviewUpsertDelegatesBulkResponse
+	31, // 54: numun.v1.DelegateService.UpsertDelegatesBulk:output_type -> numun.v1.UpsertDelegatesBulkResponse
+	33, // 55: numun.v1.DelegateService.DeleteBulkImportPreview:output_type -> numun.v1.DeleteBulkImportPreviewResponse
+	35, // 56: numun.v1.DelegateService.ResumeBulkImport:output_type -> numun.v1.ResumeBulkImportResponse
+	45, // [45:57] is the sub-list for method output_type
+	33, // [33:45] is the sub-list for method input_type
+	33, // [33:33] is the sub-list for extension type_name
+	33, // [33:33] is the sub-list for extension extendee
+	0,  // [0:33] is the sub-list for field type_name
 }
 
 func init() { file_numun_v1_delegates_proto_init() }
@@ -2526,7 +2714,7 @@ func file_numun_v1_delegates_proto_init() {
 		(*PreviewRow_Conflict)(nil),
 	}
 	file_numun_v1_delegates_proto_msgTypes[15].OneofWrappers = []any{}
-	file_numun_v1_delegates_proto_msgTypes[23].OneofWrappers = []any{
+	file_numun_v1_delegates_proto_msgTypes[25].OneofWrappers = []any{
 		(*PreviewUpsertDelegatesBulkRequest_Upload)(nil),
 		(*PreviewUpsertDelegatesBulkRequest_GoogleSheet)(nil),
 	}
@@ -2536,7 +2724,7 @@ func file_numun_v1_delegates_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numun_v1_delegates_proto_rawDesc), len(file_numun_v1_delegates_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   35,
+			NumMessages:   38,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

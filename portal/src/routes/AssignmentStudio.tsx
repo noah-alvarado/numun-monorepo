@@ -154,6 +154,24 @@ export default function AssignmentStudio() {
   const [approveAllOpen, setApproveAllOpen] = createSignal(false);
   const [editTarget, setEditTarget] = createSignal<Assignment | null>(null);
   const [historyOpen, setHistoryOpen] = createSignal(false);
+  // Row-selection state for the bulk-approve / unapprove / swap actions.
+  const [selected, setSelected] = createSignal<Set<string>>(new Set());
+  function toggleSelected(id: string) {
+    const next = new Set(selected());
+    if (next.has(id)) {
+      next.delete(id);
+    } else {
+      next.add(id);
+    }
+    setSelected(next);
+  }
+  function clearSelection() {
+    setSelected(new Set<string>());
+  }
+  function selectedAssignments(): Assignment[] {
+    const ids = selected();
+    return (assignments() ?? []).filter((a) => ids.has(a.id));
+  }
 
   function updateFilter(patch: Record<string, string | undefined>) {
     setSearchParams(patch, { replace: true });
@@ -213,6 +231,80 @@ export default function AssignmentStudio() {
         runId: "",
       });
       setApproveAllOpen(false);
+      await refetchAssignments();
+    } catch (err) {
+      setError(handleMutationError(err));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function approveSelected() {
+    const items = selectedAssignments();
+    if (items.length === 0) return;
+    setBusyAction("approve-selected");
+    setError(null);
+    try {
+      const resp = await assignmentClient.approveByIds({
+        conferenceId: conferenceId(),
+        items: items.map((a) => ({
+          assignmentId: a.id,
+          expectedVersion: a.version,
+        })),
+      });
+      if (resp.failures.length > 0) {
+        setError(
+          `Approved ${resp.approvedCount}. ${resp.failures.length} row(s) failed; reload and retry.`,
+        );
+      }
+      clearSelection();
+      await refetchAssignments();
+    } catch (err) {
+      setError(handleMutationError(err));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function unapproveSelected() {
+    const items = selectedAssignments();
+    if (items.length === 0) return;
+    setBusyAction("unapprove-selected");
+    setError(null);
+    try {
+      const resp = await assignmentClient.unapproveByIds({
+        conferenceId: conferenceId(),
+        items: items.map((a) => ({
+          assignmentId: a.id,
+          expectedVersion: a.version,
+        })),
+      });
+      if (resp.failures.length > 0) {
+        setError(
+          `Unapproved ${resp.unapprovedCount}. ${resp.failures.length} row(s) failed; reload and retry.`,
+        );
+      }
+      clearSelection();
+      await refetchAssignments();
+    } catch (err) {
+      setError(handleMutationError(err));
+    } finally {
+      setBusyAction(null);
+    }
+  }
+
+  async function swapSelected() {
+    const items = selectedAssignments();
+    if (items.length !== 2) return;
+    const [a, b] = items;
+    setBusyAction("swap");
+    setError(null);
+    try {
+      await assignmentClient.swapAssignments({
+        a: { assignmentId: a.id, expectedVersion: a.version },
+        b: { assignmentId: b.id, expectedVersion: b.version },
+      });
+      clearSelection();
       await refetchAssignments();
     } catch (err) {
       setError(handleMutationError(err));
@@ -304,10 +396,62 @@ export default function AssignmentStudio() {
               </div>
             </div>
 
+            {/* Selection action bar — shown when one or more rows are checked. */}
+            <Show when={selected().size > 0}>
+              <div class="mt-3 flex items-center justify-between rounded border border-nu-purple-200 bg-nu-purple-50 px-3 py-2 text-xs">
+                <span class="text-nu-purple-700">
+                  {selected().size} selected
+                </span>
+                <div class="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={busyAction() === "approve-selected"}
+                    onClick={approveSelected}
+                    class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
+                  >
+                    {busyAction() === "approve-selected"
+                      ? "Approving…"
+                      : "Approve selected"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={busyAction() === "unapprove-selected"}
+                    onClick={unapproveSelected}
+                    class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700 disabled:opacity-50"
+                  >
+                    {busyAction() === "unapprove-selected"
+                      ? "Unapproving…"
+                      : "Unapprove selected"}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={selected().size !== 2 || busyAction() === "swap"}
+                    onClick={swapSelected}
+                    title={
+                      selected().size === 2
+                        ? "Swap these two pairings"
+                        : "Select exactly two rows to swap"
+                    }
+                    class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700 disabled:opacity-50"
+                  >
+                    {busyAction() === "swap" ? "Swapping…" : "Swap"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearSelection}
+                    class="text-nu-purple-700 underline"
+                  >
+                    Clear
+                  </button>
+                </div>
+              </div>
+            </Show>
+
             <section class="mt-3 overflow-x-auto rounded border border-nu-purple-200 bg-white">
               <table class="w-full table-fixed text-sm">
                 <thead class="bg-nu-purple-50 text-left text-xs uppercase tracking-wide text-nu-purple-700">
                   <tr>
+                    <th class="w-8 px-2 py-2"></th>
                     <th class="px-2 py-2">Delegate</th>
                     <th class="px-2 py-2">Committee → Position</th>
                     <th class="w-24 px-2 py-2">Status</th>
@@ -322,7 +466,7 @@ export default function AssignmentStudio() {
                     fallback={
                       <tr>
                         <td
-                          colspan={6}
+                          colspan={7}
                           class="px-2 py-4 text-center text-nu-purple-700"
                         >
                           Loading…
@@ -335,7 +479,7 @@ export default function AssignmentStudio() {
                       fallback={
                         <tr>
                           <td
-                            colspan={6}
+                            colspan={7}
                             class="px-2 py-4 text-center text-nu-purple-700"
                           >
                             No assignments yet. Use Propose to generate.
@@ -351,6 +495,14 @@ export default function AssignmentStudio() {
                           const c = committeeById(a.committeeId);
                           return (
                             <tr class="border-t border-nu-purple-100 align-top">
+                              <td class="px-2 py-2">
+                                <input
+                                  type="checkbox"
+                                  checked={selected().has(a.id)}
+                                  onChange={() => toggleSelected(a.id)}
+                                  aria-label="Select assignment"
+                                />
+                              </td>
                               <td class="px-2 py-2">
                                 <div class="font-semibold">
                                   {d

@@ -19,6 +19,7 @@ import DelegateImportResult from "@/routes/DelegateImportResult";
 import Committees from "@/routes/Committees";
 import AssignmentStudio from "@/routes/AssignmentStudio";
 import AdminEmailHealth from "@/routes/AdminEmailHealth";
+import AdminCheckIn from "@/routes/AdminCheckIn";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -111,6 +112,14 @@ render(
         component={() => (
           <AppShell>
             <AdminEmailHealth />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/admin/check-in"
+        component={() => (
+          <AppShell>
+            <AdminCheckIn />
           </AppShell>
         )}
       />

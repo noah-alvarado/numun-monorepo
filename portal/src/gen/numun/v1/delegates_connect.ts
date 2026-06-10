@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
+import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, SearchDelegatesRequest, SearchDelegatesResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -75,6 +75,19 @@ export const DelegateService = {
       name: "CheckIn",
       I: CheckInRequest,
       O: CheckInResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * SearchDelegates returns delegates whose first/last name matches the query
+     * (case-insensitive substring), scoped to the conference. Backs the day-of
+     * check-in screen; results are filtered to the caller's scope.
+     *
+     * @generated from rpc numun.v1.DelegateService.SearchDelegates
+     */
+    searchDelegates: {
+      name: "SearchDelegates",
+      I: SearchDelegatesRequest,
+      O: SearchDelegatesResponse,
       kind: MethodKind.Unary,
     },
     /**

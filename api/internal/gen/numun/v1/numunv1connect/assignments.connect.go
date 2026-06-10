@@ -53,6 +53,15 @@ const (
 	// AssignmentServiceApproveAllProcedure is the fully-qualified name of the AssignmentService's
 	// ApproveAll RPC.
 	AssignmentServiceApproveAllProcedure = "/numun.v1.AssignmentService/ApproveAll"
+	// AssignmentServiceApproveByIdsProcedure is the fully-qualified name of the AssignmentService's
+	// ApproveByIds RPC.
+	AssignmentServiceApproveByIdsProcedure = "/numun.v1.AssignmentService/ApproveByIds"
+	// AssignmentServiceUnapproveByIdsProcedure is the fully-qualified name of the AssignmentService's
+	// UnapproveByIds RPC.
+	AssignmentServiceUnapproveByIdsProcedure = "/numun.v1.AssignmentService/UnapproveByIds"
+	// AssignmentServiceSwapAssignmentsProcedure is the fully-qualified name of the AssignmentService's
+	// SwapAssignments RPC.
+	AssignmentServiceSwapAssignmentsProcedure = "/numun.v1.AssignmentService/SwapAssignments"
 	// AssignmentServiceUpdateAssignmentProcedure is the fully-qualified name of the AssignmentService's
 	// UpdateAssignment RPC.
 	AssignmentServiceUpdateAssignmentProcedure = "/numun.v1.AssignmentService/UpdateAssignment"
@@ -83,6 +92,17 @@ type AssignmentServiceClient interface {
 	// ApproveAll is a convenience for the "approve every proposed assignment"
 	// bulk action in Assignment Studio.
 	ApproveAll(context.Context, *connect.Request[v1.ApproveAllRequest]) (*connect.Response[v1.ApproveAllResponse], error)
+	// ApproveByIds approves a caller-selected subset. Best-effort over the set;
+	// rows that fail individually do not roll back the rest. Per-row failures
+	// come back in `failures`.
+	ApproveByIds(context.Context, *connect.Request[v1.ApproveByIdsRequest]) (*connect.Response[v1.ApproveByIdsResponse], error)
+	// UnapproveByIds is the symmetric un-approve for a selected set.
+	UnapproveByIds(context.Context, *connect.Request[v1.UnapproveByIdsRequest]) (*connect.Response[v1.UnapproveByIdsResponse], error)
+	// SwapAssignments atomically swaps two delegates between their respective
+	// positions. Used for the last-minute swap UX. Both assignments must be in
+	// the same conference. Fails if either row was edited since the caller
+	// loaded it (optimistic-lock via expected_version pair).
+	SwapAssignments(context.Context, *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error)
 	// UpdateAssignment lets staff manually edit a single assignment's
 	// delegate/position pairing. Audited as assignment_manually_edited.
 	UpdateAssignment(context.Context, *connect.Request[v1.UpdateAssignmentRequest]) (*connect.Response[v1.UpdateAssignmentResponse], error)
@@ -135,6 +155,24 @@ func NewAssignmentServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(assignmentServiceMethods.ByName("ApproveAll")),
 			connect.WithClientOptions(opts...),
 		),
+		approveByIds: connect.NewClient[v1.ApproveByIdsRequest, v1.ApproveByIdsResponse](
+			httpClient,
+			baseURL+AssignmentServiceApproveByIdsProcedure,
+			connect.WithSchema(assignmentServiceMethods.ByName("ApproveByIds")),
+			connect.WithClientOptions(opts...),
+		),
+		unapproveByIds: connect.NewClient[v1.UnapproveByIdsRequest, v1.UnapproveByIdsResponse](
+			httpClient,
+			baseURL+AssignmentServiceUnapproveByIdsProcedure,
+			connect.WithSchema(assignmentServiceMethods.ByName("UnapproveByIds")),
+			connect.WithClientOptions(opts...),
+		),
+		swapAssignments: connect.NewClient[v1.SwapAssignmentsRequest, v1.SwapAssignmentsResponse](
+			httpClient,
+			baseURL+AssignmentServiceSwapAssignmentsProcedure,
+			connect.WithSchema(assignmentServiceMethods.ByName("SwapAssignments")),
+			connect.WithClientOptions(opts...),
+		),
 		updateAssignment: connect.NewClient[v1.UpdateAssignmentRequest, v1.UpdateAssignmentResponse](
 			httpClient,
 			baseURL+AssignmentServiceUpdateAssignmentProcedure,
@@ -152,6 +190,9 @@ type assignmentServiceClient struct {
 	approve          *connect.Client[v1.AssignmentServiceApproveRequest, v1.AssignmentServiceApproveResponse]
 	unapprove        *connect.Client[v1.AssignmentServiceUnapproveRequest, v1.AssignmentServiceUnapproveResponse]
 	approveAll       *connect.Client[v1.ApproveAllRequest, v1.ApproveAllResponse]
+	approveByIds     *connect.Client[v1.ApproveByIdsRequest, v1.ApproveByIdsResponse]
+	unapproveByIds   *connect.Client[v1.UnapproveByIdsRequest, v1.UnapproveByIdsResponse]
+	swapAssignments  *connect.Client[v1.SwapAssignmentsRequest, v1.SwapAssignmentsResponse]
 	updateAssignment *connect.Client[v1.UpdateAssignmentRequest, v1.UpdateAssignmentResponse]
 }
 
@@ -185,6 +226,21 @@ func (c *assignmentServiceClient) ApproveAll(ctx context.Context, req *connect.R
 	return c.approveAll.CallUnary(ctx, req)
 }
 
+// ApproveByIds calls numun.v1.AssignmentService.ApproveByIds.
+func (c *assignmentServiceClient) ApproveByIds(ctx context.Context, req *connect.Request[v1.ApproveByIdsRequest]) (*connect.Response[v1.ApproveByIdsResponse], error) {
+	return c.approveByIds.CallUnary(ctx, req)
+}
+
+// UnapproveByIds calls numun.v1.AssignmentService.UnapproveByIds.
+func (c *assignmentServiceClient) UnapproveByIds(ctx context.Context, req *connect.Request[v1.UnapproveByIdsRequest]) (*connect.Response[v1.UnapproveByIdsResponse], error) {
+	return c.unapproveByIds.CallUnary(ctx, req)
+}
+
+// SwapAssignments calls numun.v1.AssignmentService.SwapAssignments.
+func (c *assignmentServiceClient) SwapAssignments(ctx context.Context, req *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error) {
+	return c.swapAssignments.CallUnary(ctx, req)
+}
+
 // UpdateAssignment calls numun.v1.AssignmentService.UpdateAssignment.
 func (c *assignmentServiceClient) UpdateAssignment(ctx context.Context, req *connect.Request[v1.UpdateAssignmentRequest]) (*connect.Response[v1.UpdateAssignmentResponse], error) {
 	return c.updateAssignment.CallUnary(ctx, req)
@@ -206,6 +262,17 @@ type AssignmentServiceHandler interface {
 	// ApproveAll is a convenience for the "approve every proposed assignment"
 	// bulk action in Assignment Studio.
 	ApproveAll(context.Context, *connect.Request[v1.ApproveAllRequest]) (*connect.Response[v1.ApproveAllResponse], error)
+	// ApproveByIds approves a caller-selected subset. Best-effort over the set;
+	// rows that fail individually do not roll back the rest. Per-row failures
+	// come back in `failures`.
+	ApproveByIds(context.Context, *connect.Request[v1.ApproveByIdsRequest]) (*connect.Response[v1.ApproveByIdsResponse], error)
+	// UnapproveByIds is the symmetric un-approve for a selected set.
+	UnapproveByIds(context.Context, *connect.Request[v1.UnapproveByIdsRequest]) (*connect.Response[v1.UnapproveByIdsResponse], error)
+	// SwapAssignments atomically swaps two delegates between their respective
+	// positions. Used for the last-minute swap UX. Both assignments must be in
+	// the same conference. Fails if either row was edited since the caller
+	// loaded it (optimistic-lock via expected_version pair).
+	SwapAssignments(context.Context, *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error)
 	// UpdateAssignment lets staff manually edit a single assignment's
 	// delegate/position pairing. Audited as assignment_manually_edited.
 	UpdateAssignment(context.Context, *connect.Request[v1.UpdateAssignmentRequest]) (*connect.Response[v1.UpdateAssignmentResponse], error)
@@ -254,6 +321,24 @@ func NewAssignmentServiceHandler(svc AssignmentServiceHandler, opts ...connect.H
 		connect.WithSchema(assignmentServiceMethods.ByName("ApproveAll")),
 		connect.WithHandlerOptions(opts...),
 	)
+	assignmentServiceApproveByIdsHandler := connect.NewUnaryHandler(
+		AssignmentServiceApproveByIdsProcedure,
+		svc.ApproveByIds,
+		connect.WithSchema(assignmentServiceMethods.ByName("ApproveByIds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	assignmentServiceUnapproveByIdsHandler := connect.NewUnaryHandler(
+		AssignmentServiceUnapproveByIdsProcedure,
+		svc.UnapproveByIds,
+		connect.WithSchema(assignmentServiceMethods.ByName("UnapproveByIds")),
+		connect.WithHandlerOptions(opts...),
+	)
+	assignmentServiceSwapAssignmentsHandler := connect.NewUnaryHandler(
+		AssignmentServiceSwapAssignmentsProcedure,
+		svc.SwapAssignments,
+		connect.WithSchema(assignmentServiceMethods.ByName("SwapAssignments")),
+		connect.WithHandlerOptions(opts...),
+	)
 	assignmentServiceUpdateAssignmentHandler := connect.NewUnaryHandler(
 		AssignmentServiceUpdateAssignmentProcedure,
 		svc.UpdateAssignment,
@@ -274,6 +359,12 @@ func NewAssignmentServiceHandler(svc AssignmentServiceHandler, opts ...connect.H
 			assignmentServiceUnapproveHandler.ServeHTTP(w, r)
 		case AssignmentServiceApproveAllProcedure:
 			assignmentServiceApproveAllHandler.ServeHTTP(w, r)
+		case AssignmentServiceApproveByIdsProcedure:
+			assignmentServiceApproveByIdsHandler.ServeHTTP(w, r)
+		case AssignmentServiceUnapproveByIdsProcedure:
+			assignmentServiceUnapproveByIdsHandler.ServeHTTP(w, r)
+		case AssignmentServiceSwapAssignmentsProcedure:
+			assignmentServiceSwapAssignmentsHandler.ServeHTTP(w, r)
 		case AssignmentServiceUpdateAssignmentProcedure:
 			assignmentServiceUpdateAssignmentHandler.ServeHTTP(w, r)
 		default:
@@ -307,6 +398,18 @@ func (UnimplementedAssignmentServiceHandler) Unapprove(context.Context, *connect
 
 func (UnimplementedAssignmentServiceHandler) ApproveAll(context.Context, *connect.Request[v1.ApproveAllRequest]) (*connect.Response[v1.ApproveAllResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.AssignmentService.ApproveAll is not implemented"))
+}
+
+func (UnimplementedAssignmentServiceHandler) ApproveByIds(context.Context, *connect.Request[v1.ApproveByIdsRequest]) (*connect.Response[v1.ApproveByIdsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.AssignmentService.ApproveByIds is not implemented"))
+}
+
+func (UnimplementedAssignmentServiceHandler) UnapproveByIds(context.Context, *connect.Request[v1.UnapproveByIdsRequest]) (*connect.Response[v1.UnapproveByIdsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.AssignmentService.UnapproveByIds is not implemented"))
+}
+
+func (UnimplementedAssignmentServiceHandler) SwapAssignments(context.Context, *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.AssignmentService.SwapAssignments is not implemented"))
 }
 
 func (UnimplementedAssignmentServiceHandler) UpdateAssignment(context.Context, *connect.Request[v1.UpdateAssignmentRequest]) (*connect.Response[v1.UpdateAssignmentResponse], error) {

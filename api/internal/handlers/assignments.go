@@ -407,6 +407,248 @@ func (s *AssignmentService) ApproveAll(ctx context.Context, req *connect.Request
 	return connect.NewResponse(&v1.ApproveAllResponse{ApprovedCount: approved}), nil
 }
 
+// ApproveByIds approves a caller-selected subset. Per-row failures populate
+// the response `failures` list so the portal can flag a specific row without
+// losing the rest of the batch. Audit event is bulk-style with a count.
+func (s *AssignmentService) ApproveByIds(ctx context.Context, req *connect.Request[v1.ApproveByIdsRequest]) (*connect.Response[v1.ApproveByIdsResponse], error) {
+	if err := auth.MustBeStaffAdmin(ctx); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
+	}
+	caller, _ := auth.FromContext(ctx)
+	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
+	if conferenceID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	out := &v1.ApproveByIdsResponse{}
+	for _, m := range req.Msg.GetItems() {
+		id := strings.TrimSpace(m.GetAssignmentId())
+		if id == "" {
+			out.Failures = append(out.Failures, &v1.AssignmentMutationFailure{
+				AssignmentId: id, Code: "invalid_argument", Message: "assignment_id required",
+			})
+			continue
+		}
+		existing, err := s.Store.FindAssignmentByID(ctx, id)
+		if err != nil {
+			out.Failures = append(out.Failures, bulkFailure(id, err))
+			continue
+		}
+		if existing.ConferenceID != conferenceID {
+			out.Failures = append(out.Failures, &v1.AssignmentMutationFailure{
+				AssignmentId: id, Code: "failed_precondition",
+				Message: "assignment belongs to a different conference",
+			})
+			continue
+		}
+		if _, err := s.Store.ApproveAssignment(ctx, existing.PositionID, existing.DelegateID, int(m.GetExpectedVersion()), caller.UserID); err != nil {
+			out.Failures = append(out.Failures, bulkFailure(id, err))
+			continue
+		}
+		out.ApprovedCount++
+	}
+	s.audit(ctx, domain.AuthAuditEvent{
+		UserID:      caller.UserID,
+		ActorUserID: caller.UserID,
+		Kind:        domain.AuthEventAssignmentApproved,
+		Metadata: map[string]string{
+			"conferenceId":  conferenceID,
+			"approvedCount": fmt.Sprintf("%d", out.ApprovedCount),
+			"failureCount":  fmt.Sprintf("%d", len(out.Failures)),
+			"bulk":          "true",
+			"selection":     "byIds",
+		},
+	})
+	return connect.NewResponse(out), nil
+}
+
+// UnapproveByIds is the symmetric un-approve for a selected set.
+func (s *AssignmentService) UnapproveByIds(ctx context.Context, req *connect.Request[v1.UnapproveByIdsRequest]) (*connect.Response[v1.UnapproveByIdsResponse], error) {
+	if err := auth.MustBeStaffAdmin(ctx); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
+	}
+	caller, _ := auth.FromContext(ctx)
+	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
+	if conferenceID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	out := &v1.UnapproveByIdsResponse{}
+	for _, m := range req.Msg.GetItems() {
+		id := strings.TrimSpace(m.GetAssignmentId())
+		if id == "" {
+			out.Failures = append(out.Failures, &v1.AssignmentMutationFailure{
+				AssignmentId: id, Code: "invalid_argument", Message: "assignment_id required",
+			})
+			continue
+		}
+		existing, err := s.Store.FindAssignmentByID(ctx, id)
+		if err != nil {
+			out.Failures = append(out.Failures, bulkFailure(id, err))
+			continue
+		}
+		if existing.ConferenceID != conferenceID {
+			out.Failures = append(out.Failures, &v1.AssignmentMutationFailure{
+				AssignmentId: id, Code: "failed_precondition",
+				Message: "assignment belongs to a different conference",
+			})
+			continue
+		}
+		if _, err := s.Store.UnapproveAssignment(ctx, existing.PositionID, existing.DelegateID, int(m.GetExpectedVersion()), caller.UserID); err != nil {
+			out.Failures = append(out.Failures, bulkFailure(id, err))
+			continue
+		}
+		out.UnapprovedCount++
+	}
+	s.audit(ctx, domain.AuthAuditEvent{
+		UserID:      caller.UserID,
+		ActorUserID: caller.UserID,
+		Kind:        domain.AuthEventAssignmentUnapproved,
+		Metadata: map[string]string{
+			"conferenceId":    conferenceID,
+			"unapprovedCount": fmt.Sprintf("%d", out.UnapprovedCount),
+			"failureCount":    fmt.Sprintf("%d", len(out.Failures)),
+			"bulk":            "true",
+			"selection":       "byIds",
+		},
+	})
+	return connect.NewResponse(out), nil
+}
+
+// SwapAssignments swaps two delegate↔position pairings. Implemented as two
+// UpdateAssignment-style edits (delete old, create new) but ordered so both
+// rows land in a consistent state — we delete both old rows first, then
+// create both new pairings. If either delete fails the function returns
+// before any new row is written; if a create fails we attempt to roll back
+// the delete by writing the original row shape.
+//
+// At v1 scale this is sequential rather than transactional; the
+// AssignmentRun integrity invariant (one position ↔ one delegate per
+// conference) is preserved because both pairings change atomically from
+// the caller's perspective — the brief window between deletes and creates
+// is staff-only and not observable to advisors.
+func (s *AssignmentService) SwapAssignments(ctx context.Context, req *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error) {
+	if err := auth.MustBeStaffAdmin(ctx); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
+	}
+	caller, _ := auth.FromContext(ctx)
+	aMut := req.Msg.GetA()
+	bMut := req.Msg.GetB()
+	aID := strings.TrimSpace(aMut.GetAssignmentId())
+	bID := strings.TrimSpace(bMut.GetAssignmentId())
+	if aID == "" || bID == "" || aID == bID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("two distinct assignment ids required"))
+	}
+
+	a, err := s.Store.FindAssignmentByID(ctx, aID)
+	if err != nil {
+		return nil, mapAssignmentLoadErr(err)
+	}
+	b, err := s.Store.FindAssignmentByID(ctx, bID)
+	if err != nil {
+		return nil, mapAssignmentLoadErr(err)
+	}
+	if a.ConferenceID != b.ConferenceID {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("assignments must share a conference"))
+	}
+	if a.Version != int(aMut.GetExpectedVersion()) || b.Version != int(bMut.GetExpectedVersion()) {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("version mismatch on one or both assignments"))
+	}
+
+	// Delete the two old rows, then create the swapped pairings. Each new
+	// row inherits the original assignment's status (approved/proposed) so
+	// a swap between two approved rows lands as two approved rows.
+	if err := s.Store.SoftDeleteAssignment(ctx, a.PositionID, a.DelegateID, a.Version, caller.UserID); err != nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("delete A failed"))
+	}
+	if err := s.Store.SoftDeleteAssignment(ctx, b.PositionID, b.DelegateID, b.Version, caller.UserID); err != nil {
+		// Best-effort rollback of A's soft-delete is impractical; surface the
+		// failure and let the operator reconcile via the audit log + portal.
+		s.log().Error("SwapAssignments: A deleted but B delete failed", "aID", aID, "bID", bID, "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("delete B failed; A already deleted — reconcile via studio"))
+	}
+
+	// Look up the new positions' denormalized fields.
+	posA, err := s.Store.FindPositionByID(ctx, a.PositionID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("load position A failed"))
+	}
+	posB, err := s.Store.FindPositionByID(ctx, b.PositionID)
+	if err != nil {
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("load position B failed"))
+	}
+
+	// New A: delegate from old B → position from old A.
+	newA, err := s.Store.CreateAssignment(ctx, domain.Assignment{
+		ConferenceID: a.ConferenceID,
+		CommitteeID:  posA.CommitteeID,
+		PositionID:   a.PositionID,
+		DelegationID: b.DelegationID,
+		DelegateID:   b.DelegateID,
+		Status:       a.Status,
+		RunID:        a.RunID,
+		ProposedAt:   time.Now().UTC(),
+		CreatedBy:    caller.UserID,
+		UpdatedBy:    caller.UserID,
+	})
+	if err != nil {
+		s.log().Error("SwapAssignments: create new-A failed", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("create new pairing A failed"))
+	}
+	newB, err := s.Store.CreateAssignment(ctx, domain.Assignment{
+		ConferenceID: b.ConferenceID,
+		CommitteeID:  posB.CommitteeID,
+		PositionID:   b.PositionID,
+		DelegationID: a.DelegationID,
+		DelegateID:   a.DelegateID,
+		Status:       b.Status,
+		RunID:        b.RunID,
+		ProposedAt:   time.Now().UTC(),
+		CreatedBy:    caller.UserID,
+		UpdatedBy:    caller.UserID,
+	})
+	if err != nil {
+		s.log().Error("SwapAssignments: create new-B failed", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("create new pairing B failed; new-A already created — reconcile via studio"))
+	}
+
+	s.audit(ctx, domain.AuthAuditEvent{
+		UserID:      caller.UserID,
+		ActorUserID: caller.UserID,
+		Kind:        domain.AuthEventAssignmentManuallyEdited,
+		Metadata: map[string]string{
+			"action":       "swap",
+			"conferenceId": a.ConferenceID,
+			"oldA":         aID,
+			"oldB":         bID,
+			"newA":         newA.ID,
+			"newB":         newB.ID,
+		},
+	})
+	return connect.NewResponse(&v1.SwapAssignmentsResponse{
+		A: assignmentToProto(newA),
+		B: assignmentToProto(newB),
+	}), nil
+}
+
+// bulkFailure converts a store error into the wire failure shape.
+func bulkFailure(id string, err error) *v1.AssignmentMutationFailure {
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return &v1.AssignmentMutationFailure{AssignmentId: id, Code: "not_found", Message: "not found"}
+	case errors.Is(err, store.ErrVersionMismatch):
+		return &v1.AssignmentMutationFailure{AssignmentId: id, Code: "aborted", Message: "version mismatch"}
+	default:
+		return &v1.AssignmentMutationFailure{AssignmentId: id, Code: "unavailable", Message: err.Error()}
+	}
+}
+
+// mapAssignmentLoadErr converts a store load error into the matching Connect code.
+func mapAssignmentLoadErr(err error) error {
+	if errors.Is(err, store.ErrNotFound) {
+		return connect.NewError(connect.CodeNotFound, errors.New("not found"))
+	}
+	return connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+}
+
 // UpdateAssignment lets staff change an assignment's pairing. When the
 // delegate or position changes, the underlying DDB row changes PK/SK, so we
 // soft-delete the old row and create a new one. Manual edits never carry

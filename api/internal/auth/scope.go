@@ -143,14 +143,12 @@ func (s *Scoper) MustHaveScopeOnCommittee(ctx context.Context, committeeID strin
 // MustHaveScopeOnAssignment gates access to an Assignment id.
 //
 //   - staff-admin → always pass.
-//   - otherwise: resolve the Assignment by id, then delegate to
-//     MustHaveScopeOnDelegation using the assignment's delegationId. Going
-//     via delegation covers both the advisor case and the staff-staffer
-//     direct-oversight case (a); staff-staffer committee scope (c) is
-//     covered separately because the assignment row also carries
-//     committeeId, but in v1 we route through delegation since approved +
-//     proposed assignments remain visible to the delegation's advisor and
-//     staff overseers.
+//   - advisor → pass iff the caller has scope on the assignment's delegation.
+//   - staff-staffer → pass iff EITHER the caller has direct-oversight (case a)
+//     on the delegation, OR the caller is assigned to the committee carrying
+//     the assignment (case c). M7 deferred case (c); M10 wires it.
+//
+// AUTH.md §9.2.
 func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, assignmentID string) error {
 	c, ok := FromContext(ctx)
 	if !ok {
@@ -169,7 +167,18 @@ func (s *Scoper) MustHaveScopeOnAssignment(ctx context.Context, assignmentID str
 		}
 		return err
 	}
-	return s.MustHaveScopeOnDelegation(ctx, a.DelegationID)
+	// Advisors and staff-stafffer case (a) both route through the delegation.
+	if delErr := s.MustHaveScopeOnDelegation(ctx, a.DelegationID); delErr == nil {
+		return nil
+	}
+	// Staff-staffer case (c): committee membership grants visibility into
+	// every assignment on that committee.
+	if c.Role == domain.RoleStaffStaffer && a.CommitteeID != "" {
+		if _, err := s.Store.GetStaffCommitteeAssignment(ctx, a.CommitteeID, c.UserID); err == nil {
+			return nil
+		}
+	}
+	return ErrScopeDenied
 }
 
 // MustHaveScopeOnPayment gates access to a PaymentRecord id. Per API.md §9.2:

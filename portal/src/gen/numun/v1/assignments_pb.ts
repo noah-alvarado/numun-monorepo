@@ -15,7 +15,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file numun/v1/assignments.proto.
  */
 export const file_numun_v1_assignments: GenFile = /*@__PURE__*/
-  fileDesc("ChpudW11bi92MS9hc3NpZ25tZW50cy5wcm90bxIIbnVtdW4udjEiyQMKCkFzc2lnbm1lbnQSCgoCaWQYASABKAkSFQoNY29uZmVyZW5jZV9pZBgCIAEoCRITCgtkZWxlZ2F0ZV9pZBgDIAEoCRITCgtwb3NpdGlvbl9pZBgEIAEoCRIUCgxjb21taXR0ZWVfaWQYBSABKAkSFQoNZGVsZWdhdGlvbl9pZBgGIAEoCRIqCgZzdGF0dXMYByABKA4yGi5udW11bi52MS5Bc3NpZ25tZW50U3RhdHVzEi8KC2FwcHJvdmVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgthcHByb3ZlZF9ieRgJIAEoCRIOCgZydW5faWQYCiABKAkSDQoFc2NvcmUYCyABKAESDgoGcmVhc29uGAwgASgJEi8KC3Byb3Bvc2VkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgd2ZXJzaW9uGBQgASgFEi4KCmNyZWF0ZWRfYXQYFSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYFiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIusCCg1Bc3NpZ25tZW50UnVuEgoKAmlkGAEgASgJEhUKDWNvbmZlcmVuY2VfaWQYAiABKAkSDAoEc2VlZBgDIAEoBBITCgtydW5fb3JkaW5hbBgEIAEoBRIUCgxpc19jYW5vbmljYWwYBSABKAgSFAoMdHJpZ2dlcmVkX2J5GAYgASgJEjAKDHRyaWdnZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMY29tcGxldGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCgZzdGF0dXMYCSABKA4yHS5udW11bi52MS5Bc3NpZ25tZW50UnVuU3RhdHVzEhEKCW9iamVjdGl2ZRgKIAEoARIYChBhc3NpZ25tZW50X2NvdW50GAsgASgFEhMKC2lucHV0c19oYXNoGAwgASgJEhMKC2RpYWdub3N0aWNzGA0gASgJIrYBChZMaXN0QXNzaWdubWVudHNSZXF1ZXN0Eh4KDWNvbmZlcmVuY2VfaWQYASABKAlCB7pIBHICEAESFAoMY29tbWl0dGVlX2lkGAIgASgJEhUKDWRlbGVnYXRpb25faWQYAyABKAkSKgoGc3RhdHVzGAQgASgOMhoubnVtdW4udjEuQXNzaWdubWVudFN0YXR1cxIjCgRwYWdlGAUgASgLMhUubnVtdW4udjEuUGFnZVJlcXVlc3QiXAoXTGlzdEFzc2lnbm1lbnRzUmVzcG9uc2USIwoFaXRlbXMYASADKAsyFC5udW11bi52MS5Bc3NpZ25tZW50EhwKBHBhZ2UYAiABKAsyDi5udW11bi52MS5QYWdlIjYKFEdldEFzc2lnbm1lbnRSZXF1ZXN0Eh4KDWFzc2lnbm1lbnRfaWQYASABKAlCB7pIBHICEAEiQQoVR2V0QXNzaWdubWVudFJlc3BvbnNlEigKCmFzc2lnbm1lbnQYASABKAsyFC5udW11bi52MS5Bc3NpZ25tZW50Il0KDlByb3Bvc2VSZXF1ZXN0Eh4KDWNvbmZlcmVuY2VfaWQYASABKAlCB7pIBHICEAESDwoHZHJ5X3J1bhgCIAEoCBIRCgRzZWVkGAMgASgESACIAQFCBwoFX3NlZWQiYgoPUHJvcG9zZVJlc3BvbnNlEiQKA3J1bhgBIAEoCzIXLm51bXVuLnYxLkFzc2lnbm1lbnRSdW4SKQoLYXNzaWdubWVudHMYAiADKAsyFC5udW11bi52MS5Bc3NpZ25tZW50ImQKH0Fzc2lnbm1lbnRTZXJ2aWNlQXBwcm92ZVJlcXVlc3QSHgoNYXNzaWdubWVudF9pZBgBIAEoCUIHukgEcgIQARIhChBleHBlY3RlZF92ZXJzaW9uGAIgASgFQge6SAQaAiAAIkwKIEFzc2lnbm1lbnRTZXJ2aWNlQXBwcm92ZVJlc3BvbnNlEigKCmFzc2lnbm1lbnQYASABKAsyFC5udW11bi52MS5Bc3NpZ25tZW50ImYKIUFzc2lnbm1lbnRTZXJ2aWNlVW5hcHByb3ZlUmVxdWVzdBIeCg1hc3NpZ25tZW50X2lkGAEgASgJQge6SARyAhABEiEKEGV4cGVjdGVkX3ZlcnNpb24YAiABKAVCB7pIBBoCIAAiTgoiQXNzaWdubWVudFNlcnZpY2VVbmFwcHJvdmVSZXNwb25zZRIoCgphc3NpZ25tZW50GAEgASgLMhQubnVtdW4udjEuQXNzaWdubWVudCJDChFBcHByb3ZlQWxsUmVxdWVzdBIeCg1jb25mZXJlbmNlX2lkGAEgASgJQge6SARyAhABEg4KBnJ1bl9pZBgCIAEoCSIsChJBcHByb3ZlQWxsUmVzcG9uc2USFgoOYXBwcm92ZWRfY291bnQYASABKAUisAEKF1VwZGF0ZUFzc2lnbm1lbnRSZXF1ZXN0Eh4KDWFzc2lnbm1lbnRfaWQYASABKAlCB7pIBHICEAESGAoLZGVsZWdhdGVfaWQYAiABKAlIAIgBARIYCgtwb3NpdGlvbl9pZBgDIAEoCUgBiAEBEiEKEGV4cGVjdGVkX3ZlcnNpb24YCiABKAVCB7pIBBoCIABCDgoMX2RlbGVnYXRlX2lkQg4KDF9wb3NpdGlvbl9pZCJEChhVcGRhdGVBc3NpZ25tZW50UmVzcG9uc2USKAoKYXNzaWdubWVudBgBIAEoCzIULm51bXVuLnYxLkFzc2lnbm1lbnQiYAoZTGlzdEFzc2lnbm1lbnRSdW5zUmVxdWVzdBIeCg1jb25mZXJlbmNlX2lkGAEgASgJQge6SARyAhABEiMKBHBhZ2UYAiABKAsyFS5udW11bi52MS5QYWdlUmVxdWVzdCJiChpMaXN0QXNzaWdubWVudFJ1bnNSZXNwb25zZRImCgVpdGVtcxgBIAMoCzIXLm51bXVuLnYxLkFzc2lnbm1lbnRSdW4SHAoEcGFnZRgCIAEoCzIOLm51bXVuLnYxLlBhZ2UiNgoUR2V0Q3VycmVudFJ1blJlcXVlc3QSHgoNY29uZmVyZW5jZV9pZBgBIAEoCUIHukgEcgIQASI9ChVHZXRDdXJyZW50UnVuUmVzcG9uc2USJAoDcnVuGAEgASgLMhcubnVtdW4udjEuQXNzaWdubWVudFJ1biIyChdHZXRBc3NpZ25tZW50UnVuUmVxdWVzdBIXCgZydW5faWQYASABKAlCB7pIBHICEAEiQAoYR2V0QXNzaWdubWVudFJ1blJlc3BvbnNlEiQKA3J1bhgBIAEoCzIXLm51bXVuLnYxLkFzc2lnbm1lbnRSdW4qdQoQQXNzaWdubWVudFN0YXR1cxIhCh1BU1NJR05NRU5UX1NUQVRVU19VTlNQRUNJRklFRBAAEh4KGkFTU0lHTk1FTlRfU1RBVFVTX1BST1BPU0VEEAESHgoaQVNTSUdOTUVOVF9TVEFUVVNfQVBQUk9WRUQQAiqhAQoTQXNzaWdubWVudFJ1blN0YXR1cxIlCiFBU1NJR05NRU5UX1JVTl9TVEFUVVNfVU5TUEVDSUZJRUQQABIhCh1BU1NJR05NRU5UX1JVTl9TVEFUVVNfUlVOTklORxABEh4KGkFTU0lHTk1FTlRfUlVOX1NUQVRVU19ET05FEAISIAocQVNTSUdOTUVOVF9SVU5fU1RBVFVTX0ZBSUxFRBADMvkEChFBc3NpZ25tZW50U2VydmljZRJYCg9MaXN0QXNzaWdubWVudHMSIC5udW11bi52MS5MaXN0QXNzaWdubWVudHNSZXF1ZXN0GiEubnVtdW4udjEuTGlzdEFzc2lnbm1lbnRzUmVzcG9uc2UiABJSCg1HZXRBc3NpZ25tZW50Eh4ubnVtdW4udjEuR2V0QXNzaWdubWVudFJlcXVlc3QaHy5udW11bi52MS5HZXRBc3NpZ25tZW50UmVzcG9uc2UiABJACgdQcm9wb3NlEhgubnVtdW4udjEuUHJvcG9zZVJlcXVlc3QaGS5udW11bi52MS5Qcm9wb3NlUmVzcG9uc2UiABJiCgdBcHByb3ZlEikubnVtdW4udjEuQXNzaWdubWVudFNlcnZpY2VBcHByb3ZlUmVxdWVzdBoqLm51bXVuLnYxLkFzc2lnbm1lbnRTZXJ2aWNlQXBwcm92ZVJlc3BvbnNlIgASaAoJVW5hcHByb3ZlEisubnVtdW4udjEuQXNzaWdubWVudFNlcnZpY2VVbmFwcHJvdmVSZXF1ZXN0GiwubnVtdW4udjEuQXNzaWdubWVudFNlcnZpY2VVbmFwcHJvdmVSZXNwb25zZSIAEkkKCkFwcHJvdmVBbGwSGy5udW11bi52MS5BcHByb3ZlQWxsUmVxdWVzdBocLm51bXVuLnYxLkFwcHJvdmVBbGxSZXNwb25zZSIAElsKEFVwZGF0ZUFzc2lnbm1lbnQSIS5udW11bi52MS5VcGRhdGVBc3NpZ25tZW50UmVxdWVzdBoiLm51bXVuLnYxLlVwZGF0ZUFzc2lnbm1lbnRSZXNwb25zZSIAMqoCChRBc3NpZ25tZW50UnVuU2VydmljZRJhChJMaXN0QXNzaWdubWVudFJ1bnMSIy5udW11bi52MS5MaXN0QXNzaWdubWVudFJ1bnNSZXF1ZXN0GiQubnVtdW4udjEuTGlzdEFzc2lnbm1lbnRSdW5zUmVzcG9uc2UiABJSCg1HZXRDdXJyZW50UnVuEh4ubnVtdW4udjEuR2V0Q3VycmVudFJ1blJlcXVlc3QaHy5udW11bi52MS5HZXRDdXJyZW50UnVuUmVzcG9uc2UiABJbChBHZXRBc3NpZ25tZW50UnVuEiEubnVtdW4udjEuR2V0QXNzaWdubWVudFJ1blJlcXVlc3QaIi5udW11bi52MS5HZXRBc3NpZ25tZW50UnVuUmVzcG9uc2UiAEKbAQoMY29tLm51bXVuLnYxQhBBc3NpZ25tZW50c1Byb3RvUAFaOGdpdGh1Yi5jb20vbnVtdW4vbnVtdW4vYXBpL2ludGVybmFsL2dlbi9udW11bi92MTtudW11bnYxogIDTlhYqgIITnVtdW4uVjHKAghOdW11blxWMeICFE51bXVuXFYxXEdQQk1ldGFkYXRh6gIJTnVtdW46OlYxYgZwcm90bzM", [file_buf_validate_validate, file_google_protobuf_timestamp, file_numun_v1_common]);
+  fileDesc("ChpudW11bi92MS9hc3NpZ25tZW50cy5wcm90bxIIbnVtdW4udjEiyQMKCkFzc2lnbm1lbnQSCgoCaWQYASABKAkSFQoNY29uZmVyZW5jZV9pZBgCIAEoCRITCgtkZWxlZ2F0ZV9pZBgDIAEoCRITCgtwb3NpdGlvbl9pZBgEIAEoCRIUCgxjb21taXR0ZWVfaWQYBSABKAkSFQoNZGVsZWdhdGlvbl9pZBgGIAEoCRIqCgZzdGF0dXMYByABKA4yGi5udW11bi52MS5Bc3NpZ25tZW50U3RhdHVzEi8KC2FwcHJvdmVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBITCgthcHByb3ZlZF9ieRgJIAEoCRIOCgZydW5faWQYCiABKAkSDQoFc2NvcmUYCyABKAESDgoGcmVhc29uGAwgASgJEi8KC3Byb3Bvc2VkX2F0GA0gASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBIPCgd2ZXJzaW9uGBQgASgFEi4KCmNyZWF0ZWRfYXQYFSABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wEi4KCnVwZGF0ZWRfYXQYFiABKAsyGi5nb29nbGUucHJvdG9idWYuVGltZXN0YW1wIusCCg1Bc3NpZ25tZW50UnVuEgoKAmlkGAEgASgJEhUKDWNvbmZlcmVuY2VfaWQYAiABKAkSDAoEc2VlZBgDIAEoBBITCgtydW5fb3JkaW5hbBgEIAEoBRIUCgxpc19jYW5vbmljYWwYBSABKAgSFAoMdHJpZ2dlcmVkX2J5GAYgASgJEjAKDHRyaWdnZXJlZF9hdBgHIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5UaW1lc3RhbXASMAoMY29tcGxldGVkX2F0GAggASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcBItCgZzdGF0dXMYCSABKA4yHS5udW11bi52MS5Bc3NpZ25tZW50UnVuU3RhdHVzEhEKCW9iamVjdGl2ZRgKIAEoARIYChBhc3NpZ25tZW50X2NvdW50GAsgASgFEhMKC2lucHV0c19oYXNoGAwgASgJEhMKC2RpYWdub3N0aWNzGA0gASgJIrYBChZMaXN0QXNzaWdubWVudHNSZXF1ZXN0Eh4KDWNvbmZlcmVuY2VfaWQYASABKAlCB7pIBHICEAESFAoMY29tbWl0dGVlX2lkGAIgASgJEhUKDWRlbGVnYXRpb25faWQYAyABKAkSKgoGc3RhdHVzGAQgASgOMhoubnVtdW4udjEuQXNzaWdubWVudFN0YXR1cxIjCgRwYWdlGAUgASgLMhUubnVtdW4udjEuUGFnZVJlcXVlc3QiXAoXTGlzdEFzc2lnbm1lbnRzUmVzcG9uc2USIwoFaXRlbXMYASADKAsyFC5udW11bi52MS5Bc3NpZ25tZW50EhwKBHBhZ2UYAiABKAsyDi5udW11bi52MS5QYWdlIjYKFEdldEFzc2lnbm1lbnRSZXF1ZXN0Eh4KDWFzc2lnbm1lbnRfaWQYASABKAlCB7pIBHICEAEiQQoVR2V0QXNzaWdubWVudFJlc3BvbnNlEigKCmFzc2lnbm1lbnQYASABKAsyFC5udW11bi52MS5Bc3NpZ25tZW50Il0KDlByb3Bvc2VSZXF1ZXN0Eh4KDWNvbmZlcmVuY2VfaWQYASABKAlCB7pIBHICEAESDwoHZHJ5X3J1bhgCIAEoCBIRCgRzZWVkGAMgASgESACIAQFCBwoFX3NlZWQiYgoPUHJvcG9zZVJlc3BvbnNlEiQKA3J1bhgBIAEoCzIXLm51bXVuLnYxLkFzc2lnbm1lbnRSdW4SKQoLYXNzaWdubWVudHMYAiADKAsyFC5udW11bi52MS5Bc3NpZ25tZW50ImQKH0Fzc2lnbm1lbnRTZXJ2aWNlQXBwcm92ZVJlcXVlc3QSHgoNYXNzaWdubWVudF9pZBgBIAEoCUIHukgEcgIQARIhChBleHBlY3RlZF92ZXJzaW9uGAIgASgFQge6SAQaAiAAIkwKIEFzc2lnbm1lbnRTZXJ2aWNlQXBwcm92ZVJlc3BvbnNlEigKCmFzc2lnbm1lbnQYASABKAsyFC5udW11bi52MS5Bc3NpZ25tZW50ImYKIUFzc2lnbm1lbnRTZXJ2aWNlVW5hcHByb3ZlUmVxdWVzdBIeCg1hc3NpZ25tZW50X2lkGAEgASgJQge6SARyAhABEiEKEGV4cGVjdGVkX3ZlcnNpb24YAiABKAVCB7pIBBoCIAAiTgoiQXNzaWdubWVudFNlcnZpY2VVbmFwcHJvdmVSZXNwb25zZRIoCgphc3NpZ25tZW50GAEgASgLMhQubnVtdW4udjEuQXNzaWdubWVudCJDChFBcHByb3ZlQWxsUmVxdWVzdBIeCg1jb25mZXJlbmNlX2lkGAEgASgJQge6SARyAhABEg4KBnJ1bl9pZBgCIAEoCSIsChJBcHByb3ZlQWxsUmVzcG9uc2USFgoOYXBwcm92ZWRfY291bnQYASABKAUiVwoSQXNzaWdubWVudE11dGF0aW9uEh4KDWFzc2lnbm1lbnRfaWQYASABKAlCB7pIBHICEAESIQoQZXhwZWN0ZWRfdmVyc2lvbhgCIAEoBUIHukgEGgIgACJRChlBc3NpZ25tZW50TXV0YXRpb25GYWlsdXJlEhUKDWFzc2lnbm1lbnRfaWQYASABKAkSDAoEY29kZRgCIAEoCRIPCgdtZXNzYWdlGAMgASgJImwKE0FwcHJvdmVCeUlkc1JlcXVlc3QSHgoNY29uZmVyZW5jZV9pZBgBIAEoCUIHukgEcgIQARI1CgVpdGVtcxgCIAMoCzIcLm51bXVuLnYxLkFzc2lnbm1lbnRNdXRhdGlvbkIIukgFkgECCAEiZQoUQXBwcm92ZUJ5SWRzUmVzcG9uc2USFgoOYXBwcm92ZWRfY291bnQYASABKAUSNQoIZmFpbHVyZXMYAiADKAsyIy5udW11bi52MS5Bc3NpZ25tZW50TXV0YXRpb25GYWlsdXJlIm4KFVVuYXBwcm92ZUJ5SWRzUmVxdWVzdBIeCg1jb25mZXJlbmNlX2lkGAEgASgJQge6SARyAhABEjUKBWl0ZW1zGAIgAygLMhwubnVtdW4udjEuQXNzaWdubWVudE11dGF0aW9uQgi6SAWSAQIIASJpChZVbmFwcHJvdmVCeUlkc1Jlc3BvbnNlEhgKEHVuYXBwcm92ZWRfY291bnQYASABKAUSNQoIZmFpbHVyZXMYAiADKAsyIy5udW11bi52MS5Bc3NpZ25tZW50TXV0YXRpb25GYWlsdXJlInoKFlN3YXBBc3NpZ25tZW50c1JlcXVlc3QSLwoBYRgBIAEoCzIcLm51bXVuLnYxLkFzc2lnbm1lbnRNdXRhdGlvbkIGukgDyAEBEi8KAWIYAiABKAsyHC5udW11bi52MS5Bc3NpZ25tZW50TXV0YXRpb25CBrpIA8gBASJbChdTd2FwQXNzaWdubWVudHNSZXNwb25zZRIfCgFhGAEgASgLMhQubnVtdW4udjEuQXNzaWdubWVudBIfCgFiGAIgASgLMhQubnVtdW4udjEuQXNzaWdubWVudCKwAQoXVXBkYXRlQXNzaWdubWVudFJlcXVlc3QSHgoNYXNzaWdubWVudF9pZBgBIAEoCUIHukgEcgIQARIYCgtkZWxlZ2F0ZV9pZBgCIAEoCUgAiAEBEhgKC3Bvc2l0aW9uX2lkGAMgASgJSAGIAQESIQoQZXhwZWN0ZWRfdmVyc2lvbhgKIAEoBUIHukgEGgIgAEIOCgxfZGVsZWdhdGVfaWRCDgoMX3Bvc2l0aW9uX2lkIkQKGFVwZGF0ZUFzc2lnbm1lbnRSZXNwb25zZRIoCgphc3NpZ25tZW50GAEgASgLMhQubnVtdW4udjEuQXNzaWdubWVudCJgChlMaXN0QXNzaWdubWVudFJ1bnNSZXF1ZXN0Eh4KDWNvbmZlcmVuY2VfaWQYASABKAlCB7pIBHICEAESIwoEcGFnZRgCIAEoCzIVLm51bXVuLnYxLlBhZ2VSZXF1ZXN0ImIKGkxpc3RBc3NpZ25tZW50UnVuc1Jlc3BvbnNlEiYKBWl0ZW1zGAEgAygLMhcubnVtdW4udjEuQXNzaWdubWVudFJ1bhIcCgRwYWdlGAIgASgLMg4ubnVtdW4udjEuUGFnZSI2ChRHZXRDdXJyZW50UnVuUmVxdWVzdBIeCg1jb25mZXJlbmNlX2lkGAEgASgJQge6SARyAhABIj0KFUdldEN1cnJlbnRSdW5SZXNwb25zZRIkCgNydW4YASABKAsyFy5udW11bi52MS5Bc3NpZ25tZW50UnVuIjIKF0dldEFzc2lnbm1lbnRSdW5SZXF1ZXN0EhcKBnJ1bl9pZBgBIAEoCUIHukgEcgIQASJAChhHZXRBc3NpZ25tZW50UnVuUmVzcG9uc2USJAoDcnVuGAEgASgLMhcubnVtdW4udjEuQXNzaWdubWVudFJ1bip1ChBBc3NpZ25tZW50U3RhdHVzEiEKHUFTU0lHTk1FTlRfU1RBVFVTX1VOU1BFQ0lGSUVEEAASHgoaQVNTSUdOTUVOVF9TVEFUVVNfUFJPUE9TRUQQARIeChpBU1NJR05NRU5UX1NUQVRVU19BUFBST1ZFRBACKqEBChNBc3NpZ25tZW50UnVuU3RhdHVzEiUKIUFTU0lHTk1FTlRfUlVOX1NUQVRVU19VTlNQRUNJRklFRBAAEiEKHUFTU0lHTk1FTlRfUlVOX1NUQVRVU19SVU5OSU5HEAESHgoaQVNTSUdOTUVOVF9SVU5fU1RBVFVTX0RPTkUQAhIgChxBU1NJR05NRU5UX1JVTl9TVEFUVVNfRkFJTEVEEAMy+wYKEUFzc2lnbm1lbnRTZXJ2aWNlElgKD0xpc3RBc3NpZ25tZW50cxIgLm51bXVuLnYxLkxpc3RBc3NpZ25tZW50c1JlcXVlc3QaIS5udW11bi52MS5MaXN0QXNzaWdubWVudHNSZXNwb25zZSIAElIKDUdldEFzc2lnbm1lbnQSHi5udW11bi52MS5HZXRBc3NpZ25tZW50UmVxdWVzdBofLm51bXVuLnYxLkdldEFzc2lnbm1lbnRSZXNwb25zZSIAEkAKB1Byb3Bvc2USGC5udW11bi52MS5Qcm9wb3NlUmVxdWVzdBoZLm51bXVuLnYxLlByb3Bvc2VSZXNwb25zZSIAEmIKB0FwcHJvdmUSKS5udW11bi52MS5Bc3NpZ25tZW50U2VydmljZUFwcHJvdmVSZXF1ZXN0GioubnVtdW4udjEuQXNzaWdubWVudFNlcnZpY2VBcHByb3ZlUmVzcG9uc2UiABJoCglVbmFwcHJvdmUSKy5udW11bi52MS5Bc3NpZ25tZW50U2VydmljZVVuYXBwcm92ZVJlcXVlc3QaLC5udW11bi52MS5Bc3NpZ25tZW50U2VydmljZVVuYXBwcm92ZVJlc3BvbnNlIgASSQoKQXBwcm92ZUFsbBIbLm51bXVuLnYxLkFwcHJvdmVBbGxSZXF1ZXN0GhwubnVtdW4udjEuQXBwcm92ZUFsbFJlc3BvbnNlIgASTwoMQXBwcm92ZUJ5SWRzEh0ubnVtdW4udjEuQXBwcm92ZUJ5SWRzUmVxdWVzdBoeLm51bXVuLnYxLkFwcHJvdmVCeUlkc1Jlc3BvbnNlIgASVQoOVW5hcHByb3ZlQnlJZHMSHy5udW11bi52MS5VbmFwcHJvdmVCeUlkc1JlcXVlc3QaIC5udW11bi52MS5VbmFwcHJvdmVCeUlkc1Jlc3BvbnNlIgASWAoPU3dhcEFzc2lnbm1lbnRzEiAubnVtdW4udjEuU3dhcEFzc2lnbm1lbnRzUmVxdWVzdBohLm51bXVuLnYxLlN3YXBBc3NpZ25tZW50c1Jlc3BvbnNlIgASWwoQVXBkYXRlQXNzaWdubWVudBIhLm51bXVuLnYxLlVwZGF0ZUFzc2lnbm1lbnRSZXF1ZXN0GiIubnVtdW4udjEuVXBkYXRlQXNzaWdubWVudFJlc3BvbnNlIgAyqgIKFEFzc2lnbm1lbnRSdW5TZXJ2aWNlEmEKEkxpc3RBc3NpZ25tZW50UnVucxIjLm51bXVuLnYxLkxpc3RBc3NpZ25tZW50UnVuc1JlcXVlc3QaJC5udW11bi52MS5MaXN0QXNzaWdubWVudFJ1bnNSZXNwb25zZSIAElIKDUdldEN1cnJlbnRSdW4SHi5udW11bi52MS5HZXRDdXJyZW50UnVuUmVxdWVzdBofLm51bXVuLnYxLkdldEN1cnJlbnRSdW5SZXNwb25zZSIAElsKEEdldEFzc2lnbm1lbnRSdW4SIS5udW11bi52MS5HZXRBc3NpZ25tZW50UnVuUmVxdWVzdBoiLm51bXVuLnYxLkdldEFzc2lnbm1lbnRSdW5SZXNwb25zZSIAQpsBCgxjb20ubnVtdW4udjFCEEFzc2lnbm1lbnRzUHJvdG9QAVo4Z2l0aHViLmNvbS9udW11bi9udW11bi9hcGkvaW50ZXJuYWwvZ2VuL251bXVuL3YxO251bXVudjGiAgNOWFiqAghOdW11bi5WMcoCCE51bXVuXFYx4gIUTnVtdW5cVjFcR1BCTWV0YWRhdGHqAglOdW11bjo6VjFiBnByb3RvMw", [file_buf_validate_validate, file_google_protobuf_timestamp, file_numun_v1_common]);
 
 /**
  * Assignment — DATA_MODEL.md §2.10.
@@ -487,6 +487,196 @@ export const ApproveAllResponseSchema: GenMessage<ApproveAllResponse> = /*@__PUR
   messageDesc(file_numun_v1_assignments, 13);
 
 /**
+ * AssignmentMutation is a (id, expected_version) tuple — minimal info needed
+ * to optimistic-lock one row in a bulk operation.
+ *
+ * @generated from message numun.v1.AssignmentMutation
+ */
+export type AssignmentMutation = Message<"numun.v1.AssignmentMutation"> & {
+  /**
+   * @generated from field: string assignment_id = 1;
+   */
+  assignmentId: string;
+
+  /**
+   * @generated from field: int32 expected_version = 2;
+   */
+  expectedVersion: number;
+};
+
+/**
+ * Describes the message numun.v1.AssignmentMutation.
+ * Use `create(AssignmentMutationSchema)` to create a new message.
+ */
+export const AssignmentMutationSchema: GenMessage<AssignmentMutation> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 14);
+
+/**
+ * AssignmentMutationFailure surfaces a per-row failure when bulk operations
+ * can't fully apply. Mirrors connect's error codes so the portal can dispatch
+ * retry vs. reload vs. surface UX.
+ *
+ * @generated from message numun.v1.AssignmentMutationFailure
+ */
+export type AssignmentMutationFailure = Message<"numun.v1.AssignmentMutationFailure"> & {
+  /**
+   * @generated from field: string assignment_id = 1;
+   */
+  assignmentId: string;
+
+  /**
+   * "aborted" | "not_found" | "failed_precondition" | "unavailable"
+   *
+   * @generated from field: string code = 2;
+   */
+  code: string;
+
+  /**
+   * @generated from field: string message = 3;
+   */
+  message: string;
+};
+
+/**
+ * Describes the message numun.v1.AssignmentMutationFailure.
+ * Use `create(AssignmentMutationFailureSchema)` to create a new message.
+ */
+export const AssignmentMutationFailureSchema: GenMessage<AssignmentMutationFailure> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 15);
+
+/**
+ * @generated from message numun.v1.ApproveByIdsRequest
+ */
+export type ApproveByIdsRequest = Message<"numun.v1.ApproveByIdsRequest"> & {
+  /**
+   * @generated from field: string conference_id = 1;
+   */
+  conferenceId: string;
+
+  /**
+   * @generated from field: repeated numun.v1.AssignmentMutation items = 2;
+   */
+  items: AssignmentMutation[];
+};
+
+/**
+ * Describes the message numun.v1.ApproveByIdsRequest.
+ * Use `create(ApproveByIdsRequestSchema)` to create a new message.
+ */
+export const ApproveByIdsRequestSchema: GenMessage<ApproveByIdsRequest> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 16);
+
+/**
+ * @generated from message numun.v1.ApproveByIdsResponse
+ */
+export type ApproveByIdsResponse = Message<"numun.v1.ApproveByIdsResponse"> & {
+  /**
+   * @generated from field: int32 approved_count = 1;
+   */
+  approvedCount: number;
+
+  /**
+   * @generated from field: repeated numun.v1.AssignmentMutationFailure failures = 2;
+   */
+  failures: AssignmentMutationFailure[];
+};
+
+/**
+ * Describes the message numun.v1.ApproveByIdsResponse.
+ * Use `create(ApproveByIdsResponseSchema)` to create a new message.
+ */
+export const ApproveByIdsResponseSchema: GenMessage<ApproveByIdsResponse> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 17);
+
+/**
+ * @generated from message numun.v1.UnapproveByIdsRequest
+ */
+export type UnapproveByIdsRequest = Message<"numun.v1.UnapproveByIdsRequest"> & {
+  /**
+   * @generated from field: string conference_id = 1;
+   */
+  conferenceId: string;
+
+  /**
+   * @generated from field: repeated numun.v1.AssignmentMutation items = 2;
+   */
+  items: AssignmentMutation[];
+};
+
+/**
+ * Describes the message numun.v1.UnapproveByIdsRequest.
+ * Use `create(UnapproveByIdsRequestSchema)` to create a new message.
+ */
+export const UnapproveByIdsRequestSchema: GenMessage<UnapproveByIdsRequest> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 18);
+
+/**
+ * @generated from message numun.v1.UnapproveByIdsResponse
+ */
+export type UnapproveByIdsResponse = Message<"numun.v1.UnapproveByIdsResponse"> & {
+  /**
+   * @generated from field: int32 unapproved_count = 1;
+   */
+  unapprovedCount: number;
+
+  /**
+   * @generated from field: repeated numun.v1.AssignmentMutationFailure failures = 2;
+   */
+  failures: AssignmentMutationFailure[];
+};
+
+/**
+ * Describes the message numun.v1.UnapproveByIdsResponse.
+ * Use `create(UnapproveByIdsResponseSchema)` to create a new message.
+ */
+export const UnapproveByIdsResponseSchema: GenMessage<UnapproveByIdsResponse> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 19);
+
+/**
+ * @generated from message numun.v1.SwapAssignmentsRequest
+ */
+export type SwapAssignmentsRequest = Message<"numun.v1.SwapAssignmentsRequest"> & {
+  /**
+   * @generated from field: numun.v1.AssignmentMutation a = 1;
+   */
+  a?: AssignmentMutation | undefined;
+
+  /**
+   * @generated from field: numun.v1.AssignmentMutation b = 2;
+   */
+  b?: AssignmentMutation | undefined;
+};
+
+/**
+ * Describes the message numun.v1.SwapAssignmentsRequest.
+ * Use `create(SwapAssignmentsRequestSchema)` to create a new message.
+ */
+export const SwapAssignmentsRequestSchema: GenMessage<SwapAssignmentsRequest> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 20);
+
+/**
+ * @generated from message numun.v1.SwapAssignmentsResponse
+ */
+export type SwapAssignmentsResponse = Message<"numun.v1.SwapAssignmentsResponse"> & {
+  /**
+   * @generated from field: numun.v1.Assignment a = 1;
+   */
+  a?: Assignment | undefined;
+
+  /**
+   * @generated from field: numun.v1.Assignment b = 2;
+   */
+  b?: Assignment | undefined;
+};
+
+/**
+ * Describes the message numun.v1.SwapAssignmentsResponse.
+ * Use `create(SwapAssignmentsResponseSchema)` to create a new message.
+ */
+export const SwapAssignmentsResponseSchema: GenMessage<SwapAssignmentsResponse> = /*@__PURE__*/
+  messageDesc(file_numun_v1_assignments, 21);
+
+/**
  * @generated from message numun.v1.UpdateAssignmentRequest
  */
 export type UpdateAssignmentRequest = Message<"numun.v1.UpdateAssignmentRequest"> & {
@@ -519,7 +709,7 @@ export type UpdateAssignmentRequest = Message<"numun.v1.UpdateAssignmentRequest"
  * Use `create(UpdateAssignmentRequestSchema)` to create a new message.
  */
 export const UpdateAssignmentRequestSchema: GenMessage<UpdateAssignmentRequest> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 14);
+  messageDesc(file_numun_v1_assignments, 22);
 
 /**
  * @generated from message numun.v1.UpdateAssignmentResponse
@@ -536,7 +726,7 @@ export type UpdateAssignmentResponse = Message<"numun.v1.UpdateAssignmentRespons
  * Use `create(UpdateAssignmentResponseSchema)` to create a new message.
  */
 export const UpdateAssignmentResponseSchema: GenMessage<UpdateAssignmentResponse> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 15);
+  messageDesc(file_numun_v1_assignments, 23);
 
 /**
  * @generated from message numun.v1.ListAssignmentRunsRequest
@@ -558,7 +748,7 @@ export type ListAssignmentRunsRequest = Message<"numun.v1.ListAssignmentRunsRequ
  * Use `create(ListAssignmentRunsRequestSchema)` to create a new message.
  */
 export const ListAssignmentRunsRequestSchema: GenMessage<ListAssignmentRunsRequest> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 16);
+  messageDesc(file_numun_v1_assignments, 24);
 
 /**
  * @generated from message numun.v1.ListAssignmentRunsResponse
@@ -580,7 +770,7 @@ export type ListAssignmentRunsResponse = Message<"numun.v1.ListAssignmentRunsRes
  * Use `create(ListAssignmentRunsResponseSchema)` to create a new message.
  */
 export const ListAssignmentRunsResponseSchema: GenMessage<ListAssignmentRunsResponse> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 17);
+  messageDesc(file_numun_v1_assignments, 25);
 
 /**
  * @generated from message numun.v1.GetCurrentRunRequest
@@ -597,7 +787,7 @@ export type GetCurrentRunRequest = Message<"numun.v1.GetCurrentRunRequest"> & {
  * Use `create(GetCurrentRunRequestSchema)` to create a new message.
  */
 export const GetCurrentRunRequestSchema: GenMessage<GetCurrentRunRequest> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 18);
+  messageDesc(file_numun_v1_assignments, 26);
 
 /**
  * @generated from message numun.v1.GetCurrentRunResponse
@@ -616,7 +806,7 @@ export type GetCurrentRunResponse = Message<"numun.v1.GetCurrentRunResponse"> & 
  * Use `create(GetCurrentRunResponseSchema)` to create a new message.
  */
 export const GetCurrentRunResponseSchema: GenMessage<GetCurrentRunResponse> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 19);
+  messageDesc(file_numun_v1_assignments, 27);
 
 /**
  * @generated from message numun.v1.GetAssignmentRunRequest
@@ -633,7 +823,7 @@ export type GetAssignmentRunRequest = Message<"numun.v1.GetAssignmentRunRequest"
  * Use `create(GetAssignmentRunRequestSchema)` to create a new message.
  */
 export const GetAssignmentRunRequestSchema: GenMessage<GetAssignmentRunRequest> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 20);
+  messageDesc(file_numun_v1_assignments, 28);
 
 /**
  * @generated from message numun.v1.GetAssignmentRunResponse
@@ -650,7 +840,7 @@ export type GetAssignmentRunResponse = Message<"numun.v1.GetAssignmentRunRespons
  * Use `create(GetAssignmentRunResponseSchema)` to create a new message.
  */
 export const GetAssignmentRunResponseSchema: GenMessage<GetAssignmentRunResponse> = /*@__PURE__*/
-  messageDesc(file_numun_v1_assignments, 21);
+  messageDesc(file_numun_v1_assignments, 29);
 
 /**
  * AssignmentStatus — proposed vs approved. See DATA_MODEL.md §2.10 and
@@ -779,6 +969,41 @@ export const AssignmentService: GenService<{
     methodKind: "unary";
     input: typeof ApproveAllRequestSchema;
     output: typeof ApproveAllResponseSchema;
+  },
+  /**
+   * ApproveByIds approves a caller-selected subset. Best-effort over the set;
+   * rows that fail individually do not roll back the rest. Per-row failures
+   * come back in `failures`.
+   *
+   * @generated from rpc numun.v1.AssignmentService.ApproveByIds
+   */
+  approveByIds: {
+    methodKind: "unary";
+    input: typeof ApproveByIdsRequestSchema;
+    output: typeof ApproveByIdsResponseSchema;
+  },
+  /**
+   * UnapproveByIds is the symmetric un-approve for a selected set.
+   *
+   * @generated from rpc numun.v1.AssignmentService.UnapproveByIds
+   */
+  unapproveByIds: {
+    methodKind: "unary";
+    input: typeof UnapproveByIdsRequestSchema;
+    output: typeof UnapproveByIdsResponseSchema;
+  },
+  /**
+   * SwapAssignments atomically swaps two delegates between their respective
+   * positions. Used for the last-minute swap UX. Both assignments must be in
+   * the same conference. Fails if either row was edited since the caller
+   * loaded it (optimistic-lock via expected_version pair).
+   *
+   * @generated from rpc numun.v1.AssignmentService.SwapAssignments
+   */
+  swapAssignments: {
+    methodKind: "unary";
+    input: typeof SwapAssignmentsRequestSchema;
+    output: typeof SwapAssignmentsResponseSchema;
   },
   /**
    * UpdateAssignment lets staff manually edit a single assignment's
