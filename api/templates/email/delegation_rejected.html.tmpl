@@ -1,0 +1,7 @@
+{{define "subject"}}Update on your NUMUN delegation{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+<p>Your delegation <strong>{{index .Vars "delegationName"}}</strong> for <strong>{{index .Vars "conferenceName"}}</strong> was not approved at this time.</p>
+{{with index .Vars "reason"}}<p style="background:#fafafa;padding:12px 16px;border-left:3px solid {{$.BrandColor}};margin:16px 0;"><em>Reason:</em> {{.}}</p>{{end}}
+<p>If you'd like to discuss next steps, reply to this email and a staff member will follow up.</p>
+{{end}}

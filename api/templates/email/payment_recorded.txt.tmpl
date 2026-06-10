@@ -1,0 +1,11 @@
+{{define "subject"}}Payment recorded for your NUMUN delegation{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+A {{index .Vars "kind"}} of {{index .Vars "amountFormatted"}} has been recorded for "{{index .Vars "delegationName"}}".
+
+New balance due: {{index .Vars "newBalanceFormatted"}}
+{{with index .Vars "notes"}}
+Note: {{.}}
+{{end}}
+View the full ledger in the portal: {{.PortalBaseURL}}/delegation
+{{end}}

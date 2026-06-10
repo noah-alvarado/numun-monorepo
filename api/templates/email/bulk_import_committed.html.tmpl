@@ -1,0 +1,11 @@
+{{define "subject"}}Delegate import committed{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+<p>Your delegate import for <strong>{{index .Vars "delegationName"}}</strong> ({{index .Vars "mode"}} mode) finished successfully:</p>
+<ul style="line-height:1.7;">
+  <li>{{index .Vars "createCount"}} delegates created</li>
+  <li>{{index .Vars "updateCount"}} delegates updated</li>
+  <li>{{index .Vars "softDeleteCount"}} delegates removed</li>
+</ul>
+<p>Open <a href="{{.PortalBaseURL}}/delegation">My Delegation</a> in the portal to review the roster.</p>
+{{end}}

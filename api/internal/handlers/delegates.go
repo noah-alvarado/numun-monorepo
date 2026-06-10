@@ -11,6 +11,7 @@ import (
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
+	"github.com/numun/numun/api/internal/email"
 	v1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/store"
 )
@@ -20,6 +21,7 @@ import (
 type DelegateService struct {
 	Store  *store.Client
 	Scoper *auth.Scoper
+	Email  email.Service
 	Logger *slog.Logger
 }
 
@@ -295,6 +297,36 @@ func (s *DelegateService) CheckIn(ctx context.Context, req *connect.Request[v1.C
 func (s *DelegateService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 	if err := s.Store.RecordAuthEvent(ctx, e); err != nil {
 		s.log().Warn("audit write failed", "kind", e.Kind, "err", err)
+	}
+}
+
+// notifyBulkImportCommitted sends T4 to the advisor who committed the import.
+// Best-effort.
+func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisorUserID, delegationID string, mode domain.UpsertMode, creates, updates, softDeletes int) {
+	if s.Email == nil {
+		return
+	}
+	user, err := s.Store.GetUser(ctx, advisorUserID)
+	if err != nil {
+		return
+	}
+	d, err := s.Store.FindDelegationByID(ctx, delegationID)
+	delegationName := delegationID
+	if err == nil {
+		delegationName = d.School
+	}
+	if err := s.Email.Send(ctx, email.SendRequest{
+		User: user,
+		Kind: domain.EmailKindBulkImportCommitted,
+		Vars: map[string]any{
+			"delegationName":  delegationName,
+			"createCount":     creates,
+			"updateCount":     updates,
+			"softDeleteCount": softDeletes,
+			"mode":            string(mode),
+		},
+	}); err != nil {
+		s.log().Warn("bulk import notify: send", "err", err)
 	}
 }
 

@@ -1,0 +1,8 @@
+{{define "_layout"}}NUMUN — Northwestern University Model United Nations
+
+{{template "body" .}}
+
+Sent {{.NowFormatted}}.{{if .UnsubscribeURL}}
+
+To stop receiving announcements: {{.UnsubscribeURL}}{{end}}
+{{end}}

@@ -1,0 +1,83 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+import "numun/v1/common.proto";
+
+// Announcement — staff-authored broadcast email. EMAIL.md §1.4 (A1).
+// Persisted before fan-out so the audit log records what went out, even if
+// individual recipient sends fail downstream.
+message Announcement {
+  string id = 1;
+  string conference_id = 2;
+  string subject = 3;
+  // Sanitized HTML body. Rendered through the announcement template's
+  // `bodyHTML` slot.
+  string body_html = 4;
+  // Plain-text alternative shown by clients that prefer text.
+  string body_text = 5;
+  // Opaque JSON capturing the audience filter applied at send time.
+  string audience_filter = 6;
+  string sent_by = 7;
+  google.protobuf.Timestamp sent_at = 8;
+  int32 recipient_count = 9;
+
+  int32 version = 20;
+  google.protobuf.Timestamp created_at = 21;
+  google.protobuf.Timestamp updated_at = 22;
+}
+
+// AnnouncementAudienceFilter — v1 supports a single discriminator:
+// "advisors of approved delegations in conference X". Extensible later.
+message AnnouncementAudienceFilter {
+  // Required: scope the audience to a conference.
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Only include advisors on delegations with this status. Defaults to
+  // "approved" when unset.
+  string delegation_status = 2;
+}
+
+// AnnouncementService — staff-admin only. See EMAIL.md §5.3.
+service AnnouncementService {
+  rpc PreviewSendAudience(PreviewSendAudienceRequest) returns (PreviewSendAudienceResponse) {}
+  rpc Send(AnnouncementServiceSendRequest) returns (AnnouncementServiceSendResponse) {}
+  rpc ListAnnouncements(ListAnnouncementsRequest) returns (ListAnnouncementsResponse) {}
+  rpc GetAnnouncement(GetAnnouncementRequest) returns (GetAnnouncementResponse) {}
+}
+
+message PreviewSendAudienceRequest {
+  AnnouncementAudienceFilter audience = 1 [(buf.validate.field).required = true];
+}
+message PreviewSendAudienceResponse {
+  // Number of recipients that survive suppression + opt-out filters.
+  int32 recipient_count = 1;
+  // A redacted list of sample recipient emails (max 5) for sanity-checking.
+  repeated string sample_recipients = 2;
+}
+
+message AnnouncementServiceSendRequest {
+  string subject = 1 [(buf.validate.field).string.min_len = 1];
+  string body_html = 2 [(buf.validate.field).string.min_len = 1];
+  string body_text = 3 [(buf.validate.field).string.min_len = 1];
+  AnnouncementAudienceFilter audience = 4 [(buf.validate.field).required = true];
+}
+message AnnouncementServiceSendResponse {
+  Announcement announcement = 1;
+}
+
+message ListAnnouncementsRequest {
+  PageRequest page = 1;
+}
+message ListAnnouncementsResponse {
+  repeated Announcement items = 1;
+  Page page = 2;
+}
+
+message GetAnnouncementRequest {
+  string announcement_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message GetAnnouncementResponse {
+  Announcement announcement = 1;
+}

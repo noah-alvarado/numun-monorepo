@@ -5,20 +5,34 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"os"
 	"strings"
+	"time"
 
 	"connectrpc.com/connect"
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
+	"github.com/numun/numun/api/internal/email"
 	v1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/store"
 )
+
+// portalBase resolves the portal URL used to build links in notification
+// emails. Mirrors email.Config.PortalBaseURL without dragging the email
+// Service into pure-data helpers.
+func portalBase() string {
+	if v := os.Getenv("PORTAL_BASE_URL"); v != "" {
+		return v
+	}
+	return "https://portal.numun.org"
+}
 
 // DelegationService implements numunv1connect.DelegationServiceHandler.
 type DelegationService struct {
 	Store  *store.Client
 	Scoper *auth.Scoper
+	Email  email.Service // optional; nil-safe — handlers no-op email side-effects
 	Logger *slog.Logger
 }
 
@@ -169,6 +183,7 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 			s.log().Error("CreateDelegation: txn", "err", err)
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 		}
+		s.scheduleNewRegistrationSummary(ctx, conferenceID)
 		return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
 	}
 
@@ -179,7 +194,34 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 		s.log().Error("CreateDelegation: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
+	s.scheduleNewRegistrationSummary(ctx, conferenceID)
 	return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
+}
+
+// scheduleNewRegistrationSummary opens a 15-minute dedupe window on first
+// registration of the window; subsequent calls within the window are no-ops.
+// EMAIL.md §7.1.
+func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, conferenceID string) {
+	if s.Email == nil {
+		return
+	}
+	const window = 15 * time.Minute
+	acquired, windowStart, err := s.Store.AcquireNotificationDedupe(ctx,
+		domain.NotificationDedupeNewRegistration, conferenceID, window)
+	if err != nil {
+		s.log().Warn("schedule registration summary: dedupe", "err", err)
+		return
+	}
+	if !acquired {
+		return
+	}
+	if err := s.Email.Enqueue(ctx, email.EnqueueRequest{
+		Kind:            domain.EmailKindNewRegistrationSummary,
+		ConferenceID:    conferenceID,
+		WindowStartedAt: windowStart,
+	}, window); err != nil {
+		s.log().Warn("schedule registration summary: enqueue", "err", err)
+	}
 }
 
 // UpdateDelegation — scope-gated.
@@ -286,6 +328,15 @@ func (s *DelegationService) Approve(ctx context.Context, req *connect.Request[v1
 		Kind:        domain.AuthEventDelegationApproved,
 		Metadata:    map[string]string{"delegationId": id, "conferenceId": d.ConferenceID},
 	})
+	conferenceName := d.ConferenceID
+	if conf, err := s.Store.GetConference(ctx, d.ConferenceID); err == nil {
+		conferenceName = conf.Name
+	}
+	s.notifyAdvisors(ctx, id, domain.EmailKindDelegationApproved, map[string]any{
+		"delegationName": d.School,
+		"conferenceName": conferenceName,
+		"portalLink":     portalBase() + "/delegation",
+	})
 	return connect.NewResponse(&v1.ApproveResponse{Delegation: delegationToProto(updated)}), nil
 }
 
@@ -331,6 +382,19 @@ func (s *DelegationService) Reject(ctx context.Context, req *connect.Request[v1.
 		Kind:        domain.AuthEventDelegationRejected,
 		Metadata:    meta,
 	})
+	conferenceName := d.ConferenceID
+	if conf, err := s.Store.GetConference(ctx, d.ConferenceID); err == nil {
+		conferenceName = conf.Name
+	}
+	vars := map[string]any{
+		"delegationName": d.School,
+		"conferenceName": conferenceName,
+		"reason":         "",
+	}
+	if r := meta["reason"]; r != "" {
+		vars["reason"] = r
+	}
+	s.notifyAdvisors(ctx, id, domain.EmailKindDelegationRejected, vars)
 	return connect.NewResponse(&v1.RejectResponse{Delegation: delegationToProto(updated)}), nil
 }
 
@@ -601,6 +665,7 @@ func (s *DelegationService) AssignStaffer(ctx context.Context, req *connect.Requ
 			"delegationId": delID,
 		},
 	})
+	s.notifyScopeChange(ctx, userID, caller.UserID, fmt.Sprintf("You were assigned to oversee delegation %s.", d.School))
 	return connect.NewResponse(&v1.AssignStafferResponse{}), nil
 }
 
@@ -631,6 +696,7 @@ func (s *DelegationService) UnassignStaffer(ctx context.Context, req *connect.Re
 			"delegationId": delID,
 		},
 	})
+	s.notifyScopeChange(ctx, userID, caller.UserID, "Your delegation-oversight assignment was removed.")
 	return connect.NewResponse(&v1.UnassignStafferResponse{}), nil
 }
 
@@ -638,6 +704,59 @@ func (s *DelegationService) UnassignStaffer(ctx context.Context, req *connect.Re
 func (s *DelegationService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 	if err := s.Store.RecordAuthEvent(ctx, e); err != nil {
 		s.log().Warn("audit write failed", "kind", e.Kind, "err", err)
+	}
+}
+
+// notifyScopeChange sends a T6 scope/role-change notification to the affected
+// user. Synchronous, best-effort.
+func (s *DelegationService) notifyScopeChange(ctx context.Context, affectedUserID, actorUserID, summary string) {
+	if s.Email == nil {
+		return
+	}
+	user, err := s.Store.GetUser(ctx, affectedUserID)
+	if err != nil {
+		return
+	}
+	actorName := actorUserID
+	if actor, err := s.Store.GetUser(ctx, actorUserID); err == nil && actor.Name != "" {
+		actorName = actor.Name
+	}
+	if err := s.Email.Send(ctx, email.SendRequest{
+		User: user,
+		Kind: domain.EmailKindScopeRoleChanged,
+		Vars: map[string]any{
+			"actorName":     actorName,
+			"changeSummary": summary,
+		},
+	}); err != nil {
+		s.log().Warn("notify scope change: send", "err", err)
+	}
+}
+
+// notifyAdvisors fans the given email kind out to every advisor of the
+// delegation. Synchronous (EMAIL.md §5.1); a per-recipient SES failure is
+// logged but does not roll back the originating mutation.
+func (s *DelegationService) notifyAdvisors(ctx context.Context, delegationID string, kind domain.EmailKind, vars map[string]any) {
+	if s.Email == nil {
+		return
+	}
+	advisors, err := s.Store.ListAdvisorsByDelegation(ctx, delegationID)
+	if err != nil {
+		s.log().Warn("notify: list advisors", "err", err)
+		return
+	}
+	for _, a := range advisors {
+		user, err := s.Store.GetUser(ctx, a.UserID)
+		if err != nil {
+			continue
+		}
+		if err := s.Email.Send(ctx, email.SendRequest{
+			User: user,
+			Kind: kind,
+			Vars: vars,
+		}); err != nil {
+			s.log().Warn("notify: send", "kind", kind, "userId", user.ID, "err", err)
+		}
 	}
 }
 

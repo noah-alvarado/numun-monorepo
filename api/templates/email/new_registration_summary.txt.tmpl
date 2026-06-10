@@ -1,0 +1,11 @@
+{{define "subject"}}New NUMUN delegations registered{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+The following delegations registered for {{index .Vars "conferenceName"}} in the last 15 minutes:
+
+{{range index .Vars "delegations"}}  - {{index . "name"}} — {{index . "school"}} — {{index . "advisorEmail"}} — {{index . "createdAt"}}
+{{end}}{{with index .Vars "additionalCount"}}{{if gt . 0}}
+…and {{.}} more.
+{{end}}{{end}}
+Review pending delegations: {{.PortalBaseURL}}/admin/delegations
+{{end}}

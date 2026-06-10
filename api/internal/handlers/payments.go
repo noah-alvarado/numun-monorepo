@@ -11,6 +11,7 @@ import (
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
+	"github.com/numun/numun/api/internal/email"
 	v1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/store"
 )
@@ -21,6 +22,7 @@ import (
 type PaymentService struct {
 	Store  *store.Client
 	Scoper *auth.Scoper
+	Email  email.Service
 	Logger *slog.Logger
 }
 
@@ -189,7 +191,105 @@ func (s *PaymentService) RecordPayment(ctx context.Context, req *connect.Request
 			"kind":         string(kind),
 		},
 	})
+	s.notifyAdvisorsPaymentRecorded(ctx, parent, created)
 	return connect.NewResponse(&v1.RecordPaymentResponse{Payment: paymentToProto(created)}), nil
+}
+
+// notifyAdvisorsPaymentRecorded sends T3 to all advisors of the delegation.
+// Best-effort.
+func (s *PaymentService) notifyAdvisorsPaymentRecorded(ctx context.Context, parent domain.Delegation, p domain.PaymentRecord) {
+	if s.Email == nil {
+		return
+	}
+	advisors, err := s.Store.ListAdvisorsByDelegation(ctx, parent.ID)
+	if err != nil {
+		return
+	}
+	// Re-fetch the parent to capture the post-write balance.
+	refreshed, err := s.Store.FindDelegationByID(ctx, parent.ID)
+	if err != nil {
+		refreshed = parent
+	}
+	vars := map[string]any{
+		"delegationName":      refreshed.School,
+		"amountFormatted":     formatMoney(absInt64(p.AmountUnits), absInt32(p.AmountCents), p.AmountCurrency),
+		"kind":                string(p.Kind),
+		"newBalanceFormatted": formatMoney(refreshed.BalanceDueUnits, refreshed.BalanceDueCents, p.AmountCurrency),
+		"notes":               p.Notes,
+	}
+	for _, a := range advisors {
+		user, err := s.Store.GetUser(ctx, a.UserID)
+		if err != nil {
+			continue
+		}
+		if err := s.Email.Send(ctx, email.SendRequest{
+			User: user,
+			Kind: domain.EmailKindPaymentRecorded,
+			Vars: vars,
+		}); err != nil {
+			s.log().Warn("payment notify: send", "userId", user.ID, "err", err)
+		}
+	}
+}
+
+func absInt64(v int64) int64 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+func absInt32(v int32) int32 {
+	if v < 0 {
+		return -v
+	}
+	return v
+}
+func formatMoney(units int64, cents int32, currency string) string {
+	if currency == "" {
+		currency = "USD"
+	}
+	if currency == "USD" {
+		return fmtUSD(units, cents)
+	}
+	return fmtCurrency(units, cents, currency)
+}
+
+func fmtUSD(units int64, cents int32) string {
+	return "$" + fmtUnits(units) + "." + fmtCents(cents)
+}
+func fmtCurrency(units int64, cents int32, code string) string {
+	return code + " " + fmtUnits(units) + "." + fmtCents(cents)
+}
+func fmtUnits(units int64) string {
+	// No thousands grouping in v1; emails read fine without.
+	if units == 0 {
+		return "0"
+	}
+	neg := units < 0
+	if neg {
+		units = -units
+	}
+	var buf [20]byte
+	i := len(buf)
+	for units > 0 {
+		i--
+		buf[i] = byte('0' + units%10)
+		units /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
+}
+func fmtCents(c int32) string {
+	if c < 0 {
+		c = -c
+	}
+	if c < 10 {
+		return "0" + fmtUnits(int64(c))
+	}
+	return fmtUnits(int64(c))
 }
 
 // UpdatePayment is admin-only and patches only notes/reference. Changing

@@ -136,6 +136,25 @@ Resources:
                   - s3:GetObject
                 Resource:
                   - !Sub "arn:aws:s3:::numun-${Env}-uploads/*"
+              # M9 email pipeline: SES SendEmail for the synchronous
+              # transactional path and SQS SendMessage to enqueue announcements
+              # + the new-registration debounce summary. See EMAIL.md §5.
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    ses:FromAddress:
+                      - !Sub "noreply@mail.${RootDomain}"
+                      - !Sub "announcements@mail.${RootDomain}"
+              - Effect: Allow
+                Action:
+                  - sqs:SendMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !GetAtt EmailSendQueue.Arn
 
   # ── HTTP API ────────────────────────────────────────────────────────────────
   ApiFunction:
@@ -156,6 +175,30 @@ Resources:
           RELEASE_VERSION: !Ref ReleaseVersion
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
           COGNITO_CLIENT_ID: !Ref CognitoClientId
+          # M9 email pipeline. EMAIL.md §5.
+          EMAIL_SENDER_TRANSACTIONAL: !Sub "noreply@mail.${RootDomain}"
+          EMAIL_SENDER_ANNOUNCEMENTS: !Sub "announcements@mail.${RootDomain}"
+          EMAIL_SENDER_COGNITO: !Sub "cognito@mail.${RootDomain}"
+          EMAIL_UNSUBSCRIBE_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
+            - !Sub "https://api.${RootDomain}/v1/email/unsubscribe"
+          # EMAIL_UNSUBSCRIBE_SECRET is loaded from SSM at cold-start (mirrors
+          # the cms_oauth/state_secret pattern). When unset, the List-
+          # Unsubscribe header is omitted (announcements still send; recipients
+          # can opt out via the admin re-opt-in path). One-time bootstrap:
+          #   aws ssm put-parameter --name /numun/${Env}/email/unsubscribe_secret \
+          #     --value "<32-byte random>" --type SecureString
+          EMAIL_QUEUE_URL: !Ref EmailSendQueue
+          EMAIL_CONFIGURATION_SET: !Ref EmailConfigurationSet
+          PORTAL_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://portal.${EnvSubdomain}.${RootDomain}"
+            - !Sub "https://portal.${RootDomain}"
+          ASSETS_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://assets.${EnvSubdomain}.${RootDomain}"
+            - !Sub "https://assets.${RootDomain}"
           COOKIE_DOMAIN: !If
             - HasSubdomain
             - !Sub ".${EnvSubdomain}.${RootDomain}"
@@ -302,6 +345,204 @@ Resources:
   # PostConfirmation=<arn>` wires it. Captured in the first-admin-bootstrap
   # and seed-users runbooks so it gets executed during deployment.
 
+  # ── M9 Email pipeline ──────────────────────────────────────────────────────
+  # SQS pair: numun-${Env}-email-send (main) + numun-${Env}-email-send-dlq.
+  # Max-receive 3 → DLQ per EMAIL.md §5.4. Visibility timeout 60s; worker
+  # Lambda timeout is 30s so a stuck process is redelivered after one window.
+  EmailSendQueueDLQ:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "numun-${Env}-email-send-dlq"
+      MessageRetentionPeriod: 1209600 # 14 days, SQS max.
+
+  EmailSendQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      QueueName: !Sub "numun-${Env}-email-send"
+      VisibilityTimeout: 60
+      MessageRetentionPeriod: 1209600
+      RedrivePolicy:
+        deadLetterTargetArn: !GetAtt EmailSendQueueDLQ.Arn
+        maxReceiveCount: 3
+
+  EmailFeedbackTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub "numun-${Env}-email-feedback"
+
+  # SES configuration set so bounce/complaint events are routed to the SNS
+  # topic. The destination + the SES-domain-identity wiring are configured
+  # manually post-deploy (EMAIL.md §6.1; the SES domain identity itself is
+  # outside SAM per the M1 runbook).
+  EmailConfigurationSet:
+    Type: AWS::SES::ConfigurationSet
+    Properties:
+      Name: !Sub "numun-${Env}-email"
+
+  # ── EmailWorker Lambda ──────────────────────────────────────────────────────
+  EmailWorkerFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "numun-${Env}-api-email-worker-execution"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: numun-email-worker
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}/index/*"
+              - Effect: Allow
+                Action:
+                  - sqs:ReceiveMessage
+                  - sqs:DeleteMessage
+                  - sqs:GetQueueAttributes
+                Resource:
+                  - !GetAtt EmailSendQueue.Arn
+              - Effect: Allow
+                Action:
+                  - ses:SendEmail
+                  - ses:SendRawEmail
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    ses:FromAddress:
+                      - !Sub "noreply@mail.${RootDomain}"
+                      - !Sub "announcements@mail.${RootDomain}"
+
+  EmailWorkerFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub "numun-${Env}-api-email-worker"
+      CodeUri: ../../api
+      Handler: bootstrap
+      Role: !GetAtt EmailWorkerFunctionRole.Arn
+      MemorySize: 512
+      Timeout: 30
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Sub "numun-${Env}"
+          EMAIL_SENDER_TRANSACTIONAL: !Sub "noreply@mail.${RootDomain}"
+          EMAIL_SENDER_ANNOUNCEMENTS: !Sub "announcements@mail.${RootDomain}"
+          EMAIL_QUEUE_URL: !Ref EmailSendQueue
+          EMAIL_CONFIGURATION_SET: !Ref EmailConfigurationSet
+          PORTAL_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://portal.${EnvSubdomain}.${RootDomain}"
+            - !Sub "https://portal.${RootDomain}"
+          ASSETS_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://assets.${EnvSubdomain}.${RootDomain}"
+            - !Sub "https://assets.${RootDomain}"
+      Events:
+        SQS:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt EmailSendQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes:
+              - ReportBatchItemFailures
+
+  EmailWorkerLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${EmailWorkerFunction}"
+      RetentionInDays: 30
+
+  # ── EmailFeedback Lambda (SNS subscriber for bounces/complaints) ───────────
+  EmailFeedbackFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "numun-${Env}-api-email-feedback-execution"
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Policies:
+        - PolicyName: numun-email-feedback
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - dynamodb:GetItem
+                  - dynamodb:PutItem
+                  - dynamodb:UpdateItem
+                  - dynamodb:Query
+                  - dynamodb:Scan
+                Resource:
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}"
+                  - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}/index/*"
+
+  EmailFeedbackFunction:
+    Type: AWS::Serverless::Function
+    Metadata:
+      BuildMethod: makefile
+    Properties:
+      FunctionName: !Sub "numun-${Env}-api-email-feedback"
+      CodeUri: ../../api
+      Handler: bootstrap
+      Role: !GetAtt EmailFeedbackFunctionRole.Arn
+      MemorySize: 256
+      Timeout: 10
+      Environment:
+        Variables:
+          DDB_TABLE_NAME: !Sub "numun-${Env}"
+      Events:
+        Feedback:
+          Type: SNS
+          Properties:
+            Topic: !Ref EmailFeedbackTopic
+
+  EmailFeedbackLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub "/aws/lambda/${EmailFeedbackFunction}"
+      RetentionInDays: 30
+
+  # DLQ-depth alarm — operations want to know when sends are failing repeatedly.
+  EmailSendDLQAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub "numun-${Env}-email-dlq-depth"
+      AlarmDescription: A message landed in the email-send DLQ.
+      Namespace: AWS/SQS
+      MetricName: ApproximateNumberOfMessagesVisible
+      Dimensions:
+        - Name: QueueName
+          Value: !GetAtt EmailSendQueueDLQ.QueueName
+      Statistic: Maximum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:numun-${Env}-alarms"
+
   # ── Alarms ──────────────────────────────────────────────────────────────────
   ApiFunctionErrorAlarm:
     Type: AWS::CloudWatch::Alarm
@@ -338,3 +579,21 @@ Outputs:
         aws cognito-idp update-user-pool --user-pool-id <id> \
           --lambda-config PostConfirmation=<arn>
     Value: !GetAtt CognitoPostConfirmationFunction.Arn
+  EmailSendQueueUrl:
+    Value: !Ref EmailSendQueue
+  EmailSendQueueArn:
+    Value: !GetAtt EmailSendQueue.Arn
+  EmailFeedbackTopicArn:
+    Description: >
+      SNS topic to subscribe SES bounce + complaint notifications to. Wire via:
+        aws ses put-identity-notification-topic --identity mail.${RootDomain} \
+          --notification-type Bounce --sns-topic <arn>
+        aws ses put-identity-notification-topic --identity mail.${RootDomain} \
+          --notification-type Complaint --sns-topic <arn>
+    Value: !Ref EmailFeedbackTopic
+  EmailConfigurationSetName:
+    Value: !Ref EmailConfigurationSet
+  EmailWorkerFunctionArn:
+    Value: !GetAtt EmailWorkerFunction.Arn
+  EmailFeedbackFunctionArn:
+    Value: !GetAtt EmailFeedbackFunction.Arn

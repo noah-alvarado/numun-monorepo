@@ -1,0 +1,9 @@
+{{define "subject"}}Update on your NUMUN delegation{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+Your delegation "{{index .Vars "delegationName"}}" for {{index .Vars "conferenceName"}} was not approved at this time.
+{{with index .Vars "reason"}}
+Reason: {{.}}
+{{end}}
+If you'd like to discuss next steps, reply to this email and a staff member will follow up.
+{{end}}

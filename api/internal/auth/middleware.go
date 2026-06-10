@@ -44,7 +44,7 @@ func isPublic(p string) bool {
 		return true
 	}
 	switch p {
-	case "/v1/health", "/":
+	case "/v1/health", "/", "/v1/email/unsubscribe":
 		return true
 	}
 	if strings.HasPrefix(p, "/cms-oauth/") {

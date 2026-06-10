@@ -535,3 +535,89 @@ type AuthAuditEvent struct {
 	Metadata    map[string]string
 	ExpiresAt   time.Time
 }
+
+// EmailKind enumerates the templates served by /api/templates/email/.
+// Mirrors EMAIL.md §1 catalog (T1–T7 + A1) plus the feedback-loop kinds.
+type EmailKind string
+
+const (
+	EmailKindDelegationApproved      EmailKind = "delegation_approved"
+	EmailKindDelegationRejected      EmailKind = "delegation_rejected"
+	EmailKindPaymentRecorded         EmailKind = "payment_recorded"
+	EmailKindBulkImportCommitted     EmailKind = "bulk_import_committed"
+	EmailKindAssignmentRunCompleted  EmailKind = "assignment_run_completed"
+	EmailKindScopeRoleChanged        EmailKind = "scope_role_changed"
+	EmailKindNewRegistrationSummary  EmailKind = "new_registration_summary"
+	EmailKindAnnouncement            EmailKind = "announcement"
+
+	// Feedback / forensic rows (not user-visible).
+	EmailKindBounceReceived    EmailKind = "bounce_received"
+	EmailKindComplaintReceived EmailKind = "complaint_received"
+	EmailKindDeliveryConfirmed EmailKind = "delivery_confirmed"
+)
+
+// EmailEventStatus mirrors EMAIL.md §8.
+type EmailEventStatus string
+
+const (
+	EmailEventStatusSent       EmailEventStatus = "sent"
+	EmailEventStatusFailed     EmailEventStatus = "failed"
+	EmailEventStatusSkipped    EmailEventStatus = "skipped"
+	EmailEventStatusBounce     EmailEventStatus = "bounce_received"
+	EmailEventStatusComplaint  EmailEventStatus = "complaint_received"
+	EmailEventStatusDelivery   EmailEventStatus = "delivery_confirmed"
+)
+
+// EmailEvent is the per-send audit row. 1-year TTL. EMAIL.md §8.
+type EmailEvent struct {
+	ID             string
+	UserID         string // empty for EMAIL_FEEDBACK#<email> rows
+	RecipientEmail string
+	Kind           EmailKind
+	Subject        string
+	SenderAddress  string
+	SESMessageID   string
+	Status         EmailEventStatus
+	FailureReason  string
+	ClientToken    string
+	SentAt         time.Time
+	ExpiresAt      time.Time
+	Metadata       map[string]string
+}
+
+// NotificationDedupeKind enumerates the patterns that share the dedupe row.
+// Only `new-registration` exists in v1; the column is here for future reuse.
+type NotificationDedupeKind string
+
+const (
+	NotificationDedupeNewRegistration NotificationDedupeKind = "new-registration"
+)
+
+// NotificationDedupe is the short-lived row used to enforce at-most-one
+// notification per window. EMAIL.md §10.2.
+type NotificationDedupe struct {
+	Kind            NotificationDedupeKind
+	ScopeID         string
+	WindowStartedAt time.Time
+	ExpiresAt       time.Time
+}
+
+// Announcement is the persisted record of a sent announcement. EMAIL.md §5.3.
+type Announcement struct {
+	ID             string
+	ConferenceID   string
+	Subject        string
+	BodyHTML       string
+	BodyText       string
+	AudienceFilter string // serialized JSON of the filter accepted at send time
+	SentBy         string
+	SentAt         time.Time
+	RecipientCount int
+
+	IsDeleted bool
+	Version   int
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	CreatedBy string
+	UpdatedBy string
+}

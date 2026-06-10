@@ -1,0 +1,10 @@
+{{define "subject"}}Your NUMUN delegation has been approved{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+Great news — your delegation "{{index .Vars "delegationName"}}" for {{index .Vars "conferenceName"}} has been approved.
+
+Manage your delegation in the portal:
+{{index .Vars "portalLink"}}
+
+If you have questions, reply to this email and a staff member will follow up.
+{{end}}

@@ -1,0 +1,7 @@
+{{define "subject"}}Your NUMUN account access changed{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+<p>{{index .Vars "actorName"}} updated your access:</p>
+<p style="background:#fafafa;padding:12px 16px;border-left:3px solid {{.BrandColor}};margin:16px 0;">{{index .Vars "changeSummary"}}</p>
+<p>If this change looks unexpected, reply to this email and a staff admin will look into it.</p>
+{{end}}

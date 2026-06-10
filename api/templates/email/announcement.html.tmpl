@@ -1,0 +1,6 @@
+{{define "subject"}}{{index .Vars "subject"}}{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+{{/* bodyHTML is staff-authored and sanitized before send. */}}
+{{index .Vars "bodyHTML"}}
+{{end}}

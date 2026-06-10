@@ -26,6 +26,8 @@ import {
   AssignmentRunService,
 } from "@/gen/numun/v1/assignments_pb";
 import { PaymentService } from "@/gen/numun/v1/payments_pb";
+import { AnnouncementService } from "@/gen/numun/v1/announcements_pb";
+import { EmailHealthService } from "@/gen/numun/v1/email_health_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
@@ -89,3 +91,5 @@ export const assignmentRunClient = createClient(
   transport,
 );
 export const paymentClient = createClient(PaymentService, transport);
+export const announcementClient = createClient(AnnouncementService, transport);
+export const emailHealthClient = createClient(EmailHealthService, transport);

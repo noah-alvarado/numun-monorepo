@@ -1,0 +1,11 @@
+{{define "subject"}}Assignment run completed for {{index .Vars "conferenceName"}}{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+<p>The assignment algorithm finished for <strong>{{index .Vars "conferenceName"}}</strong>.</p>
+<ul style="line-height:1.7;">
+  <li>Total assignments produced: <strong>{{index .Vars "assignmentCount"}}</strong></li>
+  <li>Objective score: <strong>{{index .Vars "objective"}}</strong></li>
+</ul>
+<p>Review the proposal and approve in the portal:</p>
+<p><a href="{{index .Vars "runLink"}}" style="display:inline-block;padding:10px 18px;background:{{.BrandColor}};color:#ffffff;text-decoration:none;border-radius:4px;">Open assignment studio</a></p>
+{{end}}

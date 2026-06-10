@@ -27,6 +27,7 @@ import (
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
 	"github.com/numun/numun/api/internal/domain/assignment"
+	"github.com/numun/numun/api/internal/email"
 	v1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/store"
 )
@@ -46,6 +47,7 @@ const algorithmSoftCap = 20 * time.Second
 type AssignmentService struct {
 	Store  *store.Client
 	Scoper *auth.Scoper
+	Email  email.Service
 	Logger *slog.Logger
 }
 
@@ -269,6 +271,7 @@ func (s *AssignmentService) Propose(ctx context.Context, req *connect.Request[v1
 			"assignmentCount": fmt.Sprintf("%d", len(created)),
 		},
 	})
+	s.notifyRunCompleted(ctx, caller.UserID, conferenceID, persistedRun.ID, prop.Objective, len(created))
 
 	// Convert the persisted set back to proto for the response.
 	persistedProto := make([]*v1.Assignment, 0, len(created))
@@ -505,6 +508,34 @@ func (s *AssignmentService) UpdateAssignment(ctx context.Context, req *connect.R
 func (s *AssignmentService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 	if err := s.Store.RecordAuthEvent(ctx, e); err != nil {
 		s.log().Warn("audit write failed", "kind", e.Kind, "err", err)
+	}
+}
+
+// notifyRunCompleted sends T5 to the staffer who triggered the run.
+func (s *AssignmentService) notifyRunCompleted(ctx context.Context, callerUserID, conferenceID, runID string, objective float64, count int) {
+	if s.Email == nil {
+		return
+	}
+	user, err := s.Store.GetUser(ctx, callerUserID)
+	if err != nil {
+		return
+	}
+	conferenceName := conferenceID
+	if conf, err := s.Store.GetConference(ctx, conferenceID); err == nil {
+		conferenceName = conf.Name
+	}
+	vars := map[string]any{
+		"conferenceName":  conferenceName,
+		"assignmentCount": count,
+		"objective":       fmt.Sprintf("%.4f", objective),
+		"runLink":         portalBase() + "/admin/assignments?run=" + runID,
+	}
+	if err := s.Email.Send(ctx, email.SendRequest{
+		User: user,
+		Kind: domain.EmailKindAssignmentRunCompleted,
+		Vars: vars,
+	}); err != nil {
+		s.log().Warn("notify run completed: send", "err", err)
 	}
 }
 

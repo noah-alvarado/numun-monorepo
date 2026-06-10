@@ -1,0 +1,5 @@
+{{define "subject"}}{{index .Vars "subject"}}{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+{{index .Vars "bodyText"}}
+{{end}}

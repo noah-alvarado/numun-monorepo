@@ -1,0 +1,22 @@
+{{define "subject"}}New NUMUN delegations registered{{end}}
+{{define "body"}}
+<p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
+<p>The following delegations registered for <strong>{{index .Vars "conferenceName"}}</strong> in the last 15 minutes:</p>
+<table role="presentation" cellpadding="6" cellspacing="0" border="0" style="border-collapse:collapse;width:100%;font-size:14px;">
+  <thead><tr style="text-align:left;border-bottom:1px solid #e5e5e5;color:#555;">
+    <th>Delegation</th><th>School</th><th>Advisor</th><th>Submitted</th>
+  </tr></thead>
+  <tbody>
+{{range index .Vars "delegations"}}
+  <tr style="border-bottom:1px solid #f4f4f5;">
+    <td>{{index . "name"}}</td>
+    <td>{{index . "school"}}</td>
+    <td>{{index . "advisorEmail"}}</td>
+    <td>{{index . "createdAt"}}</td>
+  </tr>
+{{end}}
+  </tbody>
+</table>
+{{with index .Vars "additionalCount"}}{{if gt . 0}}<p style="color:#555;margin-top:16px;">…and {{.}} more.</p>{{end}}{{end}}
+<p style="margin-top:24px;"><a href="{{.PortalBaseURL}}/admin/delegations">Review pending delegations in the portal</a></p>
+{{end}}

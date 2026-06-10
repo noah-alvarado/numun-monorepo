@@ -1,0 +1,11 @@
+{{define "subject"}}Assignment run completed for {{index .Vars "conferenceName"}}{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+The assignment algorithm finished for {{index .Vars "conferenceName"}}.
+
+  - Total assignments produced: {{index .Vars "assignmentCount"}}
+  - Objective score: {{index .Vars "objective"}}
+
+Review the proposal and approve in the portal:
+{{index .Vars "runLink"}}
+{{end}}

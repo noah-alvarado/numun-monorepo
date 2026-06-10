@@ -23,6 +23,7 @@ import (
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/cmsoauth"
+	"github.com/numun/numun/api/internal/email"
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 	"github.com/numun/numun/api/internal/handlers"
@@ -60,7 +61,13 @@ func main() {
 	}
 	verifier := auth.NewVerifier(cog.Region, cog.UserPoolID)
 
-	root := buildHandler(logger, st, cog, verifier)
+	emailSvc, err := email.New(ctx, st, logger)
+	if err != nil {
+		logger.Error("init email", "err", err)
+		os.Exit(1)
+	}
+
+	root := buildHandler(logger, st, cog, verifier, emailSvc)
 
 	if os.Getenv("LOCAL_HTTP") == "true" {
 		addr := ":3000"
@@ -75,7 +82,7 @@ func main() {
 	lambda.Start(httpadapter.NewV2(root).ProxyWithContext)
 }
 
-func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver *auth.Verifier) http.Handler {
+func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver *auth.Verifier, emailSvc *email.Client) http.Handler {
 	mux := http.NewServeMux()
 
 	// Plain HTTP probe — usable by curl, ALBs, and uptime checks.
@@ -120,11 +127,11 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	confPath, confHandler := numunv1connect.NewConferenceServiceHandler(confSvc, opts)
 	mux.Handle(confPath, confHandler)
 
-	delSvc := &handlers.DelegationService{Store: st, Scoper: scoper, Logger: logger}
+	delSvc := &handlers.DelegationService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
 	delPath, delHandler := numunv1connect.NewDelegationServiceHandler(delSvc, opts)
 	mux.Handle(delPath, delHandler)
 
-	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Logger: logger}
+	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
 	delegatePath, delegateHandler := numunv1connect.NewDelegateServiceHandler(delegateSvc, opts)
 	mux.Handle(delegatePath, delegateHandler)
 
@@ -140,7 +147,7 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	positionPath, positionHandler := numunv1connect.NewPositionServiceHandler(positionSvc, opts)
 	mux.Handle(positionPath, positionHandler)
 
-	assignmentSvc := &handlers.AssignmentService{Store: st, Scoper: scoper, Logger: logger}
+	assignmentSvc := &handlers.AssignmentService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
 	assignmentPath, assignmentHandler := numunv1connect.NewAssignmentServiceHandler(assignmentSvc, opts)
 	mux.Handle(assignmentPath, assignmentHandler)
 
@@ -148,9 +155,23 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	assignmentRunPath, assignmentRunHandler := numunv1connect.NewAssignmentRunServiceHandler(assignmentRunSvc, opts)
 	mux.Handle(assignmentRunPath, assignmentRunHandler)
 
-	paymentSvc := &handlers.PaymentService{Store: st, Scoper: scoper, Logger: logger}
+	paymentSvc := &handlers.PaymentService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
 	paymentPath, paymentHandler := numunv1connect.NewPaymentServiceHandler(paymentSvc, opts)
 	mux.Handle(paymentPath, paymentHandler)
+
+	announcementSvc := &handlers.AnnouncementService{Store: st, Email: emailSvc, Logger: logger}
+	announcementPath, announcementHandler := numunv1connect.NewAnnouncementServiceHandler(announcementSvc, opts)
+	mux.Handle(announcementPath, announcementHandler)
+
+	emailHealthSvc := &handlers.EmailHealthService{Store: st, Logger: logger}
+	emailHealthPath, emailHealthHandler := numunv1connect.NewEmailHealthServiceHandler(emailHealthSvc, opts)
+	mux.Handle(emailHealthPath, emailHealthHandler)
+
+	// List-Unsubscribe one-click handler. Outside the Connect router; auth
+	// middleware below carves out /v1/email/unsubscribe via the public-paths
+	// allowlist so a logged-out click still works. EMAIL.md §2.2.
+	unsubSvc := &handlers.UnsubscribeRoutes{Store: st, Cfg: emailSvc.Cfg, Logger: logger}
+	unsubSvc.Register(mux)
 
 	// CSV export surface (API.md §12.1): non-Connect HTTP routes mounted on
 	// the same mux. Auth + CSRF middleware below covers them.

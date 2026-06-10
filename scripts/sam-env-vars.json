@@ -11,6 +11,14 @@
     "DEV_MODE": "true",
     "DEV_BYPASS_AUTH": "true",
     "DDB_TABLE_NAME": "numun-test",
-    "UPLOADS_BUCKET_NAME": "numun-test-uploads"
+    "UPLOADS_BUCKET_NAME": "numun-test-uploads",
+    "EMAIL_SENDER_TRANSACTIONAL": "noreply@mail.test.numun.org",
+    "EMAIL_SENDER_ANNOUNCEMENTS": "announcements@mail.test.numun.org",
+    "EMAIL_SENDER_COGNITO": "cognito@mail.test.numun.org",
+    "EMAIL_QUEUE_URL": "http://host.docker.internal:4566/000000000000/numun-test-email-send",
+    "EMAIL_UNSUBSCRIBE_BASE_URL": "http://localhost:3000/v1/email/unsubscribe",
+    "EMAIL_UNSUBSCRIBE_SECRET": "dev-unsubscribe-secret-not-for-prod",
+    "PORTAL_BASE_URL": "http://localhost:5173",
+    "ASSETS_BASE_URL": "http://localhost:4566/numun-test-assets"
   }
 }

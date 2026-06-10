@@ -1,0 +1,12 @@
+{{define "subject"}}Delegate import committed{{end}}
+{{define "body"}}Hi{{with .RecipientName}} {{.}}{{end}},
+
+Your delegate import for "{{index .Vars "delegationName"}}" ({{index .Vars "mode"}} mode) finished successfully:
+
+  - {{index .Vars "createCount"}} delegates created
+  - {{index .Vars "updateCount"}} delegates updated
+  - {{index .Vars "softDeleteCount"}} delegates removed
+
+Open My Delegation in the portal to review the roster:
+{{.PortalBaseURL}}/delegation
+{{end}}

@@ -283,6 +283,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 				"uploadId":        uploadID,
 			},
 		})
+		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), len(softDeletes))
 		return connect.NewResponse(&v1.UpsertDelegatesBulkResponse{
 			Summary: &v1.CommitSummary{
 				CreateCount:     int32(len(creates)),
@@ -341,6 +342,9 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 			"status":           string(persistedJob.Status),
 		},
 	})
+	if lastErr == nil {
+		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), len(softDeletes))
+	}
 
 	resp := &v1.UpsertDelegatesBulkResponse{
 		Summary: &v1.CommitSummary{

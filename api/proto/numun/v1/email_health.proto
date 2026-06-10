@@ -1,0 +1,38 @@
+syntax = "proto3";
+
+package numun.v1;
+
+import "buf/validate/validate.proto";
+import "google/protobuf/timestamp.proto";
+
+// SuppressedUser — a User whose emailStatus is bounced or complained. The
+// portal admin email-health page (EMAIL.md §9) lists these.
+message SuppressedUser {
+  string user_id = 1;
+  string email = 2;
+  string name = 3;
+  // "bounced" | "complained"
+  string status = 4;
+  // The most recent feedback event, if known.
+  google.protobuf.Timestamp last_feedback_at = 5;
+  // Optional human-readable feedback detail (bounce subtype, complaint
+  // feedback type, etc.). Empty when unavailable.
+  string last_feedback_detail = 6;
+}
+
+// EmailHealthService — staff-admin only. Read-only listing + manual unsuppress.
+service EmailHealthService {
+  rpc ListSuppressed(ListSuppressedRequest) returns (ListSuppressedResponse) {}
+  rpc Unsuppress(UnsuppressRequest) returns (UnsuppressResponse) {}
+}
+
+message ListSuppressedRequest {}
+message ListSuppressedResponse {
+  repeated SuppressedUser items = 1;
+}
+
+message UnsuppressRequest {
+  string user_id = 1 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
+}
+message UnsuppressResponse {}
