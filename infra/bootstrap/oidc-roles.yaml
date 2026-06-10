@@ -218,6 +218,62 @@ Resources:
                 Resource:
                   - "arn:aws:route53:::hostedzone/*"
                   - "arn:aws:route53:::change/*"
+              # SQS for the email-send queue + DLQ (M9 email pipeline).
+              - Effect: Allow
+                Action:
+                  - sqs:CreateQueue
+                  - sqs:DeleteQueue
+                  - sqs:GetQueueAttributes
+                  - sqs:SetQueueAttributes
+                  - sqs:GetQueueUrl
+                  - sqs:TagQueue
+                  - sqs:UntagQueue
+                  - sqs:ListQueueTags
+                Resource:
+                  - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:numun-${Env}-email-send"
+                  - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:numun-${Env}-email-send-dlq"
+              # SNS for the email-feedback topic + SAM-generated email-feedback
+              # Lambda subscription (M9 bounces/complaints pipeline).
+              - Effect: Allow
+                Action:
+                  - sns:CreateTopic
+                  - sns:DeleteTopic
+                  - sns:GetTopicAttributes
+                  - sns:SetTopicAttributes
+                  - sns:Subscribe
+                  - sns:Unsubscribe
+                  - sns:ListSubscriptionsByTopic
+                  - sns:TagResource
+                  - sns:UntagResource
+                  - sns:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:sns:${AWS::Region}:${AWS::AccountId}:numun-${Env}-email-feedback"
+              # SES configuration set for bounce/complaint event publishing
+              # (M9 email pipeline).
+              - Effect: Allow
+                Action:
+                  - ses:CreateConfigurationSet
+                  - ses:DeleteConfigurationSet
+                  - ses:GetConfigurationSet
+                  - ses:UpdateConfigurationSetEventDestination
+                  - ses:CreateConfigurationSetEventDestination
+                  - ses:DeleteConfigurationSetEventDestination
+                  - ses:TagResource
+                  - ses:UntagResource
+                  - ses:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:configuration-set/numun-${Env}-email"
+              # Lambda EventSourceMapping for SQS→email-worker binding.
+              # EventSourceMapping ARNs use unpredictable UUIDs, so the resource
+              # cannot be tightly scoped; the action set is narrow instead.
+              - Effect: Allow
+                Action:
+                  - lambda:CreateEventSourceMapping
+                  - lambda:DeleteEventSourceMapping
+                  - lambda:UpdateEventSourceMapping
+                  - lambda:GetEventSourceMapping
+                  - lambda:ListEventSourceMappings
+                Resource: "*"
 
   DeployRoleSite:
     Type: AWS::IAM::Role
