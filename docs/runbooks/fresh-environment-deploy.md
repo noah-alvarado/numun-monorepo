@@ -197,28 +197,20 @@ Should show no stacks from the previous env.
 
 ## Rebuild
 
-### R1. Rename / create the GitHub environment
+### R1. Create the GitHub environment
 
-For the M2.7 cutover, the `nalvarado` environment is renamed to `test`:
-
-```bash
-# Try the rename via the GitHub API. Renaming environments is not
-# universally supported; fall back to create-new + delete-old below.
-gh api -X PATCH "/repos/${GH_REPO}/environments/nalvarado" -f name=test \
-  || {
-    gh api -X PUT "/repos/${GH_REPO}/environments/${GH_ENV}"
-    # then re-set each variable on the new env (see R4) before deleting the old:
-    # gh api -X DELETE "/repos/${GH_REPO}/environments/nalvarado"
-  }
-
-gh variable list --env "$GH_ENV"   # verify the env exists
-```
-
-For a fresh prod account, just create the new env:
+The environment exists for two reasons under the M14 pattern: it scopes
+secrets (Sentry DSN was moved to SSM but anything that legitimately can't
+live in SSM goes here), and it labels deploys for GitHub's Deployments
+dashboard.
 
 ```bash
 gh api -X PUT "/repos/${GH_REPO}/environments/${GH_ENV}"
+gh api "/repos/${GH_REPO}/environments/${GH_ENV}"  # verify
 ```
+
+No variables or secrets need to be set yet — the env YAML in R4 carries
+everything, and Sentry DSN ships in SSM (see [sentry-setup.md](./sentry-setup.md)).
 
 ### R2. Land the IaC
 
@@ -249,34 +241,45 @@ aws cloudformation describe-stacks \
   --query "Stacks[0].Outputs"
 ```
 
-### R4. Set the initial GitHub env vars
+### R4. Author the env-config YAML
 
-Required before any deploy workflow can succeed:
+M14 moved per-env configuration out of GitHub Environment variables and
+into the repo. Create `infra/envs/${ENV}.yaml` (mirror `infra/envs/test.yaml`
+for the shape). All stable identifiers go here:
 
-```bash
-# Per-env infrastructure
-gh variable set AWS_REGION         --env "$GH_ENV" --body "$AWS_REGION"
-gh variable set ROOT_DOMAIN        --env "$GH_ENV" --body "$ROOT_DOMAIN"
-gh variable set ENV_SUBDOMAIN      --env "$GH_ENV" --body "$ENV_SUBDOMAIN"
-gh variable set APEX_DOMAIN        --env "$GH_ENV" --body "$APEX"
-gh variable set HOSTED_ZONE_ID     --env "$GH_ENV" --body "$HOSTED_ZONE_ID"
-gh variable set SAM_ARTIFACTS_BUCKET --env "$GH_ENV" --body "numun-${ENV}-sam-deploys-${ACCOUNT_ID}"
-gh variable set DEPLOY_ROLE_API_ARN     --env "$GH_ENV" --body "<from R3 outputs>"
-gh variable set DEPLOY_ROLE_SITE_ARN    --env "$GH_ENV" --body "<from R3 outputs>"
-gh variable set DEPLOY_ROLE_PORTAL_ARN  --env "$GH_ENV" --body "<from R3 outputs>"
-gh variable set DEPLOY_ROLE_CMS_ARN     --env "$GH_ENV" --body "<from R3 outputs>"
-gh variable set DEPLOY_ROLE_INFRA_ARN   --env "$GH_ENV" --body "<from R3 outputs>"
-gh variable set API_CERTIFICATE_ARN     --env "$GH_ENV" --body "<from P1: us-east-2 cert ARN>"
-gh variable set CDN_CERTIFICATE_ARN     --env "$GH_ENV" --body "<from P1: us-east-1 cert ARN>"
+```yaml
+ENV_NAME: ${ENV}
+ENV_SUBDOMAIN: ${ENV_SUBDOMAIN} # empty for prod
+ROOT_DOMAIN: ${ROOT_DOMAIN}
+APEX_DOMAIN: ${APEX}
+AWS_REGION: ${AWS_REGION}
+AWS_ACCOUNT_ID: "${ACCOUNT_ID}"
+ALARM_EMAIL: ops@example.com
+SAM_ARTIFACTS_BUCKET: numun-${ENV}-sam-deploys-${ACCOUNT_ID}
+
+HOSTED_ZONE_ID: ${HOSTED_ZONE_ID}
+API_CERTIFICATE_ARN: <from P1: us-east-2 cert ARN>
+CDN_CERTIFICATE_ARN: <from P1: us-east-1 cert ARN>
 ```
+
+Commit and push. The deploy workflows read this file via
+`scripts/load-env.sh` on every run.
 
 Notes:
 
-- The env name itself (`test` / `prod`) is **not** a variable — it's the
+- **No GitHub variables** are needed under the M14 pattern. The
+  deploy-role ARNs are derived from `AWS_ACCOUNT_ID` + the naming
+  convention (`numun-${ENV}-deploy-<stack>`). Cognito IDs, distribution
+  IDs, and bucket ARNs are read live via `aws cloudformation
+describe-stacks` (see `scripts/load-stack-outputs.sh`).
+- The env name itself (`test` / `prod`) is **not** stored — it's the
   GitHub Environment name and the workflows derive `ENV` from it directly.
-- The repo path is **not** a variable — the cms workflow substitutes
+- The repo path is **not** stored — the cms workflow substitutes
   `__GITHUB_REPO__` in `cms/config.yml` from the `${{ github.repository }}`
   workflow context.
+- **Secrets** (Sentry DSN, etc.) go in SSM SecureString at
+  `/numun/${ENV}/...` — see [sentry-setup.md](./sentry-setup.md) and the
+  cms-oauth / email runbooks. **Do not** add secrets to the env YAML.
 
 ### R5. Deploy base-data (under break-glass)
 
@@ -301,13 +304,11 @@ aws cloudformation describe-stacks \
   --query "Stacks[0].Outputs"
 ```
 
-### R6. Set Cognito GitHub env vars
+### R6. (removed in M14)
 
-```bash
-gh variable set COGNITO_USER_POOL_ID  --env "$GH_ENV" --body "<from R5 outputs>"
-gh variable set COGNITO_USER_POOL_ARN --env "$GH_ENV" --body "<from R5 outputs>"
-gh variable set COGNITO_CLIENT_ID     --env "$GH_ENV" --body "<from R5 outputs>"
-```
+Cognito IDs no longer need to be mirrored into GitHub variables —
+`scripts/load-stack-outputs.sh numun-${ENV}-base-data` reads them live
+inside each deploy workflow.
 
 ### R7. Deploy base-cdn (under break-glass)
 
@@ -330,13 +331,11 @@ aws cloudformation describe-stacks \
   --query "Stacks[0].Outputs"
 ```
 
-### R8. Set CloudFront distribution GitHub env vars
+### R8. (removed in M14)
 
-```bash
-gh variable set SITE_DISTRIBUTION_ID   --env "$GH_ENV" --body "<from R7>"
-gh variable set PORTAL_DISTRIBUTION_ID --env "$GH_ENV" --body "<from R7>"
-gh variable set CMS_DISTRIBUTION_ID    --env "$GH_ENV" --body "<from R7>"
-```
+CloudFront distribution IDs no longer need to be mirrored into GitHub
+variables — `scripts/load-stack-outputs.sh numun-${ENV}-base-cdn` reads
+them live inside each deploy workflow.
 
 ### R9. Deploy the billing-alarm stack (us-east-1)
 
@@ -353,7 +352,8 @@ aws cloudformation deploy \
 ### R10. Deploy the api stack via CI
 
 Push to `main` (or trigger `workflow_dispatch` on `.github/workflows/api.yml`).
-The deploy should succeed using the new OIDC role + env vars.
+The deploy should succeed using the new OIDC role + the `infra/envs/${ENV}.yaml`
+config + the base-data/base-cdn stack outputs read at deploy time.
 
 Smoke-check the new endpoint (CI does this automatically, but
 double-check):

@@ -1,10 +1,10 @@
 # Sentry setup
 
-One-time procedure to wire Sentry into the API + portal. Until the GitHub
-environment secrets are populated, deploys succeed but Sentry init no-ops
-(both `observability.InitFromEnv` and `initSentry()` return false when the
-DSN env var is empty). Errors flow to CloudWatch Logs as usual; only the
-Sentry-specific UX (grouped issues, deploy hashes, breadcrumbs) is absent.
+One-time procedure to wire Sentry into the API + portal. Until the DSN is
+stored in SSM (per §2 below), deploys succeed but Sentry init no-ops (both
+`observability.InitFromEnv` and `initSentry()` return false when no DSN
+resolves). Errors flow to CloudWatch Logs as usual; only the Sentry-
+specific UX (grouped issues, deploy hashes, breadcrumbs) is absent.
 
 ## 1. Create the Sentry project
 
@@ -20,25 +20,39 @@ Sentry-specific UX (grouped issues, deploy hashes, breadcrumbs) is absent.
 The DSN is technically a non-secret (it only authorizes ingestion, not read
 access), but treat it as scoped config to avoid public abuse.
 
-## 2. Populate GitHub environment secrets
+## 2. Populate the SSM parameter
 
-The two deploy workflows (`api.yml`, `portal.yml`) read `secrets.SENTRY_DSN`
-under their `environment:` block (`test` or `prod`).
+The Sentry DSN lives in SSM SecureString at `/numun/${ENV}/sentry/dsn`
+(M14). Both the API (Lambda cold-start) and the portal (build-time via
+`aws ssm get-parameter`) read it from there.
 
-For each of `test` and `prod`:
+For each environment (`test`, future `prod`):
 
-1. Repository **Settings → Environments → `<env>` → Add secret**.
-2. Name: `SENTRY_DSN`. Value: the API DSN. The portal deploy reads the same
-   secret name but you may want **separate** DSNs (one per Sentry project)
-   to keep errors disjoint:
-   - If you keep one secret, create a single Sentry project that both
-     surfaces post to. Workable, but issue lists mix API and browser
-     errors.
-   - If you want two, add a second secret (e.g., `SENTRY_DSN_PORTAL`) and
-     update the portal workflow's `VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN_PORTAL }}`.
+```bash
+ENV=test
+DSN='https://<key>@oXXX.ingest.sentry.io/<projectId>'  # from §1
+aws ssm put-parameter \
+  --name "/numun/$ENV/sentry/dsn" \
+  --type SecureString \
+  --value "$DSN" \
+  --overwrite \
+  --region us-east-2
+```
 
-The current default uses one secret name for both. Pick the two-project
-shape if you have more than ~50 errors/mo from either surface.
+The portal deploy role has `ssm:GetParameter` on
+`/numun/${Env}/sentry/*` (granted in `infra/bootstrap/oidc-roles.yaml`).
+The API Lambda's wildcard read on `/numun/${Env}/*` already covers it.
+
+**One DSN or two?** The recipe above uses a single `dsn` parameter for
+both surfaces. If you want separate Sentry projects (one for API errors,
+one for portal errors), create a second parameter at
+`/numun/$ENV/sentry/dsn_portal` and adjust `portal.yml`'s "load Sentry
+DSN from SSM" step to read it. Recommended only if you exceed ~50
+errors/mo on either surface.
+
+Rotation: `aws ssm put-parameter --overwrite` updates the value. The
+next deploy picks it up (Lambda reads at cold-start; portal at build).
+No code or IAM change.
 
 ## 3. Verify
 

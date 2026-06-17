@@ -122,6 +122,15 @@ Resources:
                   - cloudformation:DeleteChangeSet
                 Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:aws:transform/Serverless-2016-10-31"
+              # M14: read outputs from base-data / base-cdn so the api
+              # deploy can resolve Cognito IDs + bucket ARNs live rather
+              # than mirroring them into GitHub variables.
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-data/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
               # Lambda code/config updates (scoped by name).
               - Effect: Allow
                 Action:
@@ -312,6 +321,12 @@ Resources:
                   - cloudfront:GetDistribution
                   - cloudfront:ListDistributions
                 Resource: "*"
+              # M14: read base-cdn stack outputs (distribution IDs).
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
 
   DeployRolePortal:
     Type: AWS::IAM::Role
@@ -350,6 +365,24 @@ Resources:
                   - cloudfront:GetDistribution
                   - cloudfront:ListDistributions
                 Resource: "*"
+              # M14: read base-data (Cognito IDs) + base-cdn (distribution
+              # IDs) stack outputs so the portal build picks up live
+              # values rather than mirrored GitHub variables.
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-data/*"
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
+              # M14: Sentry DSN at /numun/${Env}/sentry/dsn — read at
+              # build time and inlined into the Vite bundle as
+              # VITE_SENTRY_DSN. Empty value tree-shakes Sentry out;
+              # missing-perm is treated the same as missing-param.
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/sentry/*"
 
   DeployRoleCms:
     Type: AWS::IAM::Role
@@ -388,6 +421,12 @@ Resources:
                   - cloudfront:GetDistribution
                   - cloudfront:ListDistributions
                 Resource: "*"
+              # M14: read base-cdn stack outputs (CmsDistributionId).
+              - Effect: Allow
+                Action:
+                  - cloudformation:DescribeStacks
+                Resource:
+                  - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
 
   # ── Infra role: deploys base-data + base-cdn (us-east-2) and the
   # ── billing-alarm stack (us-east-1). Broader perms than the per-app

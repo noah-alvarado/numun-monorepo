@@ -180,7 +180,15 @@ Notes (anything unexpected during restore): \***\*\*\*\*\***\_\_\_\_\***\*\*\*\*
 
 ## 5. Sentry verification (post-DSN bootstrap)
 
-After completing [`sentry-setup.md`](./sentry-setup.md), confirm both sides are sending events.
+After completing [`sentry-setup.md`](./sentry-setup.md) — which now stores the DSN in SSM at `/numun/${ENV}/sentry/dsn` rather than in a GitHub Environment secret — confirm both sides are sending events.
+
+```bash
+# Sanity-check that the SSM parameter exists.
+aws ssm get-parameter \
+  --name "/numun/$ENV/sentry/dsn" \
+  --with-decryption \
+  --query 'Parameter.Value' --output text --region us-east-2
+```
 
 ### API
 
