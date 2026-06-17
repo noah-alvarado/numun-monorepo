@@ -9,6 +9,33 @@ allowBuilds:
   lefthook: true
   sharp: true
 
+# Force the lockfile to include native bindings for both macOS (dev) and
+# Linux x64 (CI runners) so `pnpm install --frozen-lockfile` resolves
+# rolldown/lightningcss/oxide bindings on either platform. Without this,
+# Vite 8 builds fail in CI with "Cannot find module @rolldown/binding-
+# linux-x64-gnu".
+supportedArchitectures:
+  os:
+    - current
+    - linux
+  cpu:
+    - current
+    - x64
+    - arm64
+  libc:
+    - current
+    - glibc
+
+# Retry npm-registry fetches more aggressively. Default is 2 retries; the
+# Vite 8 + Rolldown ecosystem pulls a lot of platform-specific native
+# bindings as optional deps, and a single network blip on any of them
+# silently drops the binding (pnpm continues because they're optional),
+# which then breaks the build with "Cannot find native binding ...".
+fetchRetries: 5
+fetchRetryMintimeout: 10000
+fetchRetryMaxtimeout: 60000
+fetchTimeout: 60000
+
 # Pin a non-vulnerable js-cookie. amazon-cognito-identity-js pulls in
 # js-cookie@<=3.0.5 which has a cookie-attribute prototype-hijack advisory
 # (GHSA-qjx8-664m-686j). 3.0.6+ patches it; the API is unchanged.

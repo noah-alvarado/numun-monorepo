@@ -174,7 +174,7 @@ aws dynamodb delete-table --region "$REGION" --table-name "$DST"
 ### Tracking
 
 Date drill completed (test env): **\_\_\_\_**
-Notes (anything unexpected during restore): **********\_\_\_\_**********
+Notes (anything unexpected during restore): \***\*\*\*\*\***\_\_\_\_\***\*\*\*\*\***
 
 ---
 

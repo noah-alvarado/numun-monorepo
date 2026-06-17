@@ -68,7 +68,29 @@ jobs:
         run: sam build
       - name: sam deploy
         working-directory: infra/api
+        env:
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
+          # Build the parameter-overrides list. SentryDsn is only appended
+          # when the env-scoped secret is set; sam deploy rejects an empty
+          # value (`SentryDsn=` is not valid syntax), so we leave the
+          # template default (empty string) in place when the secret is
+          # unset and observability.InitFromEnv no-ops.
+          PARAMS=(
+            "Env=${{ env.ENV }}"
+            "RootDomain=${{ vars.ROOT_DOMAIN }}"
+            "EnvSubdomain=${{ vars.ENV_SUBDOMAIN }}"
+            "CommitSha=${{ github.sha }}"
+            "ReleaseVersion=${{ steps.version.outputs.version }}"
+            "ApiCertificateArn=${{ vars.API_CERTIFICATE_ARN }}"
+            "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}"
+            "CognitoUserPoolId=${{ vars.COGNITO_USER_POOL_ID }}"
+            "CognitoUserPoolArn=${{ vars.COGNITO_USER_POOL_ARN }}"
+            "CognitoClientId=${{ vars.COGNITO_CLIENT_ID }}"
+          )
+          if [ -n "$SENTRY_DSN" ]; then
+            PARAMS+=("SentryDsn=$SENTRY_DSN")
+          fi
           sam deploy \
             --stack-name "$STACK_NAME" \
             --region "$AWS_REGION" \
@@ -76,18 +98,7 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides \
-              Env=${{ env.ENV }} \
-              RootDomain=${{ vars.ROOT_DOMAIN }} \
-              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
-              CommitSha=${{ github.sha }} \
-              ReleaseVersion=${{ steps.version.outputs.version }} \
-              ApiCertificateArn=${{ vars.API_CERTIFICATE_ARN }} \
-              HostedZoneId=${{ vars.HOSTED_ZONE_ID }} \
-              CognitoUserPoolId=${{ vars.COGNITO_USER_POOL_ID }} \
-              CognitoUserPoolArn=${{ vars.COGNITO_USER_POOL_ARN }} \
-              CognitoClientId=${{ vars.COGNITO_CLIENT_ID }} \
-              SentryDsn="${{ secrets.SENTRY_DSN }}"
+            --parameter-overrides "${PARAMS[@]}"
       - name: get HTTP API endpoint
         id: api
         run: |
