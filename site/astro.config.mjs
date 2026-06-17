@@ -1,7 +1,8 @@
 import { defineConfig } from "astro/config";
-import tailwind from "@astrojs/tailwind";
+import tailwindcss from "@tailwindcss/vite";
 import mdx from "@astrojs/mdx";
 import sitemap from "@astrojs/sitemap";
+import { unified } from "@astrojs/markdown-remark";
 import rehypeSanitize from "rehype-sanitize";
 
 // Site is environment-aware: SITE_BASE is set in CI per environment so
@@ -16,11 +17,17 @@ const site = process.env.SITE_BASE ?? "http://localhost:4321";
 export default defineConfig({
   site,
   output: "static",
-  integrations: [tailwind(), mdx(), sitemap()],
+  integrations: [mdx(), sitemap()],
+  vite: {
+    // Tailwind v4 plugs into Astro via the Vite plugin (the legacy
+    // `@astrojs/tailwind` integration is pinned to Tailwind 3 and is
+    // not upgraded for v4 yet).
+    plugins: [tailwindcss()],
+  },
   server: {
     port: 4321,
   },
   markdown: {
-    rehypePlugins: [rehypeSanitize],
+    processor: unified({ rehypePlugins: [rehypeSanitize] }),
   },
 });

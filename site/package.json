@@ -12,18 +12,19 @@
     "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.4",
-    "@astrojs/mdx": "^4.0.1",
-    "@astrojs/rss": "^4.0.18",
-    "@astrojs/sitemap": "^3.7.3",
-    "@astrojs/tailwind": "^5.1.4",
-    "astro": "^5.0.5",
-    "tailwindcss": "^3.4.16",
-    "typescript": "^5.7.2"
+    "@astrojs/check": "0.9.7-beta.1",
+    "@astrojs/markdown-remark": "7.2.0",
+    "@astrojs/mdx": "7.0.0-beta.2",
+    "@astrojs/rss": "4.0.15-beta.4",
+    "@astrojs/sitemap": "3.6.1-beta.3",
+    "@tailwindcss/vite": "^4.3.1",
+    "astro": "7.0.0-beta.4",
+    "tailwindcss": "^4.3.1"
   },
   "devDependencies": {
     "@numun/tailwind-tokens": "workspace:*",
     "rehype-sanitize": "^6.0.0",
-    "vitest": "^2.1.8"
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.9"
   }
 }

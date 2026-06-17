@@ -22,12 +22,18 @@ import (
 
 	"github.com/numun/numun/api/internal/domain"
 	"github.com/numun/numun/api/internal/email"
+	numunlog "github.com/numun/numun/api/internal/log"
+	"github.com/numun/numun/api/internal/observability"
 	"github.com/numun/numun/api/internal/store"
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := numunlog.NewJSON(os.Stdout, nil)
 	slog.SetDefault(logger)
+
+	if observability.InitFromEnv("email-worker", logger) {
+		defer observability.Flush()
+	}
 
 	ctx := context.Background()
 	st, err := store.New(ctx)

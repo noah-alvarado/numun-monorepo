@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/numun/numun/api/internal/domain"
+	numunlog "github.com/numun/numun/api/internal/log"
 	"github.com/numun/numun/api/internal/store"
 )
 
@@ -59,7 +60,7 @@ var Users = []SeedUser{
 }
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := numunlog.NewJSON(os.Stdout, nil)
 	slog.SetDefault(logger)
 
 	// Guardrail: this is a local-dev tool. Refuse to run unless one of the

@@ -51,6 +51,14 @@ Parameters:
   CognitoClientId:
     Type: String
     Description: Cognito app client id used by the portal.
+  SentryDsn:
+    Type: String
+    Default: ""
+    NoEcho: true
+    Description: >
+      Sentry DSN for backend error reporting. Empty disables Sentry entirely
+      (init no-ops; observability.InitFromEnv returns false). Source is the
+      `SENTRY_DSN` GitHub environment secret on the deploy workflow.
 
 Conditions:
   HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
@@ -175,6 +183,10 @@ Resources:
           RELEASE_VERSION: !Ref ReleaseVersion
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
           COGNITO_CLIENT_ID: !Ref CognitoClientId
+          ENV_NAME: !Ref Env
+          SENTRY_DSN: !Ref SentryDsn
+          SENTRY_ENVIRONMENT: !Ref Env
+          SENTRY_RELEASE: !Ref CommitSha
           # M9 email pipeline. EMAIL.md §5.
           EMAIL_SENDER_TRANSACTIONAL: !Sub "noreply@mail.${RootDomain}"
           EMAIL_SENDER_ANNOUNCEMENTS: !Sub "announcements@mail.${RootDomain}"
@@ -335,6 +347,10 @@ Resources:
         Variables:
           AWS_REGION_NAME: !Ref AWS::Region
           DDB_TABLE_NAME: !Sub "numun-${Env}"
+          ENV_NAME: !Ref Env
+          SENTRY_DSN: !Ref SentryDsn
+          SENTRY_ENVIRONMENT: !Ref Env
+          SENTRY_RELEASE: !Ref CommitSha
 
   CognitoPostConfirmationLogGroup:
     Type: AWS::Logs::LogGroup
@@ -463,6 +479,10 @@ Resources:
             - HasSubdomain
             - !Sub "https://assets.${EnvSubdomain}.${RootDomain}"
             - !Sub "https://assets.${RootDomain}"
+          ENV_NAME: !Ref Env
+          SENTRY_DSN: !Ref SentryDsn
+          SENTRY_ENVIRONMENT: !Ref Env
+          SENTRY_RELEASE: !Ref CommitSha
       Events:
         SQS:
           Type: SQS
@@ -522,6 +542,10 @@ Resources:
       Environment:
         Variables:
           DDB_TABLE_NAME: !Sub "numun-${Env}"
+          ENV_NAME: !Ref Env
+          SENTRY_DSN: !Ref SentryDsn
+          SENTRY_ENVIRONMENT: !Ref Env
+          SENTRY_RELEASE: !Ref CommitSha
       Events:
         Feedback:
           Type: SNS

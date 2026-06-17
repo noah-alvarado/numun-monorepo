@@ -1,0 +1,98 @@
+/*
+ * Northwestern University brand tokens for Tailwind v4.
+ *
+ * Sources verified 2026-06-08:
+ *   - https://www.northwestern.edu/brand/visual-identity/
+ *   - https://www.northwestern.edu/brand/visual-identity/color-palettes/
+ *   - https://www.northwestern.edu/brand/visual-identity/color-palettes/secondary-palette/
+ *   - https://www.northwestern.edu/brand/visual-identity/fonts-typography/
+ *
+ * Cross-reference: numun.org self-hosts Periódico Text, Akkurat Pro, and
+ * Campton OTF files. The site's applied text colors match Angular Material
+ * defaults (rgba(0,0,0,0.87) ≈ Rich Black 80%, rgba(0,0,0,0.54) ≈ Rich
+ * Black 50%) which line up with Northwestern's published Rich Black tints,
+ * so the ramp doubles as a faithful "imitate the live site" palette.
+ *
+ * Consumers import this file *after* `@import "tailwindcss"` so it
+ * extends the default Tailwind theme. Naming conventions:
+ *   - `--color-<name>` → `bg-<name>`, `text-<name>`, `border-<name>` etc.
+ *   - `--color-<name>-<scale>` → `bg-<name>-<scale>` etc.
+ *   - `--font-<name>` → `font-<name>`.
+ */
+
+@theme {
+  /* ── Primary: Northwestern Purple ────────────────────────────────────
+   * `nu-purple` is the stable Tailwind name — downstream classes in
+   * /portal and /site depend on it. Every rung is a Northwestern-
+   * published value; nothing here is interpolated.
+   */
+  --color-nu-purple: #4e2a84; /* Northwestern Purple (Pantone 2685 C) */
+  --color-nu-purple-50: #e4e0ee; /* Purple 10 */
+  --color-nu-purple-100: #ccc4df; /* Purple 20  (RGB 204, 196, 223) */
+  --color-nu-purple-200: #b6acd1; /* Purple 30 */
+  --color-nu-purple-300: #a495c3; /* Purple 40  (RGB 164, 149, 195) */
+  --color-nu-purple-400: #836eaa; /* Purple 60 */
+  --color-nu-purple-500: #684c96; /* Purple 80  (RGB 104, 76, 150) */
+  --color-nu-purple-600: #4e2a84; /* Northwestern Purple — primary */
+  --color-nu-purple-700: #401f68; /* Purple 120 */
+  --color-nu-purple-800: #30104e; /* Purple 140 (RGB 48, 16, 78) */
+  --color-nu-purple-900: #1d0235; /* Purple 160 (RGB 29, 2, 53) */
+
+  /* ── Neutrals: Rich Black tints ──────────────────────────────────────
+   * Northwestern publishes Rich Black + 10/20/50/80% tints. We expose
+   * those at their natural rungs and fill the gaps via linear
+   * interpolation between adjacent published values so a full Tailwind
+   * 50–900 scale works for downstream callers. Interpolated rungs are
+   * marked.
+   */
+  --color-nu-black: #000000; /* Rich Black (Pantone Rich Black) */
+  --color-nu-black-50: #efecec; /* (interpolated — between white and Rich Black 10%) */
+  --color-nu-black-100: #d8d6d6; /* Rich Black 10% */
+  --color-nu-black-200: #bbb8b8; /* Rich Black 20% */
+  --color-nu-black-300: #9c9898; /* (interpolated — between 20% and 50%) */
+  --color-nu-black-400: #878282; /* (interpolated — between 20% and 50%) */
+  --color-nu-black-500: #716c6b; /* Rich Black 50% */
+  --color-nu-black-600: #58524f; /* (interpolated — between 50% and 80%) */
+  --color-nu-black-700: #46403e; /* (interpolated — between 50% and 80%) */
+  --color-nu-black-800: #342f2e; /* Rich Black 80% */
+  --color-nu-black-900: #000000; /* Rich Black */
+
+  /* ── Secondary palette ───────────────────────────────────────────────
+   * Six hue families, each with a default (bright) and `dark`. These
+   * are the 12 PMS values Northwestern publishes on the secondary
+   * palette page; pairings match the brand's bright/dark grouping.
+   *
+   * Brand guidance: "use rarely and sparingly… for items that require
+   * differentiation, for example, within charts and graphs, or for
+   * updates or callout buttons in digital applications."
+   */
+  --color-nu-green: #58b947; /* PMS 360  — bright */
+  --color-nu-green-dark: #008656; /* PMS 7725 — dark */
+  --color-nu-teal: #7fcecd; /* PMS 318  — bright */
+  --color-nu-teal-dark: #007fa4; /* PMS 314  — dark */
+  --color-nu-blue: #5091cd; /* PMS 279  — bright */
+  --color-nu-blue-dark: #0d2d6c; /* PMS 294  — dark (navy) */
+  --color-nu-yellow: #ede93b; /* PMS 394  — bright */
+  --color-nu-yellow-dark: #d9c826; /* PMS 611  — dark (mustard) */
+  --color-nu-gold: #ffc520; /* PMS 7548 — bright */
+  --color-nu-gold-dark: #ca7c1b; /* PMS 7571 — dark (rust) */
+  --color-nu-orange: #ef553f; /* PMS 7625 — bright */
+  --color-nu-orange-dark: #d85820; /* PMS 1595 — dark */
+
+  /* ── Typography ──────────────────────────────────────────────────────
+   * Stacks below use the Google Fonts Northwestern names on its
+   * typography page as the free web counterparts to the commercial
+   * brand faces:
+   *   sans (body)         → IBM Plex Sans  ("substitute for Akkurat Pro")
+   *   display (headlines) → Poppins        ("headlines and subheads on the web")
+   *   serif (body serif)  → Noto Serif     ("body text on the web")
+   * Commercial faces (Akkurat Pro / Campton / Periódico Text) are
+   * intentionally NOT first in the stack: they're never resolved unless
+   * self-hosted, so leading with them just added noise. When/if we
+   * license and self-host any of them, add it as the first entry here
+   * and load the @font-face in the layout.
+   */
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Noto Serif", ui-serif, Georgia, Cambria, serif;
+}

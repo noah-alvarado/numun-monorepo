@@ -1,0 +1,10 @@
+/*
+ * Tailwind v4 entrypoint for the marketing site.
+ *
+ * `@import "tailwindcss"` pulls in the v4 preflight + utilities; the
+ * second import layers in the Northwestern brand `@theme` block
+ * (colors, fonts) shared with the portal so both surfaces stay in
+ * sync. Layout.astro imports this file so every page picks it up.
+ */
+@import "tailwindcss";
+@import "@numun/tailwind-tokens/theme.css";

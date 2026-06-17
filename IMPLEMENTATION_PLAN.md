@@ -219,6 +219,19 @@ Goal: All the SECURITY.md operational controls actually exist.
 
 **Verification:** Walk each runbook against a tabletop exercise; confirm alarms fire on injected failures.
 
+### M13 — Post-M12 cleanup
+
+Goal: Pay down the small set of follow-ups discovered during the M12 dep-audit pass. Nothing here blocks launch; each item is independently shippable.
+
+- **`@numun/cms` build script.** `cms/package.json` references `node scripts/build.mjs` but the script does not exist on `main` (pre-existed M12; surfaced during the workspace-wide `pnpm run build`). Decap CMS is a static bundle — the build is just an `aws s3 sync` of `cms/index.html` + `cms/config.yml`. Either author `cms/scripts/build.mjs` to assemble the bundle, or replace the `build` script with a no-op + push the actual sync logic into `.github/workflows/cms.yml` (which is where the M5 design originally put it). Recommendation: the latter, since the CMS has no real build step.
+- **Astro 7-beta → stable.** When `astro@7.0.0` ships, bump out of `7.0.0-beta.4` along with the four ecosystem packages (`@astrojs/mdx`, `sitemap`, `rss`, `check`).
+- **Vite 9 readiness.** Astro internals use `resolve.alias.customResolver`, which Vite 8 deprecates and Vite 9 will remove. Astro's responsibility; track upstream.
+- **Markdown processor.** Astro 7 deprecated the top-level `markdown.remarkPlugins` / `rehypePlugins` in favor of a fully-composed `markdown.processor` from `unified()`. Already migrated in M12 dep-audit; revisit if the surface grows beyond `rehype-sanitize`.
+- **Sentry follow-ups.** Once the project's SENTRY_DSN secrets are populated per [docs/runbooks/sentry-setup.md](./docs/runbooks/sentry-setup.md), validate the BeforeSend redaction in production with the smoke-test from [docs/runbooks/operational-launch-checklist.md](./docs/runbooks/operational-launch-checklist.md) §5.
+- **Optional: backwards-compat audit gate.** `pnpm audit --audit-level=high --prod` currently passes (1 low + 1 moderate remain). Re-evaluate periodically; the moderate is in a transitive of `@astrojs/check` and will clear when the ecosystem releases drop their beta-tag.
+
+**Verification:** Workspace-wide `pnpm run build` succeeds across all five packages (currently fails on cms).
+
 ---
 
 ## Inter-milestone dependencies

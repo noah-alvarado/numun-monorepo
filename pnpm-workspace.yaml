@@ -8,3 +8,9 @@ allowBuilds:
   esbuild: true
   lefthook: true
   sharp: true
+
+# Pin a non-vulnerable js-cookie. amazon-cognito-identity-js pulls in
+# js-cookie@<=3.0.5 which has a cookie-attribute prototype-hijack advisory
+# (GHSA-qjx8-664m-686j). 3.0.6+ patches it; the API is unchanged.
+overrides:
+  js-cookie: ^3.0.8

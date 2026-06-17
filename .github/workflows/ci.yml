@@ -68,3 +68,7 @@ jobs:
       - run: pnpm run lint
       - run: pnpm run typecheck
       - run: pnpm run test
+      # Block merges on high/critical advisories; moderate/low surfaces too
+      # often as transitive noise we can't address quickly.
+      - name: pnpm audit (high+critical)
+        run: pnpm audit --audit-level=high --prod

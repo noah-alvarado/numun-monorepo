@@ -134,14 +134,21 @@ JSON and Protobuf binary deserialization are handled by the Connect framework �
 | Layer | Limit | Mechanism |
 |---|---|---|
 | Cognito sign-in | 5 failed attempts/min/user, plus per-IP global limits | Built-in |
-| Per-IP (all API requests) | 60 req/min | Lambda middleware + DDB token-bucket on `RATELIMIT#ip#<ip>` |
-| Per-user (all API requests) | 300 req/min | Lambda middleware + DDB token-bucket on `RATELIMIT#user#<userId>` |
-| `PublicService.*` | 60 req/min per IP | Same mechanism, distinct key namespace |
-| Bulk import | 10 previews + 10 commits per hour per advisor (BULK_IMPORT.md §8.2) | Same mechanism |
+| Per-user (all authenticated RPCs) | 300 req/min | In-memory `golang.org/x/time/rate` bucket per Lambda env, keyed by `userId` |
+| Per-IP (authenticated RPCs, defense-in-depth) | 600 req/min | In-memory bucket per Lambda env, keyed by `X-Forwarded-For` client IP |
+| Per-IP (anonymous surfaces: `PublicService.*`, `AuthService.Exchange`, `/cms-oauth/*`) | 60 req/min | In-memory bucket per Lambda env, keyed by client IP |
+| Bulk import | 10 previews + 10 commits per hour per advisor (BULK_IMPORT.md §8.2) | DDB conditional counter at `USER#<id>#BULK_IMPORT_HOUR#<floor(unix/3600)>` with 1h TTL — one write per attempt |
+| Per-route ceiling | API Gateway HTTP API account-level throttle (default 10k burst / 5k sustained) | AWS-managed; acts as the wallet shield against runaway traffic |
 
-Excess returns Connect `resource_exhausted` (HTTP 429). Token-bucket implementation is a counter with TTL; refresh windows in 60 s buckets — simpler than sliding window and sufficient at this scale.
+Excess returns Connect `resource_exhausted` (HTTP 429).
 
-AWS WAF on CloudFront ($5/mo base) is **not enabled in v1** because the Lambda-layer limits suffice for current threat volume and budget. WAF is the natural escalation if real attack traffic appears.
+**Why per-IP is loose on authenticated RPCs.** At the conference venue, every advisor and staff member egresses through one NATted IP. A tight per-IP cap would false-trip during day-of-conference peak load (check-in, last-minute swaps). The authenticated surface is gated by per-user limits — the loose per-IP is a defense-in-depth signal, not the primary control.
+
+**Why in-memory.** A DDB token-bucket adds one write per request and costs real WCU at conference scale (hundreds of users × dozens of req each). In-memory per-Lambda is "approximate but adequate" at our concurrency profile (single-digit warm Lambda envs at peak). A misbehaving client that hits a fresh env starts from a clean bucket — that's bounded by the API Gateway account-level throttle, which is what protects the wallet.
+
+**Why bulk import is the exception.** Persistence across Lambda envs matters for an hourly counter; a 1-per-attempt conditional write is cheap. The other layers don't need cross-env persistence to be useful.
+
+AWS WAF on CloudFront ($5/mo base + per-rule + traffic) is **not enabled in v1**. The escalation path is documented in `/docs/runbooks/ddos-or-api-abuse.md`.
 
 ### 2.11 Malicious file upload
 
@@ -505,7 +512,7 @@ NUMUN is **not** currently certified under any compliance framework. The system 
 | CSRF | SameSite=Strict + double-submit token | Per AUTH.md §9 |
 | Mass-assignment | Per-role allowlist of editable fields in handler code | Protobuf can't enforce role-based field filtering |
 | SSRF | Allowlist `docs.google.com` + private-IP block on the only external-URL fetcher (Google Sheets) | Bounds the single SSRF vector |
-| Rate limits | Lambda + DDB token-bucket; per-IP 60/min, per-user 300/min | Sufficient at scale; WAF deferred |
+| Rate limits | Per-user 300/min in-memory; per-IP 60/min on anonymous surfaces only; loose per-IP 600/min DiD on authenticated RPCs; bulk-import 10/hr/user via DDB conditional counter | Authenticated users share NATted IPs at the conference venue, so tight per-IP would false-trip. In-memory per-Lambda is approximate but adequate; API Gateway throttle bounds the cost. DDB only where persistence is necessary. |
 | WAF | Not enabled in v1 | Cost ceiling; reassess if abuse appears |
 | GuardDuty | Not enabled in v1 | Cost; reassess later |
 | S3 buckets | All private; CloudFront OAC for reads; presigned URLs for direct uploads/downloads | Standard pattern |

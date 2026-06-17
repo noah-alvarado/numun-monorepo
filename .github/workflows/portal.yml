@@ -61,6 +61,11 @@ jobs:
           VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
           VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
           VITE_VERSION: ${{ steps.version.outputs.version }}
+          VITE_ENV_NAME: ${{ env.ENV }}
+          VITE_RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          # Sentry DSN — env-scoped secret. Empty disables Sentry in the
+          # built bundle (initSentry() no-ops). See portal/src/lib/sentry.ts.
+          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: pnpm --filter @numun/portal build
       - uses: aws-actions/configure-aws-credentials@v4
         with:

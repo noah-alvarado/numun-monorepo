@@ -12,6 +12,11 @@
 
 import { getEntry } from "astro:content";
 
+// Global Tailwind v4 stylesheet (preflight + utilities + brand tokens).
+// Pulled in via a side-effect import so Astro emits a single CSS bundle
+// linked from every page that uses this layout.
+import "../styles/global.css";
+
 interface Props {
   title?: string;
   description?: string;

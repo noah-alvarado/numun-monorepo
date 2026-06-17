@@ -13,7 +13,8 @@
 //   - Singleton pages each get their own one-entry collection — type-safe
 //     and easy to `getEntry()` by name.
 
-import { defineCollection, z } from "astro:content";
+import { defineCollection } from "astro:content";
+import { z } from "astro/zod";
 import { glob } from "astro/loaders";
 
 // Resolve to /content/<sub> from the site/src/content/config.ts location.
@@ -157,12 +158,12 @@ const contact = defineCollection({
   loader: glob({ pattern: "contact.md", base: root("pages") }),
   schema: z.object({
     title: z.string(),
-    generalEmail: z.string().email(),
+    generalEmail: z.email(),
     inquiryRouting: z
       .array(
         z.object({
           label: z.string().max(80),
-          email: z.string().email(),
+          email: z.email(),
         }),
       )
       .optional(),
@@ -181,8 +182,8 @@ const leadership = defineCollection({
     year: z.number().int(),
     order: z.number().int(),
     headshot: image,
-    email: z.string().email().optional(),
-    linkedIn: z.string().url().optional(),
+    email: z.email().optional(),
+    linkedIn: z.url().optional(),
   }),
 });
 
@@ -340,7 +341,7 @@ const contactLinks = defineCollection({
         }),
       )
       .optional(),
-    primaryEmail: z.string().email(),
+    primaryEmail: z.email(),
     mailingAddress: z.string().max(300).optional(),
   }),
 });

@@ -21,14 +21,20 @@ import (
 	"github.com/aws/aws-lambda-go/lambda"
 
 	"github.com/numun/numun/api/internal/domain"
+	numunlog "github.com/numun/numun/api/internal/log"
+	"github.com/numun/numun/api/internal/observability"
 	"github.com/numun/numun/api/internal/store"
 )
 
 var logger *slog.Logger
 
 func main() {
-	logger = slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger = numunlog.NewJSON(os.Stdout, nil)
 	slog.SetDefault(logger)
+
+	if observability.InitFromEnv("cognito-post-confirmation", logger) {
+		defer observability.Flush()
+	}
 
 	ctx := context.Background()
 	st, err := store.New(ctx)

@@ -4,6 +4,10 @@ import { Route, Router } from "@solidjs/router";
 
 import "./index.css";
 
+import { initSentry } from "@/lib/sentry";
+
+initSentry();
+
 import SignIn from "@/routes/SignIn";
 import SignUp from "@/routes/SignUp";
 import SignUpVerify from "@/routes/SignUpVerify";

@@ -241,9 +241,11 @@ This is in the body, not a header — easier for the generated TS client.
 ## 8. Idempotency
 
 - All mutating RPCs accept a client-generated `Idempotency-Key` HTTP header (a UUIDv7 the client picks).
-- Backend stores `(key → response)` in DynamoDB with a 24-hour TTL.
-- A retry with the same key returns the same response **byte-for-byte**, including the original error if the first call failed.
+- Backend writes an **in-flight lock** on `IDEMPOTENCY#<key>` with a 60-second TTL via a conditional `PutItem`. A concurrent retry sees the lock and is rejected with Connect `already_exists` (HTTP 409, message `duplicate request in flight`).
+- After the original call completes, the lock expires naturally. A later retry after the TTL window proceeds as a fresh call.
 - Optional. Calls without the header behave normally (no dedupe).
+
+This catches the common double-submit case (a user clicks "Submit" twice in succession) without paying the storage cost of full response replay. Late retries — e.g., the client times out after 30 s and resubmits at minute 5 — are *not* deduplicated; if that case becomes a real source of duplicates, the middleware upgrades to a completed-status replay (store `{status, completedAt}` for 24 h) with no change to the protocol. Decision rationale captured in IMPLEMENTATION_PLAN.md M12.
 
 Implementation lives outside the Protobuf contract — it's a transport-level header handled by middleware.
 
@@ -568,5 +570,5 @@ Adding columns is a non-breaking change; removing or renaming is breaking and bu
 - **`SearchDelegates` ranking** — current spec is prefix-only via GSI2. If real users want fuzzy search, plan the OpenSearch upgrade path (DATA_MODEL.md §9 open item).
 - **OpenAPI / Swagger surface** — Buf can emit OpenAPI documents from Protobuf. Useful for non-TS consumers (e.g., curl/Postman exploration). Decide whether to generate and publish in a later iteration.
 - **WebSocket / streaming surfaces** — none in v1. If a "live dashboard" need emerges later, Connect's streaming RPCs over HTTP/1.1 SSE are an option, but they require Lambda response streaming (now supported but adds complexity).
-- **`PublicService.GetActiveConference` rate-limit mechanism** — 60 req/min/IP is the documented cap; the implementation choice (in-memory token bucket per Lambda instance vs. shared DDB counter) is deferred. At expected traffic (one build per CMS commit), either is fine.
+- **`PublicService.GetActiveConference` rate-limit mechanism** — resolved in M12: in-memory `golang.org/x/time/rate` bucket per Lambda env, keyed by client IP, 60 req/min. At expected traffic (one build per CMS commit) the approximate per-env model is fine. See SECURITY.md §2.10.
 - **Future `PublicService` RPCs** — likely candidates if the landing page ever wants live, non-rebuild-triggered data: `ListPastConferences`, `GetConferenceStats` (counts of registered delegations, etc.). None in v1.

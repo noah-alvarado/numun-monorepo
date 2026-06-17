@@ -326,7 +326,7 @@ The Sheets path **never writes the file to S3.** Parsed rows go straight into th
 ### 8.2 Rate limits
 
 - **Per advisor:** 10 successful previews per hour, 10 successful commits per hour. Excess → `resource_exhausted`.
-- Implemented with a sliding-window counter in DDB keyed by `RATELIMIT#<userId>#bulk_import` with 1-hour TTL.
+- Implemented with a fixed-window counter in DDB keyed by `USER#<userId>#BULK_IMPORT_HOUR#<floor(unix/3600)>` with a 1-hour TTL. One conditional `UpdateItem` per attempt; rejects when the post-increment count exceeds 10. Persistent across Lambda envs because the other rate-limit layers (per-user 300/min, per-IP) are in-memory and cannot enforce an *hourly* budget across cold starts. See SECURITY.md §2.10 for the broader rate-limit posture.
 
 ### 8.3 Abuse considerations
 

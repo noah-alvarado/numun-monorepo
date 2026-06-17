@@ -1,9 +1,9 @@
 ---
 import { getEntry, render } from "astro:content";
-import Layout from "@/layouts/Layout.astro";
-import { portalUrl } from "@/lib/site-urls";
+import Layout from "../layouts/Layout.astro";
+import { portalUrl } from "../lib/site-urls";
 
-import activeConference from "@/data/active-conference";
+import activeConference from "../data/active-conference";
 
 const home = await getEntry("home", "home");
 if (!home) throw new Error("content/pages/home.md is required");

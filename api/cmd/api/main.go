@@ -28,6 +28,10 @@ import (
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 	"github.com/numun/numun/api/internal/handlers"
+	numunlog "github.com/numun/numun/api/internal/log"
+	"github.com/numun/numun/api/internal/middleware/idempotency"
+	"github.com/numun/numun/api/internal/middleware/ratelimit"
+	"github.com/numun/numun/api/internal/observability"
 	"github.com/numun/numun/api/internal/store"
 )
 
@@ -39,7 +43,7 @@ var (
 )
 
 func main() {
-	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	logger := numunlog.NewJSON(os.Stdout, nil)
 	slog.SetDefault(logger)
 
 	if v := os.Getenv("COMMIT_SHA"); v != "" {
@@ -47,6 +51,10 @@ func main() {
 	}
 	if v := os.Getenv("RELEASE_VERSION"); v != "" {
 		version = v
+	}
+
+	if observability.InitFromEnv("api", logger) {
+		defer observability.Flush()
 	}
 
 	ctx := context.Background()
@@ -219,7 +227,18 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 		DevMode:   os.Getenv("DEV_MODE") == "true",
 		DevBypass: os.Getenv("DEV_BYPASS_AUTH") == "true",
 	})
-	return mw(mux)
+
+	// Middleware chain (outermost first):
+	//   Sentry HTTP (panic recovery + request scope) →
+	//   PerIP rate limit (SECURITY.md §2.10) → auth → PerUser rate limit →
+	//   Idempotency-Key lock (API.md §8) → mux.
+	// Idempotency sits inside auth so the lock row carries the caller's
+	// userId, and inside the per-user limit so a duplicate-replay flood
+	// can't drain a user's per-minute budget before reaching this layer.
+	limits := ratelimit.DefaultLimits()
+	idem := idempotency.New(st, logger)
+	chain := ratelimit.PerIP(limits)(mw(ratelimit.PerUser(limits)(idem(mux))))
+	return observability.HTTPMiddleware(chain)
 }
 
 type healthServer struct{}
