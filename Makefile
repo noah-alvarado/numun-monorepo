@@ -1,6 +1,8 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
+DEV_CONTAINER_NAMES := numun-ddb-local numun-ddb-init numun-localstack numun-mailhog
+
 # ── Help ──────────────────────────────────────────────────────────────────────
 
 help: ## Show this help.
@@ -8,8 +10,13 @@ help: ## Show this help.
 
 # ── Local dev stack ───────────────────────────────────────────────────────────
 
+dev-preflight: ## Remove stale local dev containers that can cause name conflicts.
+	@for name in $(DEV_CONTAINER_NAMES); do \
+	  docker rm -f $$name >/dev/null 2>&1 || true; \
+	done
+
 dev: ## Bring up the local prod-mirror containers (DDB Local, LocalStack, MailHog) + init.
-	docker compose up -d
+	@$(MAKE) reset
 	@echo ""
 	@echo "Local infra is up. In separate terminals run:"
 	@echo "    make dev-api      # SAM Local API Gateway + Go Lambdalith at :3000"
@@ -38,7 +45,10 @@ api-restart: ## Restart SAM Local (use after editing /api code).
 
 reset: ## Drop + recreate the DynamoDB Local table and LocalStack resources.
 	docker compose down -v
+	@$(MAKE) dev-preflight
 	docker compose up -d
+	@docker wait numun-ddb-init >/dev/null
+	@$(MAKE) seed
 
 seed: ## Populate DynamoDB Local with the seed dataset (see /docs/seed-users.md).
 	cd api && \
