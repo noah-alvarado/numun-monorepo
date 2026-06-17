@@ -232,6 +232,63 @@ Goal: Pay down the small set of follow-ups discovered during the M12 dep-audit p
 
 **Verification:** Workspace-wide `pnpm run build` succeeds across all five packages (currently fails on cms).
 
+### M14 — Version-controlled environment config
+
+Goal: Move per-environment configuration out of GitHub Environment variables and into the repo, with secrets centralized in SSM Parameter Store. Eliminates "config drift" failure modes like the M12 launch incident where `vars.AWS_REGION` was unset and four deploy workflows silently failed for two pushes before anyone noticed.
+
+The four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) stay separated — the deploy targets (Lambda+SAM vs. S3-sync) are different enough that one-per-stack is clearer than a matrix.
+
+#### Storage shape
+
+- **`infra/envs/<env>.yaml`** — one file per environment (`test`, `prod`), version-controlled. Carries the stable identifiers:
+  ```yaml
+  ENV_NAME: test
+  ENV_SUBDOMAIN: test         # empty for prod
+  ROOT_DOMAIN: numun.org
+  APEX_DOMAIN: test.numun.org
+  AWS_REGION: us-east-2
+  AWS_ACCOUNT_ID: "034083889387"
+  ALARM_EMAIL: noah@alvarado.dev
+  SAM_ARTIFACTS_BUCKET: numun-test-sam-deploys-034083889387
+  ```
+  Each deploy workflow loads it via `yq` (one-liner; pre-installed on `ubuntu-latest`):
+  ```bash
+  set -a; eval "$(yq '. | to_entries | .[] | "export " + .key + "=" + (.value | @sh)' infra/envs/$ENV.yaml)"; set +a
+  ```
+- **`aws cloudformation describe-stacks`** for stack outputs (cert ARNs, hosted-zone ID, Cognito IDs, CloudFront distribution IDs, deploy-role ARNs). Read live at deploy time rather than mirrored into config. The stack is the source of truth; CFN drift is impossible by construction.
+- **SSM SecureString `/numun/${env}/...`** for secrets. Already used by the application (cms_oauth, email/unsubscribe, github_app); extend to anything that needs to survive across local dev + CI + Lambda runtime.
+- **GitHub Secrets**: emptied. Only retained for secrets where SSM can't reach (none today; possibly a future "break-glass" PAT for repo-write actions).
+
+#### Scope of work
+
+1. **Author `infra/envs/test.yaml` and `infra/envs/prod.yaml`** with the seven identifier fields above. Migrate values from current `gh variable list --env test`.
+2. **Workflow loader.** Each of `api.yml`, `portal.yml`, `site.yml`, `cms.yml` gains a "load env" step early that reads the YAML and exports the keys as job env vars. Replaces every `${{ vars.X }}` reference.
+3. **Stack-output lookup.** A small `scripts/load-stack-outputs.sh` (idempotent, parameterized on stack name) that runs `aws cloudformation describe-stacks --query Outputs` and exports each output as an env var. Called by each workflow after env YAML loads. Replaces `${{ vars.API_CERTIFICATE_ARN }}`, `vars.COGNITO_*`, `vars.PORTAL_DISTRIBUTION_ID`, all `vars.DEPLOY_ROLE_*_ARN`, etc.
+4. **Sentry-DSN migration (re-does the M12 wiring along the new pattern).**
+   - **API**: drop the `SentryDsn` SAM parameter and the `secrets.SENTRY_DSN` workflow input. Refactor `api/internal/observability/InitFromEnv` to fetch from SSM at cold-start (matches `cms.LoadConfigFromSSM` shape). Lambda IAM grant on `/numun/${env}/sentry/*` is already covered by the wildcard policy on `/numun/${env}/*`.
+   - **Portal**: workflow gains an "ssm get-parameter" step before `pnpm build` that exports `VITE_SENTRY_DSN` from `/numun/${env}/sentry/dsn`. Portal-deploy IAM role gets `ssm:GetParameter` on `/numun/${env}/sentry/*` added to its policy in `infra/bootstrap/oidc-roles.yaml`.
+5. **Decommission GitHub Environment variables.** Once workflows are green on the new path, `gh variable delete` each migrated entry. Delete the stale `nalvarado` environment (left over from pre-M2.7).
+6. **Update runbooks**:
+   - `fresh-environment-deploy.md`: replace the "set GitHub env variables" section with "author `infra/envs/<env>.yaml`" + "put secrets in SSM."
+   - `sentry-setup.md`: change "create env-scoped GitHub secret" → "create `/numun/${env}/sentry/dsn` SSM SecureString."
+   - `operational-launch-checklist.md`: §5 Sentry verification updated to match.
+
+#### Constraints + risks
+
+- **Account ID disclosure**: `AWS_ACCOUNT_ID` ends up in version control. Already disclosed in `infra/bootstrap/oidc-roles.yaml`; not a new exposure. If the repo ever goes public, this is the kind of value worth re-evaluating.
+- **Migration is per-env**: do `test` first end-to-end, prove it works, then `prod`. Keep both code paths in the workflow during the transition (`if [ -f infra/envs/$ENV.yaml ]; then load_yaml; else use_gh_vars; fi`) so we can roll forward in steps. Remove the fallback once `prod` is migrated.
+- **Local dev unchanged**: `make dev` continues to use `.env.local` (gitignored). The new YAMLs are for CI deploys; the local prod-mirror doesn't read them.
+- **Cost**: SSM Parameter Store standard tier is free up to 10,000 params + free `GetParameter` calls below 40 TPS. Our footprint is tens of params and dozens of reads/month. Net cost: $0/mo.
+
+#### Verification
+
+- `gh variable list --env test` returns no migrated entries (only secrets remain, if any).
+- `aws ssm get-parameter --name /numun/test/sentry/dsn --with-decryption` returns the configured DSN.
+- A clean PR-and-deploy cycle from a freshly-cloned repo (no GitHub env vars touched) produces a working `test` deploy of all four stacks.
+- Sentry events flow from `test` after the migration (smoke per `operational-launch-checklist.md` §5).
+
+**Verification:** `scripts/verify-deploy.sh` (M2.7) round-trip succeeds against the migrated `test` env with zero GitHub-variable reads.
+
 ---
 
 ## Inter-milestone dependencies
