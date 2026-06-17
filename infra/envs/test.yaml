@@ -1,0 +1,37 @@
+# Per-environment configuration for the `test` (staging) AWS account.
+#
+# This file is the source of truth for stable identifiers — things that
+# either never change or that we'd explicitly choose to change. Stack
+# outputs (cert ARNs, Cognito user-pool IDs, CloudFront distribution
+# IDs, deploy-role ARNs) are NOT mirrored here; deploy workflows read
+# them live via `aws cloudformation describe-stacks` so they can never
+# drift from the actual stack.
+#
+# Secrets (Sentry DSN, etc.) live in SSM SecureString at
+# `/numun/test/...` and are read at deploy time or Lambda cold-start.
+# Nothing in this file is secret; safe to commit.
+#
+# Loaded by every deploy workflow via:
+#   yq -o=props infra/envs/$ENV.yaml >> "$GITHUB_ENV"
+# See IMPLEMENTATION_PLAN.md §M14.
+
+ENV_NAME: test
+ENV_SUBDOMAIN: test
+ROOT_DOMAIN: numun.org
+APEX_DOMAIN: test.numun.org
+AWS_REGION: us-east-2
+AWS_ACCOUNT_ID: "034083889387"
+ALARM_EMAIL: noah@alvarado.dev
+SAM_ARTIFACTS_BUCKET: numun-test-sam-deploys-034083889387
+
+# Account-level infrastructure not owned by any SAM/CFN stack — created
+# once at environment-bootstrap time (Route 53 hosted zone via the AWS
+# Console, ACM certs via `aws acm request-certificate`). Stored here
+# rather than looked up because SAM doesn't manage them and there's no
+# stack to query.
+HOSTED_ZONE_ID: Z00949061U0JI0JIYVUUF
+# `api.test.numun.org` cert, must be in us-east-2 for API Gateway.
+API_CERTIFICATE_ARN: arn:aws:acm:us-east-2:034083889387:certificate/ba2da586-da18-4208-9352-59b16d14d437
+# CloudFront cert (covers `test.numun.org`, `*.test.numun.org`), must be
+# in us-east-1 per the CloudFront requirement.
+CDN_CERTIFICATE_ARN: arn:aws:acm:us-east-1:034083889387:certificate/3c72a813-d7e9-4b2b-9f84-5f0e786533df

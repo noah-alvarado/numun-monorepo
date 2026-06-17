@@ -1,0 +1,25 @@
+# Per-environment configuration for the `prod` AWS account.
+#
+# Stub — populate before the first prod deploy. See
+# `docs/runbooks/fresh-environment-deploy.md` for the bootstrap order
+# and `infra/envs/test.yaml` for the reference shape.
+#
+# Stack outputs (cert ARNs, Cognito IDs, distribution IDs, deploy-role
+# ARNs) are NOT stored here; deploy workflows read them via
+# `aws cloudformation describe-stacks`. Secrets live in SSM SecureString
+# at `/numun/prod/...`. Nothing in this file is secret.
+
+ENV_NAME: prod
+ENV_SUBDOMAIN: "" # prod's apex is the root domain itself
+ROOT_DOMAIN: numun.org
+APEX_DOMAIN: numun.org
+AWS_REGION: us-east-2
+AWS_ACCOUNT_ID: "" # fill in once the prod AWS account is provisioned
+ALARM_EMAIL: "" # fill in before launch
+SAM_ARTIFACTS_BUCKET: "" # numun-prod-sam-deploys-<accountId> once known
+
+# Account-level infrastructure (manually bootstrapped). Populate after
+# the prod hosted zone + ACM certs are created.
+HOSTED_ZONE_ID: ""
+API_CERTIFICATE_ARN: "" # arn:aws:acm:us-east-2:<account>:certificate/<id>
+CDN_CERTIFICATE_ARN: "" # arn:aws:acm:us-east-1:<account>:certificate/<id>

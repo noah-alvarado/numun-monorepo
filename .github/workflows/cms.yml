@@ -5,6 +5,9 @@ on:
     branches: [main]
     paths:
       - "cms/**"
+      - "infra/envs/**"
+      - "scripts/load-env.sh"
+      - "scripts/load-stack-outputs.sh"
       - ".github/workflows/cms.yml"
   workflow_dispatch:
     inputs:
@@ -32,15 +35,19 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment || 'test' }}
-      url: https://cms.${{ vars.APEX_DOMAIN }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      BUCKET: numun-${{ inputs.environment || 'test' }}-cms
+    environment:
+      name: ${{ inputs.environment || 'test' }}
+      url: ${{ inputs.environment == 'prod' && 'https://cms.numun.org' || 'https://cms.test.numun.org' }}
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + bucket
+        run: |
+          echo "DEPLOY_ROLE_CMS_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-cms" >> "$GITHUB_ENV"
+          echo "BUCKET=numun-${ENV_NAME}-cms" >> "$GITHUB_ENV"
       - name: compute version
         id: version
         uses: ./.github/actions/compute-version
@@ -50,17 +57,14 @@ jobs:
           version-file: cms/package.json
       - name: Substitute placeholders in config.yml
         # config.yml is committed with `__APEX_DOMAIN__` and `__GITHUB_REPO__`
-        # tokens; we resolve them here per env. APEX_DOMAIN is set on the
-        # env-scoped GitHub Environment (e.g. `test.numun.org` for test,
-        # `numun.org` for prod). GITHUB_REPO comes from the workflow context
-        # (`<owner>/<name>`), so renaming or forking the repo doesn't require
-        # touching git-tracked config.
+        # tokens; we resolve them here per env. APEX_DOMAIN comes from the
+        # env YAML (`test.numun.org` for test, `numun.org` for prod).
+        # GITHUB_REPO comes from the workflow context (`<owner>/<name>`).
         env:
-          APEX_DOMAIN: ${{ vars.APEX_DOMAIN }}
           GITHUB_REPO: ${{ github.repository }}
         run: |
           if [[ -z "$APEX_DOMAIN" ]]; then
-            echo "vars.APEX_DOMAIN is unset; cannot resolve config.yml placeholders." >&2
+            echo "APEX_DOMAIN is unset; load-env.sh failed earlier?" >&2
             exit 1
           fi
           if [[ -z "$GITHUB_REPO" ]]; then
@@ -81,8 +85,10 @@ jobs:
           done
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_CMS_ARN }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_CMS_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: load CDN stack outputs
+        run: scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-cdn"
       - name: sync to S3
         # cms is just a Decap-CDN bootstrap + config.yml — static; no build.
         run: |
@@ -94,7 +100,7 @@ jobs:
       - name: CloudFront invalidation
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.CMS_DISTRIBUTION_ID }}" \
+            --distribution-id "$CmsDistributionId" \
             --paths "/*"
       - name: tag release
         env:

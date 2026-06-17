@@ -9,6 +9,9 @@ on:
       - "site/**"
       - "content/**"
       - "packages/tailwind-tokens/**"
+      - "infra/envs/**"
+      - "scripts/load-env.sh"
+      - "scripts/load-stack-outputs.sh"
       - ".github/workflows/site.yml"
   workflow_dispatch:
     inputs:
@@ -36,18 +39,20 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment || 'test' }}
-      url: https://${{ vars.APEX_DOMAIN }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      BUCKET: numun-${{ inputs.environment || 'test' }}-site
-      # Prefer an explicit override; otherwise derive from APEX_DOMAIN
-      # (e.g. test.numun.org -> https://api.test.numun.org).
-      API_BASE_URL: ${{ vars.API_BASE_URL != '' && vars.API_BASE_URL || format('https://api.{0}', vars.APEX_DOMAIN) }}
+    environment:
+      name: ${{ inputs.environment || 'test' }}
+      url: ${{ inputs.environment == 'prod' && 'https://numun.org' || 'https://test.numun.org' }}
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + bucket + api base
+        run: |
+          echo "DEPLOY_ROLE_SITE_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-site" >> "$GITHUB_ENV"
+          echo "BUCKET=numun-${ENV_NAME}-site" >> "$GITHUB_ENV"
+          echo "API_BASE_URL=https://api.${APEX_DOMAIN}" >> "$GITHUB_ENV"
       - name: compute version
         id: version
         uses: ./.github/actions/compute-version
@@ -91,13 +96,17 @@ jobs:
         # for this deploy; Astro exposes PUBLIC_*-prefixed env vars to the
         # client bundle via import.meta.env.
         env:
-          SITE_BASE: https://${{ vars.APEX_DOMAIN }}
+          SITE_BASE: https://${{ env.APEX_DOMAIN }}
           PUBLIC_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_SITE_ARN }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_SITE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: load CDN stack outputs
+        # Exports SiteDistributionId (and the other distribution IDs we
+        # don't need here but cost nothing to pull).
+        run: scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-cdn"
       - name: sync to S3
         run: |
           aws s3 sync site/dist/ "s3://$BUCKET/" \
@@ -111,7 +120,7 @@ jobs:
       - name: CloudFront invalidation
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.SITE_DISTRIBUTION_ID }}" \
+            --distribution-id "$SiteDistributionId" \
             --paths "/*"
       - name: tag release
         env:

@@ -6,6 +6,9 @@ on:
     paths:
       - "portal/**"
       - "packages/tailwind-tokens/**"
+      - "infra/envs/**"
+      - "scripts/load-env.sh"
+      - "scripts/load-stack-outputs.sh"
       - ".github/workflows/portal.yml"
   workflow_dispatch:
     inputs:
@@ -33,15 +36,19 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment || 'test' }}
-      url: https://portal.${{ vars.APEX_DOMAIN }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      BUCKET: numun-${{ inputs.environment || 'test' }}-portal
+    environment:
+      name: ${{ inputs.environment || 'test' }}
+      url: ${{ inputs.environment == 'prod' && 'https://portal.numun.org' || 'https://portal.test.numun.org' }}
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + bucket
+        run: |
+          echo "DEPLOY_ROLE_PORTAL_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-portal" >> "$GITHUB_ENV"
+          echo "BUCKET=numun-${ENV_NAME}-portal" >> "$GITHUB_ENV"
       - name: compute version
         id: version
         uses: ./.github/actions/compute-version
@@ -55,22 +62,37 @@ jobs:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_PORTAL_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: load base-data + base-cdn stack outputs
+        run: |
+          scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-data"
+          scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-cdn"
+      - name: load Sentry DSN from SSM
+        # Sentry DSN is stored as a SecureString at /numun/${ENV}/sentry/dsn.
+        # When unset, the export is empty and Vite tree-shakes Sentry out
+        # of the portal bundle (portal/src/lib/sentry.ts no-ops).
+        run: |
+          DSN=$(aws ssm get-parameter \
+            --name "/numun/$ENV_NAME/sentry/dsn" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$DSN" ]; then
+            echo "::add-mask::$DSN"
+          fi
+          echo "VITE_SENTRY_DSN=$DSN" >> "$GITHUB_ENV"
       - name: build portal
         env:
-          VITE_API_BASE_URL: https://api.${{ vars.APEX_DOMAIN }}
-          VITE_COGNITO_USER_POOL_ID: ${{ vars.COGNITO_USER_POOL_ID }}
-          VITE_COGNITO_CLIENT_ID: ${{ vars.COGNITO_CLIENT_ID }}
+          VITE_API_BASE_URL: https://api.${{ env.APEX_DOMAIN }}
+          VITE_COGNITO_USER_POOL_ID: ${{ env.CognitoUserPoolId }}
+          VITE_COGNITO_CLIENT_ID: ${{ env.CognitoClientId }}
           VITE_VERSION: ${{ steps.version.outputs.version }}
           VITE_ENV_NAME: ${{ env.ENV }}
           VITE_RELEASE_VERSION: ${{ steps.version.outputs.version }}
-          # Sentry DSN — env-scoped secret. Empty disables Sentry in the
-          # built bundle (initSentry() no-ops). See portal/src/lib/sentry.ts.
-          VITE_SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: pnpm --filter @numun/portal build
-      - uses: aws-actions/configure-aws-credentials@v4
-        with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_PORTAL_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
       - name: sync to S3
         run: |
           aws s3 sync portal/dist/ "s3://$BUCKET/" \
@@ -83,7 +105,7 @@ jobs:
       - name: CloudFront invalidation
         run: |
           aws cloudfront create-invalidation \
-            --distribution-id "${{ vars.PORTAL_DISTRIBUTION_ID }}" \
+            --distribution-id "$PortalDistributionId" \
             --paths "/index.html"
       - name: tag release
         env:

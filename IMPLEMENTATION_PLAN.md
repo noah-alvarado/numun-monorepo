@@ -261,22 +261,22 @@ The four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) stay 
 
 #### Scope of work
 
-1. **Author `infra/envs/test.yaml` and `infra/envs/prod.yaml`** with the seven identifier fields above. Migrate values from current `gh variable list --env test`.
-2. **Workflow loader.** Each of `api.yml`, `portal.yml`, `site.yml`, `cms.yml` gains a "load env" step early that reads the YAML and exports the keys as job env vars. Replaces every `${{ vars.X }}` reference.
-3. **Stack-output lookup.** A small `scripts/load-stack-outputs.sh` (idempotent, parameterized on stack name) that runs `aws cloudformation describe-stacks --query Outputs` and exports each output as an env var. Called by each workflow after env YAML loads. Replaces `${{ vars.API_CERTIFICATE_ARN }}`, `vars.COGNITO_*`, `vars.PORTAL_DISTRIBUTION_ID`, all `vars.DEPLOY_ROLE_*_ARN`, etc.
-4. **Sentry-DSN migration (re-does the M12 wiring along the new pattern).**
-   - **API**: drop the `SentryDsn` SAM parameter and the `secrets.SENTRY_DSN` workflow input. Refactor `api/internal/observability/InitFromEnv` to fetch from SSM at cold-start (matches `cms.LoadConfigFromSSM` shape). Lambda IAM grant on `/numun/${env}/sentry/*` is already covered by the wildcard policy on `/numun/${env}/*`.
-   - **Portal**: workflow gains an "ssm get-parameter" step before `pnpm build` that exports `VITE_SENTRY_DSN` from `/numun/${env}/sentry/dsn`. Portal-deploy IAM role gets `ssm:GetParameter` on `/numun/${env}/sentry/*` added to its policy in `infra/bootstrap/oidc-roles.yaml`.
-5. **Decommission GitHub Environment variables.** Once workflows are green on the new path, `gh variable delete` each migrated entry. Delete the stale `nalvarado` environment (left over from pre-M2.7).
-6. **Update runbooks**:
-   - `fresh-environment-deploy.md`: replace the "set GitHub env variables" section with "author `infra/envs/<env>.yaml`" + "put secrets in SSM."
-   - `sentry-setup.md`: change "create env-scoped GitHub secret" → "create `/numun/${env}/sentry/dsn` SSM SecureString."
-   - `operational-launch-checklist.md`: §5 Sentry verification updated to match.
+1. ✅ **`infra/envs/test.yaml` and `infra/envs/prod.yaml`** — written. Test populated; prod is a stub with placeholders. Account-level identifiers that don't live in any SAM stack (HOSTED_ZONE_ID, API_CERTIFICATE_ARN, CDN_CERTIFICATE_ARN) ended up in the env YAML alongside the env-shape fields.
+2. ✅ **Workflow loader** — `scripts/load-env.sh` reads the env YAML and writes `KEY=value` to `$GITHUB_ENV`. All four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) plus `infra.yml` now invoke it.
+3. ✅ **Stack-output lookup** — `scripts/load-stack-outputs.sh` runs `aws cloudformation describe-stacks --query Outputs` and writes each output to `$GITHUB_ENV` (optional prefix arg). Workflows pull `numun-${env}-base-data` (Cognito IDs, bucket ARNs, table name) and `numun-${env}-base-cdn` (distribution IDs). Deploy-role ARNs are derived from `arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-<stack>` (naming convention in `infra/bootstrap/oidc-roles.yaml`) so the chicken-and-egg of "need credentials to read outputs that include role ARN" is sidestepped.
+4. ✅ **Sentry-DSN migration (API)** — `SentryDsn` SAM parameter dropped; `SENTRY_DSN` env-var threading removed from all 4 Lambda functions in `infra/api/template.yaml`. `observability.InitFromEnv` now resolves DSN from `SENTRY_DSN` env var first, then falls back to SSM at `/numun/${ENV}/sentry/dsn` (1-second timeout, best-effort — any failure means Sentry-disabled, never a process crash). Lambda IAM wildcard `ssm:GetParameter` on `/numun/${env}/*` already covers this.
+4a. ⏸ **Sentry-DSN migration (portal)** — portal workflow has the `aws ssm get-parameter` step, but the portal-deploy IAM role needs `ssm:GetParameter` on `/numun/${env}/sentry/*` added to `oidc-roles.yaml` and the bootstrap stack re-deployed (break-glass step). Until then, the step gracefully returns "" and Vite tree-shakes Sentry out of the bundle.
+5. ⏸ **Decommission GitHub Environment variables** — pending verification that the new workflows succeed end-to-end. Once green on `test`, `gh variable delete` each migrated entry.
+6. ⏸ **Update runbooks**:
+   - `fresh-environment-deploy.md`: "set GitHub env variables" → "author `infra/envs/<env>.yaml`".
+   - `sentry-setup.md`: "create env-scoped GitHub secret" → "create `/numun/${env}/sentry/dsn` SSM SecureString".
+   - `operational-launch-checklist.md` §5: Sentry verification updated.
+7. ⏸ **Bring `infra/bootstrap/oidc-roles.yaml` into the `infra.yml` workflow** — currently the only stack still requiring break-glass deploys. Resolution involves granting the `deploy-infra` role the IAM-self-modify perms needed to re-apply oidc-roles.yaml; doing so safely needs review since deploy-infra would then be able to grant itself any permission. Defer to a follow-up sub-task with explicit threat-model write-up.
 
 #### Constraints + risks
 
 - **Account ID disclosure**: `AWS_ACCOUNT_ID` ends up in version control. Already disclosed in `infra/bootstrap/oidc-roles.yaml`; not a new exposure. If the repo ever goes public, this is the kind of value worth re-evaluating.
-- **Migration is per-env**: do `test` first end-to-end, prove it works, then `prod`. Keep both code paths in the workflow during the transition (`if [ -f infra/envs/$ENV.yaml ]; then load_yaml; else use_gh_vars; fi`) so we can roll forward in steps. Remove the fallback once `prod` is migrated.
+- **Migration is per-env**: `test` is the only live env today, so the workflows do a hard cut to the new path (no dual-mode). When `prod` is provisioned, its env YAML must be populated before its first deploy; until then `scripts/load-env.sh prod` prints empty values and the deploy fails downstream with a clear `sam`/`aws` error.
 - **Local dev unchanged**: `make dev` continues to use `.env.local` (gitignored). The new YAMLs are for CI deploys; the local prod-mirror doesn't read them.
 - **Cost**: SSM Parameter Store standard tier is free up to 10,000 params + free `GetParameter` calls below 40 TPS. Our footprint is tens of params and dozens of reads/month. Net cost: $0/mo.
 

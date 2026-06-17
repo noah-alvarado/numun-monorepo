@@ -3,7 +3,11 @@
 //
 // Configuration (env vars, all optional):
 //
-//   - SENTRY_DSN          — Sentry project DSN. If empty, Sentry is disabled.
+//   - SENTRY_DSN          — Sentry project DSN. If empty, the init helper
+//     falls back to SSM at `/numun/${ENV}/sentry/dsn` (best-effort —
+//     a missing param, missing IAM perm, or any transient SSM error all
+//     result in Sentry-disabled rather than a process crash). If both
+//     sources are empty, Sentry is disabled.
 //   - SENTRY_ENVIRONMENT  — environment tag (test|prod|...). Defaults to ENV_NAME.
 //   - SENTRY_RELEASE      — release tag (commit SHA). Defaults to COMMIT_SHA.
 //   - SENTRY_TRACES_SAMPLE_RATE — float, default 0.0 (errors only).
@@ -23,6 +27,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/aws/aws-sdk-go-v2/aws"
+	awsconfig "github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/ssm"
 	"github.com/getsentry/sentry-go"
 	sentryhttp "github.com/getsentry/sentry-go/http"
 
@@ -34,16 +41,24 @@ import (
 const FlushTimeout = 2 * time.Second
 
 // InitFromEnv configures the global Sentry hub from environment variables.
-// Returns true when Sentry is active (DSN was set) so callers can decide
-// whether to defer Flush. Errors during init are logged, not returned —
-// telemetry must never crash the process.
+// Returns true when Sentry is active so callers can decide whether to
+// defer Flush. Errors during init are logged, not returned — telemetry
+// must never crash the process.
+//
+// DSN resolution order:
+//  1. SENTRY_DSN env var.
+//  2. SSM SecureString at /numun/${ENV}/sentry/dsn (best-effort; any
+//     failure is treated as "Sentry disabled").
 func InitFromEnv(component string, logger *slog.Logger) bool {
-	dsn := os.Getenv("SENTRY_DSN")
-	if dsn == "" {
-		return false
-	}
 	if logger == nil {
 		logger = slog.Default()
+	}
+	dsn := os.Getenv("SENTRY_DSN")
+	if dsn == "" {
+		dsn = fetchDSNFromSSM(logger)
+	}
+	if dsn == "" {
+		return false
 	}
 
 	env := firstNonEmpty(os.Getenv("SENTRY_ENVIRONMENT"), os.Getenv("ENV_NAME"), "unknown")
@@ -172,6 +187,40 @@ func isSensitive(k string) bool {
 	stripped := strings.ReplaceAll(strings.ReplaceAll(lk, "-", ""), "_", "")
 	_, ok := numunlog.RedactedFields[stripped]
 	return ok
+}
+
+// fetchDSNFromSSM reads /numun/${ENV}/sentry/dsn as a SecureString.
+// Returns "" on any failure — missing param, no IAM perm, no AWS
+// credentials (local dev), network issue. The intent is "Sentry is
+// optional; never break the process for it."
+//
+// Uses a 1-second timeout so a slow/unreachable SSM endpoint doesn't
+// hold up Lambda cold-start. Real connectivity issues will surface
+// elsewhere (the Lambda's other SSM-loaded configs will fail similarly).
+func fetchDSNFromSSM(logger *slog.Logger) string {
+	envName := firstNonEmpty(os.Getenv("ENV"), os.Getenv("ENV_NAME"))
+	if envName == "" {
+		return ""
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	cfg, err := awsconfig.LoadDefaultConfig(ctx)
+	if err != nil {
+		logger.Debug("sentry: SSM aws config failed", "err", err)
+		return ""
+	}
+	out, err := ssm.NewFromConfig(cfg).GetParameter(ctx, &ssm.GetParameterInput{
+		Name:           aws.String("/numun/" + envName + "/sentry/dsn"),
+		WithDecryption: aws.Bool(true),
+	})
+	if err != nil {
+		logger.Debug("sentry: SSM GetParameter failed", "err", err)
+		return ""
+	}
+	if out.Parameter == nil || out.Parameter.Value == nil {
+		return ""
+	}
+	return *out.Parameter.Value
 }
 
 func firstNonEmpty(vs ...string) string {

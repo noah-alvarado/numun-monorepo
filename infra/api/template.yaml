@@ -51,14 +51,12 @@ Parameters:
   CognitoClientId:
     Type: String
     Description: Cognito app client id used by the portal.
-  SentryDsn:
-    Type: String
-    Default: ""
-    NoEcho: true
-    Description: >
-      Sentry DSN for backend error reporting. Empty disables Sentry entirely
-      (init no-ops; observability.InitFromEnv returns false). Source is the
-      `SENTRY_DSN` GitHub environment secret on the deploy workflow.
+
+  # Sentry DSN is no longer a stack parameter (was set in M12). Under M14
+  # the Lambda reads it at cold-start from SSM SecureString
+  # `/numun/${Env}/sentry/dsn` via observability.fetchDSNFromSSM, falling
+  # back to the SENTRY_DSN env var if set for local-dev override. See
+  # api/internal/observability/sentry.go + docs/runbooks/sentry-setup.md.
 
 Conditions:
   HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
@@ -184,7 +182,6 @@ Resources:
           COGNITO_USER_POOL_ID: !Ref CognitoUserPoolId
           COGNITO_CLIENT_ID: !Ref CognitoClientId
           ENV_NAME: !Ref Env
-          SENTRY_DSN: !Ref SentryDsn
           SENTRY_ENVIRONMENT: !Ref Env
           SENTRY_RELEASE: !Ref CommitSha
           # M9 email pipeline. EMAIL.md §5.
@@ -348,7 +345,6 @@ Resources:
           AWS_REGION_NAME: !Ref AWS::Region
           DDB_TABLE_NAME: !Sub "numun-${Env}"
           ENV_NAME: !Ref Env
-          SENTRY_DSN: !Ref SentryDsn
           SENTRY_ENVIRONMENT: !Ref Env
           SENTRY_RELEASE: !Ref CommitSha
 
@@ -480,7 +476,6 @@ Resources:
             - !Sub "https://assets.${EnvSubdomain}.${RootDomain}"
             - !Sub "https://assets.${RootDomain}"
           ENV_NAME: !Ref Env
-          SENTRY_DSN: !Ref SentryDsn
           SENTRY_ENVIRONMENT: !Ref Env
           SENTRY_RELEASE: !Ref CommitSha
       Events:
@@ -543,7 +538,6 @@ Resources:
         Variables:
           DDB_TABLE_NAME: !Sub "numun-${Env}"
           ENV_NAME: !Ref Env
-          SENTRY_DSN: !Ref SentryDsn
           SENTRY_ENVIRONMENT: !Ref Env
           SENTRY_RELEASE: !Ref CommitSha
       Events:

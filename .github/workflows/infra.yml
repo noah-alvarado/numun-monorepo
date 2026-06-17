@@ -2,6 +2,11 @@ name: deploy infra
 
 # Deploys the base infrastructure stacks (base-data, base-cdn, billing-alarm).
 # Manual-only — these change rarely and shouldn't auto-deploy on every push.
+#
+# Updates to `infra/bootstrap/oidc-roles.yaml` are NOT covered by this
+# workflow yet; they remain a break-glass step until the deploy-infra role
+# itself has the IAM-self-modify permissions needed. See M14 follow-ups
+# in IMPLEMENTATION_PLAN.md.
 
 on:
   workflow_dispatch:
@@ -38,16 +43,20 @@ jobs:
     environment: ${{ inputs.environment || 'test' }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      STACK_NAME: numun-${{ inputs.environment || 'test' }}-base-data
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + stack name
+        run: |
+          echo "DEPLOY_ROLE_INFRA_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-infra" >> "$GITHUB_ENV"
+          echo "STACK_NAME=numun-${ENV_NAME}-base-data" >> "$GITHUB_ENV"
       - uses: aws-actions/setup-sam@v2
         with:
           use-installer: true
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_INFRA_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: deploy
         working-directory: infra/base-data
@@ -59,10 +68,10 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              Env=${{ env.ENV }} \
-              RootDomain=${{ vars.ROOT_DOMAIN }} \
-              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
-              AlarmEmail=${{ vars.ALARM_EMAIL }}
+              "Env=$ENV" \
+              "RootDomain=$ROOT_DOMAIN" \
+              "EnvSubdomain=$ENV_SUBDOMAIN" \
+              "AlarmEmail=$ALARM_EMAIL"
 
   base-cdn:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'base-cdn' }}
@@ -71,16 +80,20 @@ jobs:
     environment: ${{ inputs.environment || 'test' }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      STACK_NAME: numun-${{ inputs.environment || 'test' }}-base-cdn
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + stack name
+        run: |
+          echo "DEPLOY_ROLE_INFRA_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-infra" >> "$GITHUB_ENV"
+          echo "STACK_NAME=numun-${ENV_NAME}-base-cdn" >> "$GITHUB_ENV"
       - uses: aws-actions/setup-sam@v2
         with:
           use-installer: true
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_INFRA_ARN }}
           aws-region: ${{ env.AWS_REGION }}
       - name: deploy
         working-directory: infra/base-cdn
@@ -92,11 +105,11 @@ jobs:
             --capabilities CAPABILITY_NAMED_IAM \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              Env=${{ env.ENV }} \
-              RootDomain=${{ vars.ROOT_DOMAIN }} \
-              EnvSubdomain=${{ vars.ENV_SUBDOMAIN }} \
-              HostedZoneId=${{ vars.HOSTED_ZONE_ID }} \
-              CloudFrontCertificateArn=${{ vars.CDN_CERTIFICATE_ARN }}
+              "Env=$ENV" \
+              "RootDomain=$ROOT_DOMAIN" \
+              "EnvSubdomain=$ENV_SUBDOMAIN" \
+              "HostedZoneId=$HOSTED_ZONE_ID" \
+              "CloudFrontCertificateArn=$CDN_CERTIFICATE_ARN"
 
   billing-alarm:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'billing-alarm' }}
@@ -104,26 +117,33 @@ jobs:
     environment: ${{ inputs.environment || 'test' }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      # us-east-1 is non-negotiable: CloudWatch billing metrics only exist in
-      # us-east-1, so the billing alarm stack must deploy there regardless of
-      # vars.AWS_REGION.
-      AWS_REGION: us-east-1
-      STACK_NAME: numun-${{ inputs.environment || 'test' }}-billing-alarm
+      # us-east-1 is non-negotiable: CloudWatch billing metrics only exist
+      # in us-east-1, so the billing alarm stack must deploy there
+      # regardless of the env YAML's AWS_REGION.
+      BILLING_ALARM_REGION: us-east-1
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + stack name
+        run: |
+          echo "DEPLOY_ROLE_INFRA_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-infra" >> "$GITHUB_ENV"
+          echo "STACK_NAME=numun-${ENV_NAME}-billing-alarm" >> "$GITHUB_ENV"
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_INFRA_ARN }}
-          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_INFRA_ARN }}
+          aws-region: ${{ env.BILLING_ALARM_REGION }}
       - name: deploy
         working-directory: infra/billing-alarm
+        env:
+          THRESHOLD_USD: ${{ vars.BILLING_THRESHOLD_USD || '10' }}
         run: |
           aws cloudformation deploy \
             --stack-name "$STACK_NAME" \
-            --region "$AWS_REGION" \
+            --region "$BILLING_ALARM_REGION" \
             --template-file us-east-1.yaml \
             --no-fail-on-empty-changeset \
             --parameter-overrides \
-              Env=${{ env.ENV }} \
-              AlarmEmail=${{ vars.ALARM_EMAIL }} \
-              ThresholdUsd=${{ vars.BILLING_THRESHOLD_USD || '10' }}
+              "Env=$ENV" \
+              "AlarmEmail=$ALARM_EMAIL" \
+              "ThresholdUsd=$THRESHOLD_USD"

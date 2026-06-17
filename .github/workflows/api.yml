@@ -6,6 +6,9 @@ on:
     paths:
       - "api/**"
       - "infra/api/**"
+      - "infra/envs/**"
+      - "scripts/load-env.sh"
+      - "scripts/load-stack-outputs.sh"
       - ".github/workflows/api.yml"
   workflow_dispatch:
     inputs:
@@ -33,15 +36,24 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: ${{ inputs.environment || 'test' }}
-      url: https://api.${{ vars.APEX_DOMAIN }}
     env:
       ENV: ${{ inputs.environment || 'test' }}
-      AWS_REGION: ${{ vars.AWS_REGION }}
-      STACK_NAME: numun-${{ inputs.environment || 'test' }}-api
+    environment:
+      name: ${{ inputs.environment || 'test' }}
+      # The full URL is composed in the "derive deploy role + stack name"
+      # step below from the env YAML's APEX_DOMAIN, but GitHub's
+      # `environment.url` is evaluated before that step runs. Hardcode
+      # the two known apex shapes here so the Deployments dashboard
+      # links to the right host.
+      url: ${{ inputs.environment == 'prod' && 'https://api.numun.org' || 'https://api.test.numun.org' }}
     steps:
       - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - name: derive deploy role + stack name
+        run: |
+          echo "DEPLOY_ROLE_API_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-api" >> "$GITHUB_ENV"
+          echo "STACK_NAME=numun-${ENV_NAME}-api" >> "$GITHUB_ENV"
       - name: compute version
         id: version
         uses: ./.github/actions/compute-version
@@ -58,8 +70,12 @@ jobs:
           use-installer: true
       - uses: aws-actions/configure-aws-credentials@v4
         with:
-          role-to-assume: ${{ vars.DEPLOY_ROLE_API_ARN }}
+          role-to-assume: ${{ env.DEPLOY_ROLE_API_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      - name: load base-data stack outputs
+        # Exports CognitoUserPoolId, CognitoUserPoolArn, CognitoClientId,
+        # TableName, bucket ARNs, AlarmsTopicArn — all as job env vars.
+        run: scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-data"
       - name: sam build
         working-directory: infra/api
         env:
@@ -68,37 +84,28 @@ jobs:
         run: sam build
       - name: sam deploy
         working-directory: infra/api
-        env:
-          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
         run: |
-          # Build the parameter-overrides list. SentryDsn is only appended
-          # when the env-scoped secret is set; sam deploy rejects an empty
-          # value (`SentryDsn=` is not valid syntax), so we leave the
-          # template default (empty string) in place when the secret is
-          # unset and observability.InitFromEnv no-ops.
-          PARAMS=(
-            "Env=${{ env.ENV }}"
-            "RootDomain=${{ vars.ROOT_DOMAIN }}"
-            "EnvSubdomain=${{ vars.ENV_SUBDOMAIN }}"
-            "CommitSha=${{ github.sha }}"
-            "ReleaseVersion=${{ steps.version.outputs.version }}"
-            "ApiCertificateArn=${{ vars.API_CERTIFICATE_ARN }}"
-            "HostedZoneId=${{ vars.HOSTED_ZONE_ID }}"
-            "CognitoUserPoolId=${{ vars.COGNITO_USER_POOL_ID }}"
-            "CognitoUserPoolArn=${{ vars.COGNITO_USER_POOL_ARN }}"
-            "CognitoClientId=${{ vars.COGNITO_CLIENT_ID }}"
-          )
-          if [ -n "$SENTRY_DSN" ]; then
-            PARAMS+=("SentryDsn=$SENTRY_DSN")
-          fi
+          # Sentry DSN is no longer passed as a stack parameter (M14).
+          # The Lambda reads it at cold-start from
+          # /numun/${ENV}/sentry/dsn via observability.fetchDSNFromSSM.
           sam deploy \
             --stack-name "$STACK_NAME" \
             --region "$AWS_REGION" \
-            --s3-bucket "${{ vars.SAM_ARTIFACTS_BUCKET }}" \
+            --s3-bucket "$SAM_ARTIFACTS_BUCKET" \
             --capabilities CAPABILITY_NAMED_IAM \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
-            --parameter-overrides "${PARAMS[@]}"
+            --parameter-overrides \
+              "Env=$ENV" \
+              "RootDomain=$ROOT_DOMAIN" \
+              "EnvSubdomain=$ENV_SUBDOMAIN" \
+              "CommitSha=${{ github.sha }}" \
+              "ReleaseVersion=${{ steps.version.outputs.version }}" \
+              "ApiCertificateArn=$API_CERTIFICATE_ARN" \
+              "HostedZoneId=$HOSTED_ZONE_ID" \
+              "CognitoUserPoolId=$CognitoUserPoolId" \
+              "CognitoUserPoolArn=$CognitoUserPoolArn" \
+              "CognitoClientId=$CognitoClientId"
       - name: get HTTP API endpoint
         id: api
         run: |
