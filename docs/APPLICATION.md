@@ -10,14 +10,14 @@ This document defines the **application architecture** — repo layout, framewor
 - **Structure (top-level directories at repo root):**
 
 ```
-/site/        — [Astro](https://astro.build/) static site (landing page, served at numun.org)
-/portal/      — [SolidJS](https://www.solidjs.com/) SPA (served at portal.numun.org)
+/.github/     — GitHub Actions workflows
 /api/         — [Go](https://go.dev/) backend (served at api.numun.org)
 /cms/         — [Decap CMS](https://decapcms.org/) static admin bundle (served at cms.numun.org)
 /content/     — Markdown / JSON / image content edited via Decap CMS
-/infra/       — AWS SAM templates (CloudFormation)
-/.github/     — GitHub Actions workflows
 /docs/        — runbooks (content-editor onboarding, local dev, deploy)
+/infra/       — AWS SAM templates (CloudFormation)
+/portal/      — [SolidJS](https://www.solidjs.com/) SPA (served at portal.numun.org)
+/site/        — [Astro](https://astro.build/) static site (landing page, served at numun.org)
 PROJECT.md
 INFRASTRUCTURE.md
 APPLICATION.md

@@ -86,11 +86,6 @@
    *   sans (body)         → IBM Plex Sans  ("substitute for Akkurat Pro")
    *   display (headlines) → Poppins        ("headlines and subheads on the web")
    *   serif (body serif)  → Noto Serif     ("body text on the web")
-   * Commercial faces (Akkurat Pro / Campton / Periódico Text) are
-   * intentionally NOT first in the stack: they're never resolved unless
-   * self-hosted, so leading with them just added noise. When/if we
-   * license and self-host any of them, add it as the first entry here
-   * and load the @font-face in the layout.
    */
   --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-display: "Poppins", ui-sans-serif, system-ui, sans-serif;

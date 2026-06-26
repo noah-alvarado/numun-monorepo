@@ -33,32 +33,32 @@ This doc is **schema and process**. The literal site copy (mission statement wor
 
 ```
 /content/
-  /pages/                       — single-instance pages (one file each)
-    home.md
-    about.md
-    hosted-conference.md
-    travel-team.md
-    resources.md
-    contact.md
-  /leadership/                  — collection: executive board members
-    <year>-<role-slug>.md
-  /news/                        — collection: blog-style posts (NewsPost)
-    YYYY-MM-DD-<slug>.md
-  /past-conferences/            — collection: completed-conference summaries
-    numun-XX-<slug>.md
+  /_generated/                  — build-time-only files; never edited by humans
+    active-conference.json
   /awards-archive/              — collection: curated awards highlights (v1)
     YYYY-<slug>.md
   /background-guides/           — collection: BG-guide metadata + PDF reference
     <conference-slug>/<committee-slug>.md
+  /config/                      — single-file site-wide settings
+    contact-links.md
+    footer.md
+    seo-defaults.md
   /faq/                         — collection: FAQ entries
     <slug>.md
-  /config/                      — single-file site-wide settings
-    seo-defaults.md
-    footer.md
-    contact-links.md
+  /leadership/                  — collection: executive board members
+    <year>-<role-slug>.md
+  /news/                        — collection: blog-style posts (NewsPost)
+    YYYY-MM-DD-<slug>.md
+  /pages/                       — single-instance pages (one file each)
+    about.md
+    contact.md
+    home.md
+    hosted-conference.md
+    resources.md
+    travel-team.md
+  /past-conferences/            — collection: completed-conference summaries
+    numun-XX-<slug>.md
   /uploads/                     — media (Git-committed) — see §6
-  /_generated/                  — build-time-only files; never edited by humans
-    active-conference.json
 ```
 
 - Collection entries are individual files; Decap lists them in its admin UI.

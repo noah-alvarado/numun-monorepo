@@ -52,27 +52,37 @@ Operational docs:
 - **[PROCEDURES_ADMIN.md](./PROCEDURES_ADMIN.md)** — staff-admin user guide.
 - **[DEVELOPERS.md](./DEVELOPERS.md)** — developer onboarding, local dev, testing, deployment, VS Code setup.
 
-## Repository layout (planned)
+## Repository layout
 
 ```
-/                        — design docs, README
-/site/                   — Astro landing site (numun.org)
-/portal/                 — SolidJS portal (portal.numun.org)
-/api/                    — Go backend (api.numun.org)
-  /proto/numun/v1/       — Protobuf service definitions
-  /cmd/api/              — Lambdalith entrypoint
-  /cmd/email-worker/     — SQS consumer entrypoint
-  /cmd/email-feedback/   — SES feedback handler
-  /internal/             — handlers, middleware, store, domain, email
-  /templates/email/      — email HTML + plaintext templates
-/cms/                    — Decap CMS static admin bundle
-/content/                — CMS-managed content (markdown, images, uploads)
-/infra/                  — AWS SAM templates
-/.github/workflows/      — GitHub Actions deploy and CI workflows
-/docs/                   — runbooks, onboarding guides
+/                          — design docs, README
+
+/.github/workflows/        — GitHub Actions deploy and CI workflows
+
+/api/                      — Go backend (api.numun.org)
+  /cmd/api/                — Lambdalith entrypoint
+  /cmd/email-feedback/     — SES feedback handler
+  /cmd/email-worker/       — SQS consumer entrypoint
+  /internal/               — handlers, middleware, store, domain, email
+  /proto/numun/v1/         — Protobuf service definitions
+  /templates/email/        — email HTML + plaintext templates
+
+/cms/                      — Decap CMS static admin bundle
+
+/content/                  — CMS-managed content (markdown, images, uploads)
+
+/docs/                     — runbooks, onboarding guides
+
+/infra/                    — AWS SAM templates
+
+/packages/tailwind-tokens/ — Tailwind theme shared by /portal and /site
+
+/portal/                   — SolidJS portal (portal.numun.org)
+
+/site/                     — Astro landing site (numun.org)
 ```
 
-See [APPLICATION.md §1](./docs/APPLICATION.md) for the canonical layout spec.
+Not fully inclusive. See [APPLICATION.md §1](./docs/APPLICATION.md) for the canonical layout spec.
 
 ## Cost target
 

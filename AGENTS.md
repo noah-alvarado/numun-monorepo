@@ -6,13 +6,13 @@ This file provides guidance to AI agents when working with code in this reposito
 
 Monorepo holding four deployable surfaces plus shared infra and content:
 
-- `/site` — Astro + Tailwind static site (`numun.org`)
-- `/portal` — SolidJS + Vite SPA (`portal.numun.org`); calls the API via generated Connect clients
 - `/api` — Go Lambdalith (`api.numun.org`); one binary, one Lambda, multiple `cmd/` entrypoints (`api`, `cognito-post-confirmation`, `seed`, and forthcoming `email-worker`, `email-feedback`)
 - `/cms` — Decap CMS static bundle (`cms.numun.org`) committing into `/content`
 - `/content` — CMS-managed Markdown / JSON / images consumed by `/site`
-- `/infra` — five SAM template groups: `bootstrap` (OIDC roles), `base-data` (DDB + Cognito), `base-cdn` (S3 + CloudFront + DNS), `api` (Lambda + API GW), `billing-alarm`
 - `/docs` — design docs (`PROJECT`, `INFRASTRUCTURE`, `APPLICATION`, `DATA_MODEL`, `API`, `AUTH`, `SECURITY`) plus `runbooks/` and `subsystems/`
+- `/infra` — five SAM template groups: `bootstrap` (OIDC roles), `base-data` (DDB + Cognito), `base-cdn` (S3 + CloudFront + DNS), `api` (Lambda + API GW), `billing-alarm`
+- `/portal` — SolidJS + Vite SPA (`portal.numun.org`); calls the API via generated Connect clients
+- `/site` — Astro + Tailwind static site (`numun.org`)
 
 `DEVELOPERS.md`, `IMPLEMENTATION_PLAN.md`, and the design docs under `/docs` are the source of truth for architecture decisions. Consult them before inventing patterns; they were written before code existed and define the target shape.
 

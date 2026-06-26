@@ -13,14 +13,14 @@ For higher-level context, read [README.md](./README.md) and then [PROJECT.md](./
 The repo is a single monorepo at `/Users/<you>/numun-monorepo` (or wherever you cloned it). Top-level directories:
 
 ```
-/site/         — Astro static site (numun.org)
-/portal/       — SolidJS SPA (portal.numun.org)
+/.github/      — CI workflows
 /api/          — Go backend (api.numun.org); Connect/Protobuf service
 /cms/          — Decap CMS static bundle (cms.numun.org)
 /content/      — CMS-managed Markdown / images / PDFs
-/infra/        — AWS SAM templates + parameter files
-/.github/      — CI workflows
 /docs/         — runbooks, onboarding guides
+/infra/        — AWS SAM templates + parameter files
+/portal/       — SolidJS SPA (portal.numun.org)
+/site/         — Astro static site (numun.org)
 ```
 
 Read [APPLICATION.md](./docs/APPLICATION.md) for the rationale.
@@ -29,21 +29,21 @@ Within `/api`:
 
 ```
 /api
-  /proto/numun/v1/             — Protobuf service & message definitions (source of truth)
   /cmd/
     api/main.go                — Lambdalith entrypoint (API Gateway HTTP API → Connect → handlers)
-    email-worker/main.go       — SQS-consumer Lambda for announcements + debounced summaries
-    email-feedback/main.go     — SNS-subscribed Lambda for SES bounce/complaint events
     cognito-post-confirmation/ — Cognito trigger Lambda
+    email-feedback/main.go     — SNS-subscribed Lambda for SES bounce/complaint events
+    email-worker/main.go       — SQS-consumer Lambda for announcements + debounced summaries
   /internal/
-    gen/                       — generated code from protos (committed to repo)
-    handlers/                  — one package per service
-    middleware/                — auth, CSRF, request-id, rate-limit, logging
-    store/                     — DynamoDB access patterns
     domain/                    — entity types, business logic, the assignment algorithm
     email/                     — SES send helpers, template rendering
+    gen/                       — generated code from protos (committed to repo)
+    handlers/                  — one package per service
     httpclient/                — hardened HTTP client wrapper (SSRF defense)
     log/                       — slog wrapper with redaction
+    middleware/                — auth, CSRF, request-id, rate-limit, logging
+    store/                     — DynamoDB access patterns
+  /proto/numun/v1/             — Protobuf service & message definitions (source of truth)
   /templates/email/            — HTML + plaintext email templates
   buf.yaml / buf.gen.yaml      — Buf config
   go.mod / go.sum
@@ -54,12 +54,12 @@ Within `/portal`:
 ```
 /portal
   /src/
-    main.tsx
-    routes/                    — Solid Router route components
+    api/                       — generated Connect clients (auto-imported from /api/proto)
     components/                — UI primitives (no external library)
     forms/                     — modular-forms compositions
-    api/                       — generated Connect clients (auto-imported from /api/proto)
     gen/                       — generated TS types (Buf output)
+    main.tsx
+    routes/                    — Solid Router route components
   /public/
   package.json
   vite.config.ts
@@ -71,10 +71,10 @@ Within `/site`:
 ```
 /site
   /src/
-    layouts/                   — Astro layouts (includes the brand layout)
-    pages/                     — file-system routing
     components/                — Astro and Solid islands
     config/                    — shared Tailwind tokens
+    layouts/                   — Astro layouts (includes the brand layout)
+    pages/                     — file-system routing
   astro.config.mjs
   package.json
 ```
