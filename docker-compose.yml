@@ -94,12 +94,12 @@ services:
       AWS_DEFAULT_REGION: us-east-2
       DEBUG: 0
       PERSISTENCE: 0
-      # Route LocalStack SES sends to MailHog's SMTP listener so the dev loop
+      # Route LocalStack SES sends to Mailpit's SMTP listener so the dev loop
       # can inspect rendered messages at http://localhost:8025. EMAIL.md §3
       # template work depends on this. M9 / IMPLEMENTATION_PLAN.md.
-      SMTP_HOST: mailhog:1025
+      SMTP_HOST: mailpit:1025
     depends_on:
-      - mailhog
+      - mailpit
     volumes:
       - ./scripts/localstack-init.sh:/etc/localstack/init/ready.d/init.sh:ro
     healthcheck:
@@ -112,9 +112,10 @@ services:
       timeout: 3s
       retries: 20
 
-  mailhog:
-    image: mailhog/mailhog:v1.0.1
-    container_name: numun-mailhog
+  # Mailpit: maintained, multi-arch MailHog replacement (same ports).
+  mailpit:
+    image: axllent/mailpit:v1.20
+    container_name: numun-mailpit
     ports:
       - "1025:1025" # SMTP
       - "8025:8025" # web UI — open http://localhost:8025 to inspect outbound mail

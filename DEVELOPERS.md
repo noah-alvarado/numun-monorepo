@@ -144,8 +144,8 @@ After `make dev`, the following are running locally (see [INFRASTRUCTURE.md §4]
 - `localhost:3000` — SAM local API Gateway → Go Lambdalith
 - `localhost:5173` — Vite dev server (portal)
 - `localhost:4321` — Astro dev server (site)
-- `localhost:1025` — MailHog SMTP (captured emails for inspection)
-- `localhost:8025` — MailHog web UI
+- `localhost:1025` — Mailpit SMTP (captured emails for inspection)
+- `localhost:8025` — Mailpit web UI
 
 A first-time `make dev` may take several minutes (Docker pulls). Subsequent runs are fast.
 

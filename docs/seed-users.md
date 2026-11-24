@@ -9,7 +9,7 @@ hand-rolled `curl` calls can target.
 Populate the dataset:
 
 ```bash
-make dev          # bring DDB Local + LocalStack + MailHog up
+make dev          # bring DDB Local + LocalStack + Mailpit up
 make seed         # idempotent; safe to re-run
 ```
 
