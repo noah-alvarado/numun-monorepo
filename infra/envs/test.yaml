@@ -24,8 +24,8 @@ AWS_ACCOUNT_ID: "034083889387"
 ALARM_EMAIL: noah@alvarado.dev
 BILLING_THRESHOLD_USD: "10"
 # Cognito verification/reset sender: `cognito` (default, 50/day) or `ses`
-# (cognito@mail.<apex>; needs SES production access).
-COGNITO_EMAIL_SENDER: cognito
+# (cognito@mail.<apex>; needs SES production access, granted 2026-11-24).
+COGNITO_EMAIL_SENDER: ses
 SAM_ARTIFACTS_BUCKET: numun-test-sam-deploys-034083889387
 
 # Account-level infrastructure not owned by any SAM/CFN stack — created
