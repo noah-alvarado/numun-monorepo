@@ -47,4 +47,7 @@ func TestConnectInterceptorReportsOnlyServerErrors(t *testing.T) {
 	if len(tr.events) != 1 {
 		t.Fatalf("want 1 event (internal only), got %d", len(tr.events))
 	}
+	if fp := tr.events[0].Fingerprint; len(fp) != 2 || fp[0] != "{{ default }}" {
+		t.Fatalf("want fingerprint [{{ default }}, <procedure>], got %v", fp)
+	}
 }
