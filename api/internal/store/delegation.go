@@ -21,7 +21,7 @@ type delegationItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID string `dynamodbav:"conferenceId"`
 	School       string `dynamodbav:"school"`
@@ -288,34 +288,14 @@ func (c *Client) GetDelegation(ctx context.Context, conferenceID, id string) (do
 }
 
 // FindDelegationByID does an id-only lookup when the conferenceId isn't known
-// (e.g., from a scope check). Walks the GSI on the delegation id is not
-// available; instead we query the link tables which carry both ids. For
-// simplicity v1 takes a Scan with FilterExpression on `id`. Acceptable at
-// scale; revisit if it becomes hot.
-//
-// Returns ErrNotFound when no row matches.
+// (e.g., from a scope check). Returns ErrNotFound when no live row matches.
 func (c *Client) FindDelegationByID(ctx context.Context, id string) (domain.Delegation, error) {
-	exprNames := map[string]string{"#e": "entity", "#del": "isDeleted"}
-	exprVals := map[string]ddbtypes.AttributeValue{
-		":entity": &ddbtypes.AttributeValueMemberS{Value: "Delegation"},
-		":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-	}
-	in := &dynamodb.ScanInput{
-		TableName:                 aws.String(c.Table),
-		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames:  exprNames,
-		ExpressionAttributeValues: exprVals,
-	}
-	items, err := scanFirst(ctx, c.DDB, in, 1)
+	item, err := c.getLiveByEntityID(ctx, "Delegation", id)
 	if err != nil {
-		return domain.Delegation{}, fmt.Errorf("find delegation: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Delegation{}, ErrNotFound
+		return domain.Delegation{}, err
 	}
 	var it delegationItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Delegation{}, fmt.Errorf("unmarshal delegation: %w", err)
 	}
 	return delegationFromItem(it), nil

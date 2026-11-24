@@ -37,7 +37,7 @@ type assignmentItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID string `dynamodbav:"conferenceId"`
 	DelegateID   string `dynamodbav:"delegateId"`
@@ -203,29 +203,14 @@ func (c *Client) GetAssignment(ctx context.Context, positionID, delegateID strin
 	return assignmentFromItem(it), nil
 }
 
-// FindAssignmentByID does an id-only Scan lookup.
+// FindAssignmentByID does an id-only lookup.
 func (c *Client) FindAssignmentByID(ctx context.Context, id string) (domain.Assignment, error) {
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:        aws.String(c.Table),
-		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames: map[string]string{
-			"#e":   "entity",
-			"#del": "isDeleted",
-		},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":entity": &ddbtypes.AttributeValueMemberS{Value: "Assignment"},
-			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-		},
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "Assignment", id)
 	if err != nil {
-		return domain.Assignment{}, fmt.Errorf("find assignment: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Assignment{}, ErrNotFound
+		return domain.Assignment{}, err
 	}
 	var it assignmentItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Assignment{}, fmt.Errorf("unmarshal assignment: %w", err)
 	}
 	return assignmentFromItem(it), nil

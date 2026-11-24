@@ -83,7 +83,6 @@ Resources:
               - dynamodb:UpdateItem
               - dynamodb:DeleteItem
               - dynamodb:Query
-              - dynamodb:Scan
               - dynamodb:BatchGetItem
               - dynamodb:BatchWriteItem
               - dynamodb:ConditionCheckItem

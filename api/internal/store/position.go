@@ -22,7 +22,7 @@ type positionItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID   string `dynamodbav:"conferenceId"`
 	CommitteeID    string `dynamodbav:"committeeId"`
@@ -153,30 +153,15 @@ func (c *Client) GetPosition(ctx context.Context, committeeID, id string) (domai
 	return positionFromItem(it), nil
 }
 
-// FindPositionByID does an id-only Scan lookup; used by cross-aggregate scope
+// FindPositionByID does an id-only lookup; used by cross-aggregate scope
 // checks where only the position id is available.
 func (c *Client) FindPositionByID(ctx context.Context, id string) (domain.Position, error) {
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:        aws.String(c.Table),
-		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames: map[string]string{
-			"#e":   "entity",
-			"#del": "isDeleted",
-		},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":entity": &ddbtypes.AttributeValueMemberS{Value: "Position"},
-			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-		},
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "Position", id)
 	if err != nil {
-		return domain.Position{}, fmt.Errorf("find position: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Position{}, ErrNotFound
+		return domain.Position{}, err
 	}
 	var it positionItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Position{}, fmt.Errorf("unmarshal position: %w", err)
 	}
 	return positionFromItem(it), nil

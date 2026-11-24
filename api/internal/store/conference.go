@@ -21,7 +21,7 @@ type conferenceItem struct {
 	PK            string            `dynamodbav:"PK"`
 	SK            string            `dynamodbav:"SK"`
 	Entity        string            `dynamodbav:"entity"`
-	ID            string            `dynamodbav:"id"`
+	ID            string            `dynamodbav:"id,omitempty"`
 	Name          string            `dynamodbav:"name"`
 	EditionNumber int               `dynamodbav:"editionNumber"`
 	Year          int               `dynamodbav:"year"`
@@ -247,12 +247,26 @@ func (c *Client) UpdateConference(ctx context.Context, id string, expectedVersio
 	return conferenceFromItem(it), nil
 }
 
-// ListConferences returns conferences (newest-first by id) for admin listings.
-// Implementation note: DDB has no native global "all conferences" query without
-// a separate aggregate row. We Scan with a filter on `entity = "Conference"` —
-// acceptable at NUMUN scale (<25 conferences over a decade) and rare enough
-// that the cost is negligible. If volume changes, introduce a sparse GSI on
-// `entity = "Conference"` with a sort key by `createdAt` desc.
+// liveConferences returns every non-deleted conference, newest first (UUIDv7
+// ids). A handful of rows over a decade, so callers filter in memory.
+func (c *Client) liveConferences(ctx context.Context) ([]domain.Conference, error) {
+	items, err := c.listLiveByEntity(ctx, "Conference", true)
+	if err != nil {
+		return nil, err
+	}
+	confs := make([]domain.Conference, 0, len(items))
+	for _, raw := range items {
+		var it conferenceItem
+		if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
+			return nil, fmt.Errorf("unmarshal conference: %w", err)
+		}
+		confs = append(confs, conferenceFromItem(it))
+	}
+	return confs, nil
+}
+
+// ListConferences returns conferences newest-first, optionally filtered by
+// status. The cursor carries the last id returned.
 func (c *Client) ListConferences(ctx context.Context, status domain.ConferenceStatus, cursor string, pageSize int32) ([]domain.Conference, string, error) {
 	if pageSize <= 0 {
 		pageSize = 100
@@ -260,51 +274,39 @@ func (c *Client) ListConferences(ctx context.Context, status domain.ConferenceSt
 	if pageSize > 500 {
 		pageSize = 500
 	}
-	exprNames := map[string]string{"#e": "entity", "#del": "isDeleted"}
-	exprVals := map[string]ddbtypes.AttributeValue{
-		":entity": &ddbtypes.AttributeValueMemberS{Value: "Conference"},
-		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-	}
-	filter := "#e = :entity AND #del = :false"
-	if status != "" {
-		exprNames["#st"] = "status"
-		exprVals[":status"] = &ddbtypes.AttributeValueMemberS{Value: string(status)}
-		filter += " AND #st = :status"
-	}
-	in := &dynamodb.ScanInput{
-		TableName:                 aws.String(c.Table),
-		FilterExpression:          aws.String(filter),
-		ExpressionAttributeNames:  exprNames,
-		ExpressionAttributeValues: exprVals,
-		Limit:                     aws.Int32(pageSize),
-	}
+	after := ""
 	if cursor != "" {
-		start, err := decodeCursor(cursor)
+		key, err := decodeCursor(cursor)
 		if err != nil {
 			return nil, "", fmt.Errorf("decode cursor: %w", err)
 		}
-		in.ExclusiveStartKey = start
+		id, ok := key["id"].(*ddbtypes.AttributeValueMemberS)
+		if !ok {
+			return nil, "", errors.New("decode cursor: missing id")
+		}
+		after = id.Value
 	}
-	out, err := c.DDB.Scan(ctx, in)
+	all, err := c.liveConferences(ctx)
 	if err != nil {
-		return nil, "", fmt.Errorf("scan conferences: %w", err)
+		return nil, "", err
 	}
-	confs := make([]domain.Conference, 0, len(out.Items))
-	for _, raw := range out.Items {
-		var it conferenceItem
-		if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
-			return nil, "", fmt.Errorf("unmarshal conference: %w", err)
+	page := make([]domain.Conference, 0, pageSize)
+	for _, conf := range all {
+		if after != "" && conf.ID >= after {
+			continue
 		}
-		confs = append(confs, conferenceFromItem(it))
-	}
-	var next string
-	if len(out.LastEvaluatedKey) > 0 {
-		next, err = encodeCursor(out.LastEvaluatedKey)
-		if err != nil {
-			return nil, "", fmt.Errorf("encode cursor: %w", err)
+		if status != "" && conf.Status != status {
+			continue
 		}
+		if len(page) == int(pageSize) {
+			next, err := encodeCursor(map[string]ddbtypes.AttributeValue{
+				"id": &ddbtypes.AttributeValueMemberS{Value: page[len(page)-1].ID},
+			})
+			return page, next, err
+		}
+		page = append(page, conf)
 	}
-	return confs, next, nil
+	return page, "", nil
 }
 
 // FindActiveConference returns the unique conference whose status is
@@ -313,32 +315,22 @@ func (c *Client) ListConferences(ctx context.Context, status domain.ConferenceSt
 // matches — the handler surfaces this as failed_precondition per API.md
 // §10.1b.
 func (c *Client) FindActiveConference(ctx context.Context) (domain.Conference, error) {
-	exprNames := map[string]string{"#e": "entity", "#st": "status", "#del": "isDeleted"}
-	exprVals := map[string]ddbtypes.AttributeValue{
-		":entity": &ddbtypes.AttributeValueMemberS{Value: "Conference"},
-		":open":   &ddbtypes.AttributeValueMemberS{Value: string(domain.ConferenceStatusOpenForRegistration)},
-		":inProg": &ddbtypes.AttributeValueMemberS{Value: string(domain.ConferenceStatusInProgress)},
-		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-	}
-	in := &dynamodb.ScanInput{
-		TableName:                 aws.String(c.Table),
-		FilterExpression:          aws.String("#e = :entity AND #del = :false AND (#st = :open OR #st = :inProg)"),
-		ExpressionAttributeNames:  exprNames,
-		ExpressionAttributeValues: exprVals,
-	}
-	items, err := scanFirst(ctx, c.DDB, in, 2)
+	all, err := c.liveConferences(ctx)
 	if err != nil {
-		return domain.Conference{}, fmt.Errorf("scan active conference: %w", err)
+		return domain.Conference{}, err
 	}
-	if len(items) == 0 {
+	var active []domain.Conference
+	for _, conf := range all {
+		if conf.Status == domain.ConferenceStatusOpenForRegistration || conf.Status == domain.ConferenceStatusInProgress {
+			active = append(active, conf)
+		}
+	}
+	switch len(active) {
+	case 0:
 		return domain.Conference{}, ErrNotFound
-	}
-	if len(items) > 1 {
+	case 1:
+		return active[0], nil
+	default:
 		return domain.Conference{}, ErrMultipleActiveConferences
 	}
-	var it conferenceItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
-		return domain.Conference{}, fmt.Errorf("unmarshal conference: %w", err)
-	}
-	return conferenceFromItem(it), nil
 }

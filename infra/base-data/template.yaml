@@ -84,6 +84,10 @@ Resources:
           AttributeType: S
         - AttributeName: GSI2SK
           AttributeType: S
+        - AttributeName: entity
+          AttributeType: S
+        - AttributeName: id
+          AttributeType: S
       KeySchema:
         - AttributeName: PK
           KeyType: HASH
@@ -106,6 +110,16 @@ Resources:
               KeyType: RANGE
           Projection:
             ProjectionType: ALL
+        # By-id lookups and per-entity listings over the existing entity/id
+        # attributes; rows without an `id` aren't indexed. DATA_MODEL.md §5.
+        - IndexName: GSI3
+          KeySchema:
+            - AttributeName: entity
+              KeyType: HASH
+            - AttributeName: id
+              KeyType: RANGE
+          Projection:
+            ProjectionType: KEYS_ONLY
       SSESpecification:
         SSEEnabled: true
 

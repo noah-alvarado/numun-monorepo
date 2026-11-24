@@ -31,7 +31,7 @@ type paymentItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID   string `dynamodbav:"conferenceId"`
 	DelegationID   string `dynamodbav:"delegationId"`
@@ -288,29 +288,15 @@ func (c *Client) GetPayment(ctx context.Context, delegationID, paymentID string)
 	return domain.PaymentRecord{}, ErrNotFound
 }
 
-// FindPaymentByID does an id-only Scan lookup; used by the scope helper that
-// only knows the payment id from the request. Mirrors FindDelegationByID.
+// FindPaymentByID does an id-only lookup; used by the scope helper that only
+// knows the payment id from the request.
 func (c *Client) FindPaymentByID(ctx context.Context, id string) (domain.PaymentRecord, error) {
-	exprNames := map[string]string{"#e": "entity", "#del": "isDeleted"}
-	exprVals := map[string]ddbtypes.AttributeValue{
-		":entity": &ddbtypes.AttributeValueMemberS{Value: "PaymentRecord"},
-		":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-	}
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:                 aws.String(c.Table),
-		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames:  exprNames,
-		ExpressionAttributeValues: exprVals,
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "PaymentRecord", id)
 	if err != nil {
-		return domain.PaymentRecord{}, fmt.Errorf("find payment: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.PaymentRecord{}, ErrNotFound
+		return domain.PaymentRecord{}, err
 	}
 	var it paymentItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.PaymentRecord{}, fmt.Errorf("unmarshal payment: %w", err)
 	}
 	return paymentFromItem(it), nil
@@ -424,8 +410,10 @@ func (c *Client) UpdatePayment(ctx context.Context, delegationID, paymentSK, id 
 		":now":         &ddbtypes.AttributeValueMemberS{Value: now.Format(time.RFC3339Nano)},
 		":false":       &ddbtypes.AttributeValueMemberBOOL{Value: false},
 	}
+	exprNames := map[string]string{}
 	if p.Reference != nil {
-		upd += ", reference = :ref"
+		upd += ", #ref = :ref"
+		exprNames["#ref"] = "reference" // DynamoDB reserved word
 		exprVals[":ref"] = &ddbtypes.AttributeValueMemberS{Value: *p.Reference}
 	}
 	if p.Notes != nil {
@@ -437,7 +425,7 @@ func (c *Client) UpdatePayment(ctx context.Context, delegationID, paymentSK, id 
 		exprVals[":ub"] = &ddbtypes.AttributeValueMemberS{Value: p.UpdatedBy}
 	}
 
-	out, err := c.DDB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+	in := &dynamodb.UpdateItemInput{
 		TableName: aws.String(c.Table),
 		Key: map[string]ddbtypes.AttributeValue{
 			"PK": &ddbtypes.AttributeValueMemberS{Value: paymentPK(delegationID)},
@@ -447,7 +435,11 @@ func (c *Client) UpdatePayment(ctx context.Context, delegationID, paymentSK, id 
 		ConditionExpression:       aws.String("version = :expected AND isDeleted = :false"),
 		ExpressionAttributeValues: exprVals,
 		ReturnValues:              ddbtypes.ReturnValueAllNew,
-	})
+	}
+	if len(exprNames) > 0 {
+		in.ExpressionAttributeNames = exprNames
+	}
+	out, err := c.DDB.UpdateItem(ctx, in)
 	if err != nil {
 		var ccf *ddbtypes.ConditionalCheckFailedException
 		if errors.As(err, &ccf) {

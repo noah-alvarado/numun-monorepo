@@ -23,7 +23,7 @@ type bulkImportPreviewItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	UserID       string `dynamodbav:"userId"`
 	DelegationID string `dynamodbav:"delegationId"`
@@ -154,7 +154,7 @@ type bulkImportJobItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	UploadID         string `dynamodbav:"uploadId"`
 	UserID           string `dynamodbav:"userId"`

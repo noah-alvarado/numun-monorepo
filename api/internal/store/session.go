@@ -21,7 +21,7 @@ type sessionItem struct {
 	PK                         string `dynamodbav:"PK"`
 	SK                         string `dynamodbav:"SK"`
 	Entity                     string `dynamodbav:"entity"`
-	ID                         string `dynamodbav:"id"`
+	ID                         string `dynamodbav:"id,omitempty"`
 	UserID                     string `dynamodbav:"userId"`
 	RefreshToken               string `dynamodbav:"refreshToken"`
 	CachedAccessToken          string `dynamodbav:"cachedAccessToken"`

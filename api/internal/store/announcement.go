@@ -19,7 +19,7 @@ type announcementItem struct {
 	PK             string `dynamodbav:"PK"`
 	SK             string `dynamodbav:"SK"`
 	Entity         string `dynamodbav:"entity"`
-	ID             string `dynamodbav:"id"`
+	ID             string `dynamodbav:"id,omitempty"`
 	ConferenceID   string `dynamodbav:"conferenceId,omitempty"`
 	Subject        string `dynamodbav:"subject"`
 	BodyHTML       string `dynamodbav:"bodyHtml"`

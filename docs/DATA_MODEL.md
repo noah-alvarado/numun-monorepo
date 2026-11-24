@@ -394,6 +394,7 @@ A general-purpose reverse-lookup index. Used for several patterns; each item tha
 | List a staffer's assigned committees | StaffCommitteeAssignment | `USER#<userId>` | `CHAIRS#<conferenceId>#<committeeId>` |
 | Find a delegate's assignment | Assignment | `DELEGATE#<delegateId>` | `ASSIGNED_TO#<positionId>` |
 | Find a delegation's assignments | Assignment | `DELEGATION#<delegationId>` | `ASSIGNED#<positionId>#<delegateId>` |
+| Worker dedupe: has this send already happened? | EmailEvent (only when `clientToken` is set) | `EMAIL_TOKEN#<clientToken>` | same as SK |
 
 A single Query on `GSI1PK = USER#<userId>` returns all of a user's role-bindings in one call; the SK prefix (`ADVISES` / `OVERSEES` / `CHAIRS`) lets the application route appropriately.
 
@@ -408,12 +409,25 @@ Status-filtered listings and bounded prefix search.
 | List announcements (newest first) | Announcement | `CONF#<conferenceId>#ANNOUNCEMENT` *or* `GLOBAL#ANNOUNCEMENT` | `<sentAt>#<id>` |
 | Find an assignment run by status (e.g., the in-flight `running` run) | AssignmentRun | `CONF#<conferenceId>#ASSIGNMENT_RUN_STATUS#<status>` | `<triggeredAt>#<id>` |
 
-`GSI2SK` for delegate name uses lowercased last+first names. Supports `begins_with` prefix search; full fuzzy search is **not in scope** (Scan-with-filter is acceptable fallback at NUMUN scale).
+`GSI2SK` for delegate name uses lowercased last+first names. Supports `begins_with` prefix search; full fuzzy search is **not in scope**.
+
+### GSI3 — "by entity + id"
+
+Keyed directly on the existing `entity` (HASH) and `id` (RANGE) attributes, so every row that has an `id` is indexed with no extra fields to maintain. Store structs tag `id` as `omitempty`; rows without one stay out of the index.
+
+| Use case | Query |
+|---|---|
+| Resolve a child entity from its id alone (scope checks, `Find*ByID`, `GetAssignmentRun`) | `entity = <Type> AND id = <id>` → consistent `GetItem` on the returned PK/SK |
+| List all users (role / suppression / by-email filters in memory) | `entity = User` → `BatchGetItem` |
+| List conferences newest-first, find the active one | `entity = Conference`, descending (UUIDv7 ids sort by creation) → `BatchGetItem` |
+
+No request path reads the table with `Scan`; the Lambda roles and permissions boundary don't grant it.
 
 ### Index attribute projections
 
 - `GSI1`: **KEYS_ONLY** — application re-fetches items from the base table when full attributes are needed. Keeps GSI storage minimal.
 - `GSI2`: **INCLUDE** a small attribute set (`entity`, `status`, `school` or `firstName`+`lastName`, `updatedAt`) — supports listing UIs without follow-up reads.
+- `GSI3`: **KEYS_ONLY** — lookups re-read the base row with `ConsistentRead`, so a just-written row's latest version is returned once the index has it.
 
 ---
 
