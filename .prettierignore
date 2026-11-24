@@ -9,6 +9,8 @@ build/
 api/internal/gen/
 portal/src/gen/
 pnpm-lock.yaml
+# Not Markdown despite the editor's guess; reformatting breaks the owner rules.
+.github/CODEOWNERS
 
 # Design corpus + operational docs were hand-authored before Prettier
 # landed in this repo. Don't reformat — line wrapping affects readability.

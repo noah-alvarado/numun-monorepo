@@ -48,7 +48,7 @@ Runbooks referenced: [fresh-environment-deploy.md](docs/runbooks/fresh-environme
 ## 6. Secrets and integrations
 
 - [ ] `/numun/prod/cms_oauth/*`: GitHub OAuth app for Decap ([cms-oauth-app-setup.md](docs/cms-oauth-app-setup.md)).
-- [ ] `/numun/prod/github_app/*`: CMS award write-back ([github-app-setup.md](docs/runbooks/github-app-setup.md)).
+- [ ] `/numun/prod/github_app/*`: CMS award write-back ([github-app-setup.md](docs/runbooks/github-app-setup.md)). Reuse the `numun-cms-bot` App with a new prod-only private key, leave `branch` unset (`main`), and add the App as a bypass actor on both `main` rulesets (step 5).
 - [ ] `/numun/prod/sentry/dsn` ([sentry-setup.md](docs/runbooks/sentry-setup.md)).
 
 ## 7. Data and first users

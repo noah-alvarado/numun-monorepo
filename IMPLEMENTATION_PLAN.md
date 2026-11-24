@@ -217,7 +217,7 @@ Goal: All the SECURITY.md operational controls actually exist.
 - SES sandbox-exit confirmed completed (should be done by now; verify).
 - govulncheck + pnpm audit gating in CI.
 - Backup verification: do a restore drill of DDB PITR into a side table.
-- **Idempotency-Key middleware** (24h TTL) for mutating RPCs. Deferred from M3 — pick the depth (in-flight lock vs. completed-status replay vs. full byte-for-byte replay per API.md §8) and implement. Open item; see plan ambiguity #12.
+- **Idempotency-Key middleware** for mutating RPCs. ✅ Implemented as the in-flight lock depth (`api/internal/middleware/idempotency`): a 60s `IDEMPOTENCY#<key>` marker rejects concurrent retries with 409 `already_exists`; completed-response replay was not built. See plan ambiguity #12.
 
 **Verification:** Walk each runbook against a tabletop exercise; confirm alarms fire on injected failures.
 

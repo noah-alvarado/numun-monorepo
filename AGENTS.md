@@ -71,6 +71,6 @@ Node is pinned to **24.16.0** (`.nvmrc`); Go to the version in `api/go.mod`. Use
 - **Generated files are committed.** `/api/internal/gen/` and `/portal/src/gen/` ship in the repo (often hidden in editor file trees). CI fails if codegen drifted from protos.
 - **Brand tokens** (Northwestern purple, typefaces) live in a shared Tailwind config consumed by both `/site` and `/portal`. No hardcoded brand colors in components.
 - **No external UI component library** in the portal — components are built on Tailwind primitives. Forms use `modular-forms` + `Valibot`.
-- **Idempotency-Key middleware** (24h TTL) on mutating RPCs. Audit-log writes happen in the handler, not the store layer.
+- **Idempotency-Key middleware** (60s in-flight lock) on mutating RPCs. Audit-log writes happen in the handler, not the store layer.
 - **Email templates** live under `/api/templates/email/<kind>.{html,txt}.tmpl` with a render test asserting no `<no value>` markers per `docs/subsystems/EMAIL.md`.
 - **Squash-merge** is the default; PR title becomes the commit subject (imperative, ≤70 chars).

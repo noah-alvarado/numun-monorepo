@@ -1,7 +1,14 @@
 #!/usr/bin/env bash
 # Generalized end-to-end auth verification against any deployed env.
 #
-# Inputs (all required; pass via env vars to keep secrets out of `ps`):
+# Usage:
+#   AWS_PROFILE=numun-prod ADMIN_EMAIL=you@example.com scripts/verify-deploy.sh test
+#
+# With an env argument, API_BASE_URL / COGNITO_USER_POOL / COGNITO_CLIENT_ID
+# default to the numun-<env>-api and numun-<env>-base-data stack outputs, and
+# AWS_REGION defaults to us-east-2. Any of them can still be set explicitly.
+#
+# Inputs (pass via env vars to keep secrets out of `ps`):
 #
 #   API_BASE_URL       e.g. https://6dx8ilgqp3.execute-api.us-east-2.amazonaws.com
 #                      or https://api.test.numun.org once DNS is cut over
@@ -20,6 +27,22 @@
 # re-GetMe-expect-401. Tokens never written to disk or stdout.
 
 set -euo pipefail
+
+if [[ $# -ge 1 ]]; then
+  ENV_NAME="$1"
+  : "${AWS_PROFILE:?set AWS_PROFILE}"
+  AWS_REGION="${AWS_REGION:-us-east-2}"
+  stack_output() {
+    aws cloudformation describe-stacks \
+      --profile "$AWS_PROFILE" --region "$AWS_REGION" \
+      --stack-name "numun-${ENV_NAME}-$1" \
+      --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
+  }
+  API_BASE_URL="${API_BASE_URL:-$(stack_output api HttpApiEndpoint)}"
+  COGNITO_USER_POOL="${COGNITO_USER_POOL:-$(stack_output base-data CognitoUserPoolId)}"
+  COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID:-$(stack_output base-data CognitoClientId)}"
+  echo "env=${ENV_NAME} api=${API_BASE_URL} pool=${COGNITO_USER_POOL}"
+fi
 
 : "${API_BASE_URL:?set API_BASE_URL}"
 : "${COGNITO_USER_POOL:?set COGNITO_USER_POOL}"
