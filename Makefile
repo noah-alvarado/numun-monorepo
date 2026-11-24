@@ -106,7 +106,8 @@ test: ## Run unit tests across all packages.
 	pnpm -r --if-present run test
 
 integration-tests: ## Run Go integration tests against LocalStack + DDB Local (requires `make dev`).
-	cd api && go test -tags=integration ./...
+	cd api && AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 AWS_ENDPOINT_URL_S3=http://localhost:4566 \
+		DDB_TABLE_NAME=numun-test go test -count=1 ./...
 
 # ── Doctor ────────────────────────────────────────────────────────────────────
 

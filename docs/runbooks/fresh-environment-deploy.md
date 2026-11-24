@@ -400,14 +400,13 @@ Gateway invoke URL until DNS is live).
 V3. `scripts/verify-deploy.sh` succeeds end-to-end with the new admin:
 
 ```bash
-API_BASE_URL="$ENDPOINT" \
-COGNITO_USER_POOL="$NEW_USER_POOL_ID" \
-COGNITO_CLIENT_ID="$NEW_CLIENT_ID" \
-AWS_PROFILE="$AWS_PROFILE" \
-AWS_REGION="$AWS_REGION" \
-ADMIN_EMAIL="$ADMIN_EMAIL" \
-  scripts/verify-deploy.sh
+AWS_PROFILE="$AWS_PROFILE" ADMIN_EMAIL="$ADMIN_EMAIL" \
+  scripts/verify-deploy.sh "$ENV"
 ```
+
+The env argument reads the API endpoint and Cognito IDs from the
+`numun-${ENV}-api` / `numun-${ENV}-base-data` stack outputs; set
+`API_BASE_URL`, `COGNITO_USER_POOL`, or `COGNITO_CLIENT_ID` to override.
 
 V4. A no-op push to `main` triggers all four deploy workflows; each
 completes cleanly against the new OIDC roles.
