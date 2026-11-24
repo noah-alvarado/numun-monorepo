@@ -48,7 +48,7 @@ aws ssm get-parameters-by-path \
   --query 'Parameters[].Name' --output text
 ```
 
-Cover at minimum: `/numun/$ENV/cms_oauth/state_secret`, `/numun/$ENV/cms_oauth/client_secret`, `/numun/$ENV/email/unsubscribe_secret`, `/numun/$ENV/github_app/private_key`, `/numun/$ENV/sentry/dsn` (rotate the Sentry project's DSN via the Sentry UI; treat it as scoped config), plus the GitHub OAuth app client secret (GitHub UI → OAuth Apps → Generate a new client secret).
+Cover at minimum: `/numun/$ENV/cms_oauth/state_secret`, `/numun/$ENV/cms_oauth/client_secret`, `/numun/$ENV/email/unsubscribe_secret`, `/numun/$ENV/github_app/private_key`, `/numun/$ENV/sentry/dsn` and `/numun/$ENV/sentry/dsn_portal` (rotate the Sentry project's DSN via the Sentry UI; treat it as scoped config), plus the GitHub OAuth app client secret (GitHub UI → OAuth Apps → Generate a new client secret).
 
 If a break-glass console session is suspected compromised, rotate that IAM user's MFA and any active STS sessions — see [`./breakglass-access.md`](./breakglass-access.md).
 
@@ -107,7 +107,7 @@ Repeat for `email-worker`, `email-feedback`, `cognito-post-confirmation`.
 
 ```bash
 curl -H "Authorization: Bearer $SENTRY_TOKEN" \
-  "https://sentry.io/api/0/projects/numun/numun-api/events/?statsPeriod=7d" \
+  "https://sentry.io/api/0/projects/numun/numun-backend/events/?statsPeriod=7d" \
   > "sentry-events-$NOW.json"
 ```
 

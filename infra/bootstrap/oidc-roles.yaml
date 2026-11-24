@@ -502,7 +502,7 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-data/*"
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
-              # M14: Sentry DSN at /numun/${Env}/sentry/dsn — read at
+              # M14: Sentry DSN at /numun/${Env}/sentry/dsn_portal — read at
               # build time and inlined into the Vite bundle as
               # VITE_SENTRY_DSN. Empty value tree-shakes Sentry out;
               # missing-perm is treated the same as missing-param.

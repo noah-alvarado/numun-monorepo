@@ -6,49 +6,46 @@ stored in SSM (per §2 below), deploys succeed but Sentry init no-ops (both
 resolves). Errors flow to CloudWatch Logs as usual; only the Sentry-
 specific UX (grouped issues, deploy hashes, breadcrumbs) is absent.
 
-## 1. Create the Sentry project
+## 1. Create the Sentry projects
 
-1. Sign up at https://sentry.io (free tier covers 5 k events / mo, well
-   beyond our expected volume).
-2. Create an organization (e.g., `numun`).
-3. Create two projects:
-   - `numun-api` — platform: Go.
-   - `numun-portal` — platform: JavaScript → Browser.
-4. For each project, copy the DSN from **Settings → Client Keys (DSN)**.
-   They look like `https://<key>@oXXX.ingest.sentry.io/<projectId>`.
+Done for org `numun` (https://numun.sentry.io). Test and prod share both
+projects; events are separated by the `environment` tag.
+
+| Project          | Platform   | Used by                   | SSM parameter                     |
+| ---------------- | ---------- | ------------------------- | --------------------------------- |
+| `numun-backend`  | go         | API + all Lambdas         | `/numun/${ENV}/sentry/dsn`        |
+| `numun-frontend` | javascript | portal (inlined at build) | `/numun/${ENV}/sentry/dsn_portal` |
+
+To recreate: sign up at https://sentry.io (free tier: 5k errors/mo), create
+org `numun`, then with the Sentry CLI (`sentry auth login`):
+
+```bash
+sentry project create numun/numun-backend:go
+sentry project create numun/numun-frontend:javascript
+```
 
 The DSN is technically a non-secret (it only authorizes ingestion, not read
 access), but treat it as scoped config to avoid public abuse.
 
-## 2. Populate the SSM parameter
+## 2. Populate the SSM parameters
 
-The Sentry DSN lives in SSM SecureString at `/numun/${ENV}/sentry/dsn`
-(M14). Both the API (Lambda cold-start) and the portal (build-time via
-`aws ssm get-parameter`) read it from there.
-
-For each environment (`test`, future `prod`):
+The API reads `/numun/${ENV}/sentry/dsn` at Lambda cold start; the portal
+reads `/numun/${ENV}/sentry/dsn_portal` at build time. For each env
+(`test`, future `prod`), copy each project's active DSN without printing it:
 
 ```bash
 ENV=test
-DSN='https://<key>@oXXX.ingest.sentry.io/<projectId>'  # from §1
-aws ssm put-parameter \
-  --name "/numun/$ENV/sentry/dsn" \
-  --type SecureString \
-  --value "$DSN" \
-  --overwrite \
-  --region us-east-2
+for pair in numun-backend:dsn numun-frontend:dsn_portal; do
+  DSN=$(sentry dsn list "numun/${pair%%:*}" --json | jq -r '[.data[] | select(.isActive)][0].dsn')
+  aws ssm put-parameter --region us-east-2 --overwrite --type SecureString \
+    --name "/numun/$ENV/sentry/${pair##*:}" --value "$DSN" --query Version
+  unset DSN
+done
 ```
 
 The portal deploy role has `ssm:GetParameter` on
 `/numun/${Env}/sentry/*` (granted in `infra/bootstrap/oidc-roles.yaml`).
 The API Lambda's wildcard read on `/numun/${Env}/*` already covers it.
-
-**One DSN or two?** The recipe above uses a single `dsn` parameter for
-both surfaces. If you want separate Sentry projects (one for API errors,
-one for portal errors), create a second parameter at
-`/numun/$ENV/sentry/dsn_portal` and adjust `portal.yml`'s "load Sentry
-DSN from SSM" step to read it. Recommended only if you exceed ~50
-errors/mo on either surface.
 
 Rotation: `aws ssm put-parameter --overwrite` updates the value. The
 next deploy picks it up (Lambda reads at cold-start; portal at build).
