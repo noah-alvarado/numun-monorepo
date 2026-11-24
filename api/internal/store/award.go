@@ -196,7 +196,7 @@ func (c *Client) GetAward(ctx context.Context, conferenceID, id string) (domain.
 
 // FindAwardByID does an id-only lookup when the conferenceId isn't known.
 func (c *Client) FindAwardByID(ctx context.Context, id string) (domain.Award, error) {
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -208,16 +208,15 @@ func (c *Client) FindAwardByID(ctx context.Context, id string) (domain.Award, er
 			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.Award{}, fmt.Errorf("find award: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Award{}, ErrNotFound
 	}
 	var it awardItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Award{}, fmt.Errorf("unmarshal award: %w", err)
 	}
 	return awardFromItem(it)

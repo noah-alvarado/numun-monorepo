@@ -297,21 +297,20 @@ func (c *Client) FindPaymentByID(ctx context.Context, id string) (domain.Payment
 		":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 	}
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:                 aws.String(c.Table),
 		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprVals,
-		Limit:                     aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.PaymentRecord{}, fmt.Errorf("find payment: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.PaymentRecord{}, ErrNotFound
 	}
 	var it paymentItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.PaymentRecord{}, fmt.Errorf("unmarshal payment: %w", err)
 	}
 	return paymentFromItem(it), nil

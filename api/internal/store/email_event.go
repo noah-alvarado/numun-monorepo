@@ -101,19 +101,18 @@ func (c *Client) FindEmailEventByClientToken(ctx context.Context, token string) 
 	if token == "" {
 		return false, nil
 	}
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("entity = :e AND clientToken = :ct"),
 		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
 			":e":  &ddbtypes.AttributeValueMemberS{Value: "EmailEvent"},
 			":ct": &ddbtypes.AttributeValueMemberS{Value: token},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return false, fmt.Errorf("scan email events: %w", err)
 	}
-	return len(out.Items) > 0, nil
+	return len(items) > 0, nil
 }
 
 // ListSuppressedUsers returns User rows whose emailStatus is bounced or
@@ -150,7 +149,7 @@ func (c *Client) FindUserByEmail(ctx context.Context, email string) (domain.User
 	if emailLower == "" {
 		return domain.User{}, ErrNotFound
 	}
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("entity = :e AND #email = :addr AND isDeleted = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -161,14 +160,13 @@ func (c *Client) FindUserByEmail(ctx context.Context, email string) (domain.User
 			":addr":  &ddbtypes.AttributeValueMemberS{Value: emailLower},
 			":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("scan user by email: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		// Fall back to case-sensitive match in case stored email isn't lowercased.
-		out2, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+		items, err = scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 			TableName:        aws.String(c.Table),
 			FilterExpression: aws.String("entity = :e AND #email = :addr AND isDeleted = :false"),
 			ExpressionAttributeNames: map[string]string{
@@ -179,18 +177,16 @@ func (c *Client) FindUserByEmail(ctx context.Context, email string) (domain.User
 				":addr":  &ddbtypes.AttributeValueMemberS{Value: strings.TrimSpace(email)},
 				":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
 			},
-			Limit: aws.Int32(1),
-		})
+		}, 1)
 		if err != nil {
 			return domain.User{}, fmt.Errorf("scan user by email: %w", err)
 		}
-		if len(out2.Items) == 0 {
+		if len(items) == 0 {
 			return domain.User{}, ErrNotFound
 		}
-		out = out2
 	}
 	var it userItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.User{}, fmt.Errorf("unmarshal user: %w", err)
 	}
 	return userFromItem(it), nil

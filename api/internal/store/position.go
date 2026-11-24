@@ -156,7 +156,7 @@ func (c *Client) GetPosition(ctx context.Context, committeeID, id string) (domai
 // FindPositionByID does an id-only Scan lookup; used by cross-aggregate scope
 // checks where only the position id is available.
 func (c *Client) FindPositionByID(ctx context.Context, id string) (domain.Position, error) {
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -168,16 +168,15 @@ func (c *Client) FindPositionByID(ctx context.Context, id string) (domain.Positi
 			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.Position{}, fmt.Errorf("find position: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Position{}, ErrNotFound
 	}
 	var it positionItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Position{}, fmt.Errorf("unmarshal position: %w", err)
 	}
 	return positionFromItem(it), nil

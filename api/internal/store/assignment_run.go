@@ -185,7 +185,7 @@ func (c *Client) CreateAssignmentRun(ctx context.Context, in domain.AssignmentRu
 // because the SK encodes the triggeredAt timestamp and isn't reconstructable
 // from the id alone.
 func (c *Client) GetAssignmentRun(ctx context.Context, id string) (domain.AssignmentRun, error) {
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -197,16 +197,15 @@ func (c *Client) GetAssignmentRun(ctx context.Context, id string) (domain.Assign
 			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.AssignmentRun{}, fmt.Errorf("get assignment run: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.AssignmentRun{}, ErrNotFound
 	}
 	var it assignmentRunItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.AssignmentRun{}, fmt.Errorf("unmarshal assignment run: %w", err)
 	}
 	return assignmentRunFromItem(it), nil
@@ -225,7 +224,6 @@ func (c *Client) FindInFlightRun(ctx context.Context, conferenceID string) (doma
 			":pk":    &ddbtypes.AttributeValueMemberS{Value: assignmentRunGSI2PK(conferenceID, domain.AssignmentRunStatusRunning)},
 			":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
 	})
 	if err != nil {
 		return domain.AssignmentRun{}, fmt.Errorf("find in-flight run: %w", err)
