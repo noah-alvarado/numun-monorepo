@@ -12,6 +12,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/mail"
 	"os"
 	"time"
 
@@ -131,6 +132,15 @@ func (c Config) Validate() error {
 		return fmt.Errorf("email: required env vars unset: %v", missing)
 	}
 	return nil
+}
+
+// fromHeader adds the display name; SES matches ses:FromAddress on the bare address.
+func fromHeader(kind domain.EmailKind, addr string) string {
+	name := "NUMUN Portal"
+	if kind == domain.EmailKindAnnouncement {
+		name = "NUMUN"
+	}
+	return (&mail.Address{Name: name, Address: addr}).String()
 }
 
 // Client is the production implementation of Service.
@@ -257,7 +267,7 @@ func (c *Client) Send(ctx context.Context, req SendRequest) error {
 	}
 
 	in := &sesv2.SendEmailInput{
-		FromEmailAddress: aws.String(sender),
+		FromEmailAddress: aws.String(fromHeader(req.Kind, sender)),
 		Destination:      &sesv2types.Destination{ToAddresses: []string{req.User.Email}},
 		Content:          &sesv2types.EmailContent{Simple: msg},
 	}

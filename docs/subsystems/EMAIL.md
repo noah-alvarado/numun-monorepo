@@ -72,9 +72,9 @@ Deferred to v1.1:
 | Setting | Value |
 |---|---|
 | Sending subdomain | `mail.numun.org` (isolated from any future `@numun.org` human mailboxes) |
-| Primary sender (transactional) | `noreply@mail.numun.org` |
-| Announcements sender | `announcements@mail.numun.org` |
-| Cognito sender | `accounts@mail.numun.org` |
+| Primary sender (transactional) | `NUMUN Portal <noreply@mail.numun.org>` |
+| Announcements sender | `NUMUN <announcements@mail.numun.org>` |
+| Cognito sender | `NUMUN Portal <accounts@mail.numun.org>` (once `COGNITO_EMAIL_SENDER: ses`) |
 | Reply-To (transactional + announcements) | Omitted. `mail.<apex>` has no MX, so replies bounce; the footer says replies aren't monitored and templates that invite follow-up link `mailto:registration@numun.org` (Zoho) instead. |
 | Bounce / complaint feedback loop | SES → SNS topic `numun-prod-email-feedback` → handler Lambda (§6). |
 
