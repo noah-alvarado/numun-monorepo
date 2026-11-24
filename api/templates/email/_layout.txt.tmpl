@@ -2,7 +2,7 @@
 
 {{template "body" .}}
 
-Sent {{.NowFormatted}}.{{if .UnsubscribeURL}}
+Sent {{.NowFormatted}}. This is an automated message; replies are not monitored.{{if .UnsubscribeURL}}
 
 To stop receiving announcements: {{.UnsubscribeURL}}{{end}}
 {{end}}

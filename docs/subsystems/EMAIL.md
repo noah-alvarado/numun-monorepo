@@ -75,7 +75,7 @@ Deferred to v1.1:
 | Primary sender (transactional) | `noreply@mail.numun.org` |
 | Announcements sender | `announcements@mail.numun.org` |
 | Cognito sender | `cognito@mail.numun.org` |
-| Reply-To (transactional + announcements) | `contact@numun.org` if such a mailbox exists; otherwise omitted (recipients reply at their own risk to the no-reply address — clearly stated in the email footer). |
+| Reply-To (transactional + announcements) | Omitted. `mail.<apex>` has no MX, so replies bounce; the footer says replies aren't monitored and templates that invite follow-up link `mailto:registration@numun.org` (Zoho) instead. |
 | Bounce / complaint feedback loop | SES → SNS topic `numun-prod-email-feedback` → handler Lambda (§6). |
 
 ### 2.1 DNS records (in Route 53)
@@ -492,7 +492,7 @@ SQS at this scale is well under the 1M-request/month free tier. SNS bounce/compl
 - **Custom Cognito message templates** via `CustomMessage` Lambda trigger — gives advisor-friendly branded verification/reset emails. v1.1 candidate.
 - **Shared brand-tokens module** between landing-page Tailwind config and email layout — currently hand-synced. Factor out once a third surface (e.g., portal emails) needs the same tokens.
 - **DMARC progression** — watch reports for 2–4 weeks at `p=quarantine; pct=10`, then move stepwise to `p=quarantine; pct=100` and eventually `p=reject; pct=100`.
-- **Reply-To target mailbox** (`contact@numun.org`) — exists only if NUMUN operates a real inbox there. If not, the `Reply-To` is omitted and the email footer states explicitly that replies are not monitored.
+- **Reply handling** — decided 2026-11-24: no Reply-To; footer states replies aren't monitored and follow-up copy links `registration@numun.org`. Revisit (Reply-To to a Zoho inbox, or SES inbound on `mail.<apex>`) if advisors keep replying anyway.
 - **Soft-bounce threshold tuning** — 5-in-30-days is a guess; tune from real bounce-rate data.
 - **Open tracking** — privacy tradeoff; revisit if announcement engagement becomes a KPI.
 - **Email preferences UI** — beyond the single global "announcements opt-in," advisors may eventually want per-conference or per-topic filters. Out of scope in v1.
