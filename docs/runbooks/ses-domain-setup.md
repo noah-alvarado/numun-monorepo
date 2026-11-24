@@ -64,7 +64,7 @@ Status flips to `Success` once DNS propagates (usually under 10 minutes).
 ### 4. Create the three sender identities
 
 ```bash
-for addr in noreply@mail.numun.org announcements@mail.numun.org cognito@mail.numun.org; do
+for addr in noreply@mail.numun.org announcements@mail.numun.org accounts@mail.numun.org; do
   aws ses verify-email-identity --email-address "$addr" --region us-east-2
 done
 ```
@@ -88,7 +88,7 @@ Once the account has SES production access:
 1. Redeploy the bootstrap stack if it predates the deploy-infra
    `iam:CreateServiceLinkedRole` grant for `email.cognito-idp.amazonaws.com`.
 2. Set `COGNITO_EMAIL_SENDER: ses` in the env YAML and redeploy base-data.
-   The pool switches to `DEVELOPER` mode: `From: NUMUN <cognito@mail.<apex>>`
+   The pool switches to `DEVELOPER` mode: `From: NUMUN Portal <accounts@mail.<apex>>`
    via the verified domain identity, using the `numun-<env>-email`
    configuration set so bounces reach the feedback Lambda.
 

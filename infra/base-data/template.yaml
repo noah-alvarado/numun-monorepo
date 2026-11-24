@@ -49,7 +49,7 @@ Parameters:
     AllowedValues: [cognito, ses]
     Description: >
       `cognito` sends verification/reset mail from no-reply@verificationemail.com
-      (50/day). `ses` sends as cognito@mail.<apex> through this account's SES;
+      (50/day). `ses` sends as accounts@mail.<apex> through this account's SES;
       requires SES production access (see ses-domain-setup.md §4a).
 
 Conditions:
@@ -306,8 +306,8 @@ Resources:
             - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${RootDomain}"
           From: !If
             - HasSubdomain
-            - !Sub "NUMUN <cognito@mail.${EnvSubdomain}.${RootDomain}>"
-            - !Sub "NUMUN <cognito@mail.${RootDomain}>"
+            - !Sub "NUMUN Portal <accounts@mail.${EnvSubdomain}.${RootDomain}>"
+            - !Sub "NUMUN Portal <accounts@mail.${RootDomain}>"
           ConfigurationSet: !Sub "numun-${Env}-email"
         - EmailSendingAccount: COGNITO_DEFAULT
 
