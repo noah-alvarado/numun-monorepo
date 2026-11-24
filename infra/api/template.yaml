@@ -207,12 +207,6 @@ Resources:
               !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
               !Sub "announcements@mail.${RootDomain}",
             ]
-          EMAIL_SENDER_COGNITO:
-            !If [
-              HasSubdomain,
-              !Sub "cognito@mail.${EnvSubdomain}.${RootDomain}",
-              !Sub "cognito@mail.${RootDomain}",
-            ]
           EMAIL_UNSUBSCRIBE_BASE_URL: !If
             - HasSubdomain
             - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
@@ -388,11 +382,8 @@ Resources:
       Principal: cognito-idp.amazonaws.com
       SourceArn: !Ref CognitoUserPoolArn
 
-  # The trigger attachment itself lives on the user pool, which is owned by
-  # the base-data stack. We expose the function ARN as an output here; a
-  # one-time `aws cognito-idp update-user-pool --lambda-config
-  # PostConfirmation=<arn>` wires it. Captured in the first-admin-bootstrap
-  # and seed-users runbooks so it gets executed during deployment.
+  # The trigger attachment lives on the user pool in the base-data stack,
+  # which composes this function's ARN (PostConfirmationTrigger parameter).
 
   # ── M9 Email pipeline ──────────────────────────────────────────────────────
   # SQS pair: numun-${Env}-email-send (main) + numun-${Env}-email-send-dlq.
@@ -419,14 +410,27 @@ Resources:
     Properties:
       TopicName: !Sub "numun-${Env}-email-feedback"
 
-  # SES configuration set so bounce/complaint events are routed to the SNS
-  # topic. The destination + the SES-domain-identity wiring are configured
-  # manually post-deploy (EMAIL.md §6.1; the SES domain identity itself is
-  # outside SAM per the M1 runbook).
+  # SES configuration set; every worker send names it, so its event
+  # destination routes bounce/complaint/delivery to the feedback topic
+  # (EMAIL.md §6.1). The SES domain identity itself is outside SAM.
   EmailConfigurationSet:
     Type: AWS::SES::ConfigurationSet
     Properties:
       Name: !Sub "numun-${Env}-email"
+
+  EmailFeedbackEventDestination:
+    Type: AWS::SES::ConfigurationSetEventDestination
+    Properties:
+      ConfigurationSetName: !Ref EmailConfigurationSet
+      EventDestination:
+        Name: feedback-sns
+        Enabled: true
+        MatchingEventTypes:
+          - bounce
+          - complaint
+          - delivery
+        SnsDestination:
+          TopicARN: !Ref EmailFeedbackTopic
 
   # ── EmailWorker Lambda ──────────────────────────────────────────────────────
   EmailWorkerFunctionRole:
@@ -465,6 +469,11 @@ Resources:
                   - sqs:GetQueueAttributes
                 Resource:
                   - !GetAtt EmailSendQueue.Arn
+              - Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/email/*"
               - Effect: Allow
                 Action:
                   - ses:SendEmail
@@ -510,6 +519,10 @@ Resources:
               !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
               !Sub "announcements@mail.${RootDomain}",
             ]
+          EMAIL_UNSUBSCRIBE_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
+            - !Sub "https://api.${RootDomain}/v1/email/unsubscribe"
           EMAIL_QUEUE_URL: !Ref EmailSendQueue
           EMAIL_CONFIGURATION_SET: !Ref EmailConfigurationSet
           PORTAL_BASE_URL: !If
@@ -648,23 +661,14 @@ Outputs:
     Description: Internal HTTP API invoke URL — use the api.${Apex} custom domain in practice.
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
   CognitoPostConfirmationFunctionArn:
-    Description: >
-      ARN to wire into the Cognito user pool's LambdaConfig.PostConfirmation.
-      Run once after deploy:
-        aws cognito-idp update-user-pool --user-pool-id <id> \
-          --lambda-config PostConfirmation=<arn>
+    Description: Attached to the user pool by base-data (PostConfirmationTrigger=enabled).
     Value: !GetAtt CognitoPostConfirmationFunction.Arn
   EmailSendQueueUrl:
     Value: !Ref EmailSendQueue
   EmailSendQueueArn:
     Value: !GetAtt EmailSendQueue.Arn
   EmailFeedbackTopicArn:
-    Description: >
-      SNS topic to subscribe SES bounce + complaint notifications to. Wire via:
-        aws ses put-identity-notification-topic --identity mail.<apex> \
-          --notification-type Bounce --sns-topic <arn>
-        aws ses put-identity-notification-topic --identity mail.<apex> \
-          --notification-type Complaint --sns-topic <arn>
+    Description: Receives SES events via the EmailFeedbackEventDestination on the configuration set.
     Value: !Ref EmailFeedbackTopic
   EmailConfigurationSetName:
     Value: !Ref EmailConfigurationSet

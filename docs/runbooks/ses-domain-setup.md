@@ -75,6 +75,37 @@ Because `mail.numun.org` is a verified domain, these inherit verification automa
 aws ses list-identities --region us-east-2
 ```
 
+### 4a. Let Cognito send from the domain
+
+The user pool (base-data) sends verification and reset mail as
+`cognito@mail.<apex>` with `EmailSendingAccount: COGNITO_DEFAULT`, so
+Cognito needs a sending-authorization policy on the identity. Create it
+before deploying base-data, or the pool update fails:
+
+```bash
+IDENTITY=mail.numun.org   # mail.test.numun.org for test
+ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
+aws sesv2 create-email-identity-policy --region us-east-2 \
+  --email-identity "$IDENTITY" --policy-name cognito-user-pool \
+  --policy "$(jq -nc --arg id "$IDENTITY" --arg acct "$ACCOUNT" '{
+    Version: "2012-10-17",
+    Statement: [{
+      Effect: "Allow",
+      Principal: {Service: "email.cognito-idp.amazonaws.com"},
+      Action: ["ses:SendEmail", "ses:SendRawEmail"],
+      Resource: "arn:aws:ses:us-east-2:\($acct):identity/\($id)",
+      Condition: {
+        StringEquals: {"aws:SourceAccount": $acct},
+        ArnLike: {"aws:SourceArn": "arn:aws:cognito-idp:us-east-2:\($acct):userpool/*"}
+      }
+    }]
+  }')"
+```
+
+After sandbox exit, prod can switch the pool to `DEVELOPER` for SES-account
+throughput (needs `iam:CreateServiceLinkedRole` on the deploy role); see
+EMAIL.md §4.1.
+
 ### 5. Submit the SES sandbox-exit request
 
 New SES accounts can only send to verified recipients. **Submit the production-access request now** so it's approved by the time M2 needs it for real signups.

@@ -35,9 +35,18 @@ Parameters:
   AlarmEmail:
     Type: String
     Description: Email address subscribed to the alarms SNS topic.
+  PostConfirmationTrigger:
+    Type: String
+    Default: enabled
+    AllowedValues: [enabled, disabled]
+    Description: >
+      Attach the api stack's cognito-post-confirmation function as the
+      pool's PostConfirmation trigger. Use `disabled` only for the first
+      deploy of a fresh env, before the api stack exists.
 
 Conditions:
   HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
+  WirePostConfirmation: !Equals [!Ref PostConfirmationTrigger, enabled]
 
 Resources:
   # ── DynamoDB ────────────────────────────────────────────────────────────────
@@ -274,6 +283,22 @@ Resources:
       UserAttributeUpdateSettings:
         AttributesRequireVerificationBeforeUpdate:
           - email
+      LambdaConfig: !If
+        - WirePostConfirmation
+        - PostConfirmation: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:numun-${Env}-api-cognito-post-confirmation"
+        - !Ref AWS::NoValue
+      # COGNITO_DEFAULT works while SES is sandboxed (50/day cap); needs the
+      # identity sending-authorization policy from ses-domain-setup.md §4a.
+      EmailConfiguration:
+        EmailSendingAccount: COGNITO_DEFAULT
+        SourceArn: !If
+          - HasSubdomain
+          - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${EnvSubdomain}.${RootDomain}"
+          - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${RootDomain}"
+        From: !If
+          - HasSubdomain
+          - !Sub "NUMUN <cognito@mail.${EnvSubdomain}.${RootDomain}>"
+          - !Sub "NUMUN <cognito@mail.${RootDomain}>"
 
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient

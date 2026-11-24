@@ -248,12 +248,10 @@ function PrefsRow(props: {
               {(v) => (
                 <label class="cursor-pointer">
                   <input
+                    {...fieldProps}
                     type="radio"
-                    name={fieldProps.name}
                     value={v}
                     checked={field.value === v}
-                    onChange={fieldProps.onChange}
-                    onBlur={fieldProps.onBlur}
                     class="peer sr-only"
                   />
                   <span class="rounded border border-nu-purple-300 px-2 py-1 text-xs peer-checked:border-nu-purple peer-checked:bg-nu-purple peer-checked:text-white">

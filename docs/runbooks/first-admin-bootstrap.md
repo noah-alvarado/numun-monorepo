@@ -20,29 +20,22 @@ in the portal.
 
 ## Procedure
 
-### 1. Wire the post-confirmation trigger (once per pool)
+### 1. Confirm the post-confirmation trigger is attached
 
-SAM cannot manage the user pool's `LambdaConfig` because the pool lives in
-the `base-data` stack while the trigger function lives in the `api` stack.
-The api stack publishes the function ARN as the
-`CognitoPostConfirmationFunctionArn` output; attach it manually:
+The `base-data` stack attaches `numun-${ENV}-api-cognito-post-confirmation`
+to the pool (`PostConfirmationTrigger=enabled`, the default). Verify:
 
 ```bash
 # Substitute $ENV (e.g. `test` or `prod`) and the actual pool id.
 USER_POOL_ID=<from cloudformation describe-stacks numun-${ENV}-base-data>
 
-aws cognito-idp update-user-pool \
-  --user-pool-id "$USER_POOL_ID" \
-  --lambda-config "PostConfirmation=$(aws cloudformation describe-stacks \
-      --stack-name numun-${ENV}-api \
-      --query \"Stacks[0].Outputs[?OutputKey=='CognitoPostConfirmationFunctionArn'].OutputValue | [0]\" \
-      --output text)"
+aws cognito-idp describe-user-pool --user-pool-id "$USER_POOL_ID" \
+  --query UserPool.LambdaConfig
 ```
 
-`update-user-pool` is a **full replacement** of the pool's mutable
-configuration; if other mutable settings have drifted (MFA, password policy,
-etc.), pass them again or you will silently revert them. Cross-check
-against `infra/base-data/template.yaml` before running.
+If it's empty, redeploy base-data with the default parameter. Don't use
+`update-user-pool` by hand: it replaces all mutable pool config and drifts
+the stack.
 
 ### 2. Mint the first staff-admin in Cognito
 

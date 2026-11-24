@@ -59,10 +59,18 @@ type handler struct {
 
 type sesNotification struct {
 	NotificationType string        `json:"notificationType"`
+	EventType        string        `json:"eventType"` // configuration-set event publishing
 	Mail             sesMail       `json:"mail"`
 	Bounce           *sesBounce    `json:"bounce,omitempty"`
 	Complaint        *sesComplaint `json:"complaint,omitempty"`
 	Delivery         *sesDelivery  `json:"delivery,omitempty"`
+}
+
+func (n sesNotification) kind() string {
+	if n.NotificationType != "" {
+		return n.NotificationType
+	}
+	return n.EventType
 }
 
 type sesMail struct {
@@ -105,7 +113,7 @@ func (h *handler) processOne(ctx context.Context, rawMessage string) error {
 	if err := json.Unmarshal([]byte(rawMessage), &n); err != nil {
 		return fmt.Errorf("unmarshal SES notification: %w", err)
 	}
-	switch n.NotificationType {
+	switch n.kind() {
 	case "Bounce":
 		return h.handleBounce(ctx, n)
 	case "Complaint":
@@ -113,7 +121,7 @@ func (h *handler) processOne(ctx context.Context, rawMessage string) error {
 	case "Delivery":
 		return h.handleDelivery(ctx, n)
 	default:
-		h.logger.Warn("feedback: unknown notification type", "type", n.NotificationType)
+		h.logger.Warn("feedback: unknown notification type", "type", n.kind())
 		return nil
 	}
 }

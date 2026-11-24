@@ -289,6 +289,30 @@ The four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) stay 
 
 **Verification:** `scripts/verify-deploy.sh` (M2.7) round-trip succeeds against the migrated `test` env with zero GitHub-variable reads.
 
+### M15 — Replace table Scans with indexed lookups
+
+Goal: Every hot-path read is a `GetItem` or `Query`. Today a family of by-id lookups resolves child entities with a full-table `Scan` + `FilterExpression` because RPCs carry only the entity id, not its parent key. Surfaced in `test` on 2026-11-24: those Scans also set `Limit: 1`, which DynamoDB applies *before* the filter, so `GetDelegation` / `UpdateDelegation` returned `not_found` once the table had more than a handful of rows. PR #10 stopgapped it with `scanFirst` (`api/internal/store/scan.go`), which pages until a match — correct, but every call reads the table end to end and cost/latency grow linearly with table size.
+
+#### Inventory
+
+- **By-id Scans (via `scanFirst`):** `FindDelegationByID`, `FindDelegateByID`, `FindCommitteeByID`, `FindPositionByID`, `FindAssignmentByID`, `FindAwardByID`, `FindPaymentByID`, `GetAssignmentRun`. Called from scope helpers and most mutating handlers, so they sit on nearly every request.
+- **Other lookups via Scan:** `FindActiveConference` (public site + portal home), `FindUserByEmail` (two Scans; bounce handling), `FindEmailEventByClientToken` (email-worker dedupe, one per send).
+- **Unpaginated list Scans** — read only the first 1 MB page and silently truncate past it: `ListSuppressedUsers`, `ListUsersByRole`. `ListConferences` scans with `Limit = pageSize` + filter, so pages can come back short or empty while a cursor is still returned.
+
+#### Scope of work
+
+1. **`GSI3` (sparse, `KEYS_ONLY`) — "by id".** `GSI3PK = <ENTITY>#<id>`, `GSI3SK = META`, set on Delegation, Delegate, Committee, Position, Assignment, Award, PaymentRecord, AssignmentRun. `Find*ByID` becomes `Query GSI3` → `GetItem` on the base key. Add to `infra/base-data` and `docs/DATA_MODEL.md` §5; GSI creation is online. Cost: one extra index write per entity write, keys-only storage — pennies/yr at NUMUN scale.
+2. **Other lookup keys on the same index** (or GSI1 where the item has no GSI1 entry): `USER_EMAIL#<lower>` on User, `EMAIL_TOKEN#<token>` on EmailEvent, and `CONF_STATUS#<status>` on Conference for `FindActiveConference` / `ListConferences` (Query + real cursor instead of Scan).
+3. **Role/suppression listings:** a `ROLE#<role>` and `EMAIL_SUPPRESSED` GSI key on User, or at minimum paginate the Scan to completion.
+4. **Backfill.** One-shot `cmd/seed`-style migrator that rewrites existing rows with the new keys (idempotent; conditional on `version`). Run per env before the code that depends on the index ships, then flip the store methods.
+5. **Retire `scanFirst`** once no callers remain; keep `dynamodb:Scan` in `ApiFunctionRole` only if a residual admin-only path needs it, otherwise drop it from the role and the Lambda boundary.
+
+#### Verification
+
+- `grep -rn 'DDB.Scan\|scanFirst' api/internal/store` returns nothing outside an explicitly-justified admin path.
+- Store integration tests (DDB Local) seed >1 MB of decoy rows and assert every `Find*` / list method still returns the right item and complete pages.
+- `ConsumedCapacity` on a `GetDelegation` call in `test` is a constant handful of RCUs regardless of table size.
+
 ---
 
 ## Inter-milestone dependencies

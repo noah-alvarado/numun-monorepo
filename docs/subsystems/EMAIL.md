@@ -75,7 +75,7 @@ Deferred to v1.1:
 | Primary sender (transactional) | `noreply@mail.numun.org` |
 | Announcements sender | `announcements@mail.numun.org` |
 | Cognito sender | `cognito@mail.numun.org` |
-| Reply-To (transactional + announcements) | `contact@numun.org` if such a mailbox exists; otherwise omitted (recipients reply at their own risk to the no-reply address — clearly stated in the email footer). |
+| Reply-To (transactional + announcements) | Omitted. `mail.<apex>` has no MX, so replies bounce; the footer says replies aren't monitored and templates that invite follow-up link `mailto:registration@numun.org` (Zoho) instead. |
 | Bounce / complaint feedback loop | SES → SNS topic `numun-prod-email-feedback` → handler Lambda (§6). |
 
 ### 2.1 DNS records (in Route 53)
@@ -190,12 +190,9 @@ Tokens used in `_layout.html.tmpl` (brand color, font stack, asset URLs) are der
 
 ### 4.1 Configure Cognito to send via SES
 
-- Cognito user pool's email configuration is set to **`Send email with Amazon SES`**, not the default Cognito-managed sender.
-- `FROM` address: `cognito@mail.numun.org` (verified in SES).
-- `SourceArn`: the SES verified identity ARN for the address.
-- `ReplyToEmailAddress`: `contact@numun.org` (or unset).
-
-This raises the Cognito email send cap from 50/day (default) to the full SES throughput.
+- Configured in `infra/base-data/template.yaml`: `EmailSendingAccount: COGNITO_DEFAULT` with `From: NUMUN <cognito@mail.<apex>>` and `SourceArn` = the `mail.<apex>` domain identity. Cognito sends through its own SES account under our identity's sending-authorization policy ([ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a), so it works while our account is in the SES sandbox.
+- No Reply-To.
+- Limit: 50 Cognito emails/day. Once prod exits the sandbox, switch to `DEVELOPER` to lift the cap to our SES quota. That mode creates a Cognito service-linked role, so the deploy role needs `iam:CreateServiceLinkedRole`. In `COGNITO_DEFAULT`, bounces of Cognito mail don't reach our feedback topic.
 
 ### 4.2 Cognito email content in v1
 
@@ -297,7 +294,7 @@ Each SQS message carries a `clientToken` UUIDv7. The worker checks for an existi
 
 ### 6.1 Wiring
 
-- SES is configured to publish **Bounce**, **Complaint**, and **Delivery** notifications to SNS topic `numun-prod-email-feedback`.
+- SES publishes **Bounce**, **Complaint**, and **Delivery** events to SNS topic `numun-${env}-email-feedback` via the `numun-${env}-email` configuration set's event destination (`infra/api/template.yaml`). The worker names that configuration set on every send. Mail sent outside it (e.g. Cognito) does not produce feedback events.
 - A small Lambda (`/api/cmd/email-feedback/main.go`, third entry point in the same Go module) subscribes to the topic.
 
 ### 6.2 Handling
@@ -492,7 +489,7 @@ SQS at this scale is well under the 1M-request/month free tier. SNS bounce/compl
 - **Custom Cognito message templates** via `CustomMessage` Lambda trigger — gives advisor-friendly branded verification/reset emails. v1.1 candidate.
 - **Shared brand-tokens module** between landing-page Tailwind config and email layout — currently hand-synced. Factor out once a third surface (e.g., portal emails) needs the same tokens.
 - **DMARC progression** — watch reports for 2–4 weeks at `p=quarantine; pct=10`, then move stepwise to `p=quarantine; pct=100` and eventually `p=reject; pct=100`.
-- **Reply-To target mailbox** (`contact@numun.org`) — exists only if NUMUN operates a real inbox there. If not, the `Reply-To` is omitted and the email footer states explicitly that replies are not monitored.
+- **Reply handling** — decided 2026-11-24: no Reply-To; footer states replies aren't monitored and follow-up copy links `registration@numun.org`. Revisit (Reply-To to a Zoho inbox, or SES inbound on `mail.<apex>`) if advisors keep replying anyway.
 - **Soft-bounce threshold tuning** — 5-in-30-days is a guess; tune from real bounce-rate data.
 - **Open tracking** — privacy tradeoff; revisit if announcement engagement becomes a KPI.
 - **Email preferences UI** — beyond the single global "announcements opt-in," advisors may eventually want per-conference or per-topic filters. Out of scope in v1.
