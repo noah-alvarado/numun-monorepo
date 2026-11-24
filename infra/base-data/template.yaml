@@ -43,10 +43,19 @@ Parameters:
       Attach the api stack's cognito-post-confirmation function as the
       pool's PostConfirmation trigger. Use `disabled` only for the first
       deploy of a fresh env, before the api stack exists.
+  CognitoEmailSender:
+    Type: String
+    Default: cognito
+    AllowedValues: [cognito, ses]
+    Description: >
+      `cognito` sends verification/reset mail from no-reply@verificationemail.com
+      (50/day). `ses` sends as cognito@mail.<apex> through this account's SES;
+      requires SES production access (see ses-domain-setup.md §4a).
 
 Conditions:
   HasSubdomain: !Not [!Equals [!Ref EnvSubdomain, ""]]
   WirePostConfirmation: !Equals [!Ref PostConfirmationTrigger, enabled]
+  CognitoSendsViaSes: !Equals [!Ref CognitoEmailSender, ses]
 
 Resources:
   # ── DynamoDB ────────────────────────────────────────────────────────────────
@@ -287,18 +296,20 @@ Resources:
         - WirePostConfirmation
         - PostConfirmation: !Sub "arn:aws:lambda:${AWS::Region}:${AWS::AccountId}:function:numun-${Env}-api-cognito-post-confirmation"
         - !Ref AWS::NoValue
-      # COGNITO_DEFAULT works while SES is sandboxed (50/day cap); needs the
-      # identity sending-authorization policy from ses-domain-setup.md §4a.
-      EmailConfiguration:
-        EmailSendingAccount: COGNITO_DEFAULT
-        SourceArn: !If
-          - HasSubdomain
-          - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${EnvSubdomain}.${RootDomain}"
-          - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${RootDomain}"
-        From: !If
-          - HasSubdomain
-          - !Sub "NUMUN <cognito@mail.${EnvSubdomain}.${RootDomain}>"
-          - !Sub "NUMUN <cognito@mail.${RootDomain}>"
+      # ConfigurationSet (api stack) routes Cognito bounces to the feedback topic.
+      EmailConfiguration: !If
+        - CognitoSendsViaSes
+        - EmailSendingAccount: DEVELOPER
+          SourceArn: !If
+            - HasSubdomain
+            - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${EnvSubdomain}.${RootDomain}"
+            - !Sub "arn:aws:ses:${AWS::Region}:${AWS::AccountId}:identity/mail.${RootDomain}"
+          From: !If
+            - HasSubdomain
+            - !Sub "NUMUN <cognito@mail.${EnvSubdomain}.${RootDomain}>"
+            - !Sub "NUMUN <cognito@mail.${RootDomain}>"
+          ConfigurationSet: !Sub "numun-${Env}-email"
+        - EmailSendingAccount: COGNITO_DEFAULT
 
   CognitoUserPoolClient:
     Type: AWS::Cognito::UserPoolClient

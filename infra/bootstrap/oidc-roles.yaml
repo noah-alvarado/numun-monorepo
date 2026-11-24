@@ -631,6 +631,13 @@ Resources:
                   - cognito-idp:SetUserPoolMfaConfig
                   - cognito-idp:GetUserPoolMfaConfig
                 Resource: "*"
+              # CognitoEmailSender=ses (DEVELOPER mode) creates this SLR on first use.
+              - Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: "*"
+                Condition:
+                  StringEquals:
+                    iam:AWSServiceName: email.cognito-idp.amazonaws.com
               # SSM parameters published by base-data.
               - Effect: Allow
                 Action:

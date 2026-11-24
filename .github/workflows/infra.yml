@@ -71,7 +71,8 @@ jobs:
               "Env=$ENV" \
               "RootDomain=$ROOT_DOMAIN" \
               "EnvSubdomain=$ENV_SUBDOMAIN" \
-              "AlarmEmail=$ALARM_EMAIL"
+              "AlarmEmail=$ALARM_EMAIL" \
+              "CognitoEmailSender=$COGNITO_EMAIL_SENDER"
 
   base-cdn:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'base-cdn' }}

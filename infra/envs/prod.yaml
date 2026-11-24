@@ -17,6 +17,8 @@ AWS_REGION: us-east-2
 AWS_ACCOUNT_ID: "" # fill in once the prod AWS account is provisioned
 ALARM_EMAIL: "" # fill in before launch
 BILLING_THRESHOLD_USD: "10"
+# Flip to `ses` once SES production access is granted (ses-domain-setup.md §4a).
+COGNITO_EMAIL_SENDER: cognito
 SAM_ARTIFACTS_BUCKET: "" # numun-prod-sam-deploys-<accountId> once known
 
 # Account-level infrastructure (manually bootstrapped). Populate after

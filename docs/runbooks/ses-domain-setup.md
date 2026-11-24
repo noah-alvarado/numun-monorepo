@@ -75,36 +75,25 @@ Because `mail.numun.org` is a verified domain, these inherit verification automa
 aws ses list-identities --region us-east-2
 ```
 
-### 4a. Let Cognito send from the domain
+### 4a. Switch Cognito mail to SES (after §5 is approved)
 
-The user pool (base-data) sends verification and reset mail as
-`cognito@mail.<apex>` with `EmailSendingAccount: COGNITO_DEFAULT`, so
-Cognito needs a sending-authorization policy on the identity. Create it
-before deploying base-data, or the pool update fails:
+By default (`COGNITO_EMAIL_SENDER: cognito` in `infra/envs/<env>.yaml`)
+Cognito sends verification/reset mail from `no-reply@verificationemail.com`,
+capped at 50/day. A custom sender under that mode would need a
+separately-verified `cognito@` address identity, which can't receive the
+confirmation link, so we don't use it.
 
-```bash
-IDENTITY=mail.numun.org   # mail.test.numun.org for test
-ACCOUNT=$(aws sts get-caller-identity --query Account --output text)
-aws sesv2 create-email-identity-policy --region us-east-2 \
-  --email-identity "$IDENTITY" --policy-name cognito-user-pool \
-  --policy "$(jq -nc --arg id "$IDENTITY" --arg acct "$ACCOUNT" '{
-    Version: "2012-10-17",
-    Statement: [{
-      Effect: "Allow",
-      Principal: {Service: "email.cognito-idp.amazonaws.com"},
-      Action: ["ses:SendEmail", "ses:SendRawEmail"],
-      Resource: "arn:aws:ses:us-east-2:\($acct):identity/\($id)",
-      Condition: {
-        StringEquals: {"aws:SourceAccount": $acct},
-        ArnLike: {"aws:SourceArn": "arn:aws:cognito-idp:us-east-2:\($acct):userpool/*"}
-      }
-    }]
-  }')"
-```
+Once the account has SES production access:
 
-After sandbox exit, prod can switch the pool to `DEVELOPER` for SES-account
-throughput (needs `iam:CreateServiceLinkedRole` on the deploy role); see
-EMAIL.md §4.1.
+1. Redeploy the bootstrap stack if it predates the deploy-infra
+   `iam:CreateServiceLinkedRole` grant for `email.cognito-idp.amazonaws.com`.
+2. Set `COGNITO_EMAIL_SENDER: ses` in the env YAML and redeploy base-data.
+   The pool switches to `DEVELOPER` mode: `From: NUMUN <cognito@mail.<apex>>`
+   via the verified domain identity, using the `numun-<env>-email`
+   configuration set so bounces reach the feedback Lambda.
+
+In the sandbox, `ses` mode can only reach verified recipients, so sign-ups
+from anyone else would never get their code.
 
 ### 5. Submit the SES sandbox-exit request
 
