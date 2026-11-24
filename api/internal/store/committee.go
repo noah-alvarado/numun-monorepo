@@ -22,7 +22,7 @@ type committeeItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID       string `dynamodbav:"conferenceId"`
 	Name               string `dynamodbav:"name"`
@@ -146,29 +146,13 @@ func (c *Client) GetCommittee(ctx context.Context, conferenceID, id string) (dom
 }
 
 // FindCommitteeByID does an id-only lookup when the conferenceId isn't known.
-// v1 uses a single-row Scan with a FilterExpression.
 func (c *Client) FindCommitteeByID(ctx context.Context, id string) (domain.Committee, error) {
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:        aws.String(c.Table),
-		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames: map[string]string{
-			"#e":   "entity",
-			"#del": "isDeleted",
-		},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":entity": &ddbtypes.AttributeValueMemberS{Value: "Committee"},
-			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-		},
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "Committee", id)
 	if err != nil {
-		return domain.Committee{}, fmt.Errorf("find committee: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Committee{}, ErrNotFound
+		return domain.Committee{}, err
 	}
 	var it committeeItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Committee{}, fmt.Errorf("unmarshal committee: %w", err)
 	}
 	return committeeFromItem(it), nil

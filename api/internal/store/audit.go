@@ -19,7 +19,7 @@ type authAuditEventItem struct {
 	PK          string            `dynamodbav:"PK"`
 	SK          string            `dynamodbav:"SK"`
 	Entity      string            `dynamodbav:"entity"`
-	ID          string            `dynamodbav:"id"`
+	ID          string            `dynamodbav:"id,omitempty"`
 	UserID      string            `dynamodbav:"userId"`
 	ActorUserID string            `dynamodbav:"actorUserId,omitempty"`
 	Kind        string            `dynamodbav:"kind"`

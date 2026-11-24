@@ -291,6 +291,8 @@ The four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) stay 
 
 ### M15 — Replace table Scans with indexed lookups
 
+✅ Done 2026-11-24. GSI3 keys on the existing `entity`/`id` attributes, so DynamoDB backfilled it at index creation and no migrator was needed (that replaced scope items 1–4 below). `scanFirst` is gone, and `dynamodb:Scan` is removed from every Lambda role and the boundary. EmailEvent client tokens use a sparse GSI1 key. Users and conferences are listed via GSI3 and filtered in memory, since both collections are small. Integration tests: `api/internal/store/entity_index_test.go`. The DDB Local run also turned up and fixed `UpdatePayment` writing the reserved word `reference` unaliased.
+
 Goal: Every hot-path read is a `GetItem` or `Query`. Today a family of by-id lookups resolves child entities with a full-table `Scan` + `FilterExpression` because RPCs carry only the entity id, not its parent key. Surfaced in `test` on 2026-11-24: those Scans also set `Limit: 1`, which DynamoDB applies *before* the filter, so `GetDelegation` / `UpdateDelegation` returned `not_found` once the table had more than a handful of rows. PR #10 stopgapped it with `scanFirst` (`api/internal/store/scan.go`), which pages until a match — correct, but every call reads the table end to end and cost/latency grow linearly with table size.
 
 #### Inventory

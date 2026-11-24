@@ -23,7 +23,7 @@ type delegateItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID    string `dynamodbav:"conferenceId"`
 	DelegationID    string `dynamodbav:"delegationId"`
@@ -169,28 +169,14 @@ func (c *Client) GetDelegate(ctx context.Context, delegationID, id string) (doma
 }
 
 // FindDelegateByID does an id-only lookup when the delegationId isn't known
-// (e.g., from a scope check). v1 uses a single-row Scan with a FilterExpression.
+// (e.g., from a scope check).
 func (c *Client) FindDelegateByID(ctx context.Context, id string) (domain.Delegate, error) {
-	exprNames := map[string]string{"#e": "entity", "#del": "isDeleted"}
-	exprVals := map[string]ddbtypes.AttributeValue{
-		":entity": &ddbtypes.AttributeValueMemberS{Value: "Delegate"},
-		":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-	}
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:                 aws.String(c.Table),
-		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames:  exprNames,
-		ExpressionAttributeValues: exprVals,
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "Delegate", id)
 	if err != nil {
-		return domain.Delegate{}, fmt.Errorf("find delegate: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Delegate{}, ErrNotFound
+		return domain.Delegate{}, err
 	}
 	var it delegateItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Delegate{}, fmt.Errorf("unmarshal delegate: %w", err)
 	}
 	return delegateFromItem(it), nil

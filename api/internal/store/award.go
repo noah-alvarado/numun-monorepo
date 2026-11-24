@@ -25,7 +25,7 @@ type awardItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID  string `dynamodbav:"conferenceId"`
 	Name          string `dynamodbav:"name"`
@@ -196,27 +196,12 @@ func (c *Client) GetAward(ctx context.Context, conferenceID, id string) (domain.
 
 // FindAwardByID does an id-only lookup when the conferenceId isn't known.
 func (c *Client) FindAwardByID(ctx context.Context, id string) (domain.Award, error) {
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:        aws.String(c.Table),
-		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames: map[string]string{
-			"#e":   "entity",
-			"#del": "isDeleted",
-		},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":entity": &ddbtypes.AttributeValueMemberS{Value: "Award"},
-			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-		},
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "Award", id)
 	if err != nil {
-		return domain.Award{}, fmt.Errorf("find award: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.Award{}, ErrNotFound
+		return domain.Award{}, err
 	}
 	var it awardItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.Award{}, fmt.Errorf("unmarshal award: %w", err)
 	}
 	return awardFromItem(it)

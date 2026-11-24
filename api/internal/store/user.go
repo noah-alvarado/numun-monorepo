@@ -20,7 +20,7 @@ type userItem struct {
 	PK                 string `dynamodbav:"PK"`
 	SK                 string `dynamodbav:"SK"`
 	Entity             string `dynamodbav:"entity"`
-	ID                 string `dynamodbav:"id"`
+	ID                 string `dynamodbav:"id,omitempty"`
 	Role               string `dynamodbav:"role"`
 	Email              string `dynamodbav:"email"`
 	Name               string `dynamodbav:"name"`

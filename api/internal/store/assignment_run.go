@@ -24,7 +24,7 @@ type assignmentRunItem struct {
 	PK     string `dynamodbav:"PK"`
 	SK     string `dynamodbav:"SK"`
 	Entity string `dynamodbav:"entity"`
-	ID     string `dynamodbav:"id"`
+	ID     string `dynamodbav:"id,omitempty"`
 
 	ConferenceID    string  `dynamodbav:"conferenceId"`
 	Seed            uint64  `dynamodbav:"seed"`
@@ -181,31 +181,15 @@ func (c *Client) CreateAssignmentRun(ctx context.Context, in domain.AssignmentRu
 	return assignmentRunFromItem(it), nil
 }
 
-// GetAssignmentRun fetches an AssignmentRun by id. v1 uses an id-only Scan
-// because the SK encodes the triggeredAt timestamp and isn't reconstructable
-// from the id alone.
+// GetAssignmentRun fetches an AssignmentRun by id. The SK encodes triggeredAt,
+// so it can't be rebuilt from the id; resolve via GSI3.
 func (c *Client) GetAssignmentRun(ctx context.Context, id string) (domain.AssignmentRun, error) {
-	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
-		TableName:        aws.String(c.Table),
-		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
-		ExpressionAttributeNames: map[string]string{
-			"#e":   "entity",
-			"#del": "isDeleted",
-		},
-		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
-			":entity": &ddbtypes.AttributeValueMemberS{Value: "AssignmentRun"},
-			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
-			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
-		},
-	}, 1)
+	item, err := c.getLiveByEntityID(ctx, "AssignmentRun", id)
 	if err != nil {
-		return domain.AssignmentRun{}, fmt.Errorf("get assignment run: %w", err)
-	}
-	if len(items) == 0 {
-		return domain.AssignmentRun{}, ErrNotFound
+		return domain.AssignmentRun{}, err
 	}
 	var it assignmentRunItem
-	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(item, &it); err != nil {
 		return domain.AssignmentRun{}, fmt.Errorf("unmarshal assignment run: %w", err)
 	}
 	return assignmentRunFromItem(it), nil
