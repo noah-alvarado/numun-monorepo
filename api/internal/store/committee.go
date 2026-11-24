@@ -148,7 +148,7 @@ func (c *Client) GetCommittee(ctx context.Context, conferenceID, id string) (dom
 // FindCommitteeByID does an id-only lookup when the conferenceId isn't known.
 // v1 uses a single-row Scan with a FilterExpression.
 func (c *Client) FindCommitteeByID(ctx context.Context, id string) (domain.Committee, error) {
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -160,16 +160,15 @@ func (c *Client) FindCommitteeByID(ctx context.Context, id string) (domain.Commi
 			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.Committee{}, fmt.Errorf("find committee: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Committee{}, ErrNotFound
 	}
 	var it committeeItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Committee{}, fmt.Errorf("unmarshal committee: %w", err)
 	}
 	return committeeFromItem(it), nil

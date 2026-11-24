@@ -325,20 +325,19 @@ func (c *Client) FindActiveConference(ctx context.Context) (domain.Conference, e
 		FilterExpression:          aws.String("#e = :entity AND #del = :false AND (#st = :open OR #st = :inProg)"),
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprVals,
-		Limit:                     aws.Int32(10),
 	}
-	out, err := c.DDB.Scan(ctx, in)
+	items, err := scanFirst(ctx, c.DDB, in, 2)
 	if err != nil {
 		return domain.Conference{}, fmt.Errorf("scan active conference: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Conference{}, ErrNotFound
 	}
-	if len(out.Items) > 1 {
+	if len(items) > 1 {
 		return domain.Conference{}, ErrMultipleActiveConferences
 	}
 	var it conferenceItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Conference{}, fmt.Errorf("unmarshal conference: %w", err)
 	}
 	return conferenceFromItem(it), nil

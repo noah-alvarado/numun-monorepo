@@ -177,21 +177,20 @@ func (c *Client) FindDelegateByID(ctx context.Context, id string) (domain.Delega
 		":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 		":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 	}
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:                 aws.String(c.Table),
 		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprVals,
-		Limit:                     aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.Delegate{}, fmt.Errorf("find delegate: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Delegate{}, ErrNotFound
 	}
 	var it delegateItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Delegate{}, fmt.Errorf("unmarshal delegate: %w", err)
 	}
 	return delegateFromItem(it), nil

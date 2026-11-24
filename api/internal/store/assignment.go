@@ -205,7 +205,7 @@ func (c *Client) GetAssignment(ctx context.Context, positionID, delegateID strin
 
 // FindAssignmentByID does an id-only Scan lookup.
 func (c *Client) FindAssignmentByID(ctx context.Context, id string) (domain.Assignment, error) {
-	out, err := c.DDB.Scan(ctx, &dynamodb.ScanInput{
+	items, err := scanFirst(ctx, c.DDB, &dynamodb.ScanInput{
 		TableName:        aws.String(c.Table),
 		FilterExpression: aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames: map[string]string{
@@ -217,16 +217,15 @@ func (c *Client) FindAssignmentByID(ctx context.Context, id string) (domain.Assi
 			":id":     &ddbtypes.AttributeValueMemberS{Value: id},
 			":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
 		},
-		Limit: aws.Int32(1),
-	})
+	}, 1)
 	if err != nil {
 		return domain.Assignment{}, fmt.Errorf("find assignment: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Assignment{}, ErrNotFound
 	}
 	var it assignmentItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Assignment{}, fmt.Errorf("unmarshal assignment: %w", err)
 	}
 	return assignmentFromItem(it), nil

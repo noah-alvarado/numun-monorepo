@@ -306,17 +306,16 @@ func (c *Client) FindDelegationByID(ctx context.Context, id string) (domain.Dele
 		FilterExpression:          aws.String("#e = :entity AND id = :id AND #del = :false"),
 		ExpressionAttributeNames:  exprNames,
 		ExpressionAttributeValues: exprVals,
-		Limit:                     aws.Int32(1),
 	}
-	out, err := c.DDB.Scan(ctx, in)
+	items, err := scanFirst(ctx, c.DDB, in, 1)
 	if err != nil {
 		return domain.Delegation{}, fmt.Errorf("find delegation: %w", err)
 	}
-	if len(out.Items) == 0 {
+	if len(items) == 0 {
 		return domain.Delegation{}, ErrNotFound
 	}
 	var it delegationItem
-	if err := attributevalue.UnmarshalMap(out.Items[0], &it); err != nil {
+	if err := attributevalue.UnmarshalMap(items[0], &it); err != nil {
 		return domain.Delegation{}, fmt.Errorf("unmarshal delegation: %w", err)
 	}
 	return delegationFromItem(it), nil
