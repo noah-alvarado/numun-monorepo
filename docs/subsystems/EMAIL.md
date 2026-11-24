@@ -190,9 +190,10 @@ Tokens used in `_layout.html.tmpl` (brand color, font stack, asset URLs) are der
 
 ### 4.1 Configure Cognito to send via SES
 
-- Configured in `infra/base-data/template.yaml`: `EmailSendingAccount: COGNITO_DEFAULT` with `From: NUMUN <cognito@mail.<apex>>` and `SourceArn` = the `mail.<apex>` domain identity. Cognito sends through its own SES account under our identity's sending-authorization policy ([ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a), so it works while our account is in the SES sandbox.
+- Configured in `infra/base-data/template.yaml` via the `CognitoEmailSender` parameter, set per env as `COGNITO_EMAIL_SENDER` in `infra/envs/<env>.yaml`:
+  - `cognito` (current, works in the SES sandbox): `COGNITO_DEFAULT`, sender `no-reply@verificationemail.com`, 50 emails/day. Bounces don't reach our feedback topic.
+  - `ses` (after SES production access): `DEVELOPER` mode, `From: NUMUN <cognito@mail.<apex>>` via the `mail.<apex>` domain identity, through the `numun-<env>-email` configuration set so bounces reach the feedback Lambda. Switch procedure: [ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a.
 - No Reply-To.
-- Limit: 50 Cognito emails/day. Once prod exits the sandbox, switch to `DEVELOPER` to lift the cap to our SES quota. That mode creates a Cognito service-linked role, so the deploy role needs `iam:CreateServiceLinkedRole`. In `COGNITO_DEFAULT`, bounces of Cognito mail don't reach our feedback topic.
 
 ### 4.2 Cognito email content in v1
 

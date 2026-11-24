@@ -286,9 +286,9 @@ describe-stacks` (see `scripts/load-stack-outputs.sh`).
 There is no CI workflow for base-data (it's deployed rarely; the
 deploy-api role doesn't carry permissions for Cognito/DDB/S3 creation).
 
-Prerequisite: the SES domain identity for `mail.<apex>` and its Cognito
-sending-authorization policy ([ses-domain-setup.md](./ses-domain-setup.md)
-§1–§4a). The pool's `EmailConfiguration` references it.
+Cognito mail starts on the default sender (`COGNITO_EMAIL_SENDER: cognito`);
+switch to SES after sandbox exit per
+[ses-domain-setup.md](./ses-domain-setup.md) §4a.
 
 The api stack doesn't exist yet, so attach no trigger on this first deploy
 (`PostConfirmationTrigger=disabled`); R11 flips it on.

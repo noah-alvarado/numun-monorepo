@@ -22,6 +22,9 @@ import (
 func readSSMUnsubscribeSecret(ctx context.Context, _ aws.Config, logger *slog.Logger) (string, error) {
 	envName := os.Getenv("ENV")
 	if envName == "" {
+		envName = os.Getenv("ENV_NAME")
+	}
+	if envName == "" {
 		if sub := os.Getenv("ENV_SUBDOMAIN"); sub != "" {
 			envName = sub
 		} else {
