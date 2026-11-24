@@ -6,6 +6,8 @@ This plan turns the ~5,900-line design corpus in `/Users/nalvarado/numun-monorep
 
 The aim of the plan is to reach a deployable Lambdalith and a runnable local-prod mirror as fast as possible, then bring the system up feature-by-feature in dependency order, with each milestone yielding something demonstrable end-to-end. The plan flags ambiguities the design docs leave open and risks for first-time AWS-stack mechanics (Cognito-via-SES wiring, the Decap OAuth `postMessage` handshake, Connect-over-Lambda response shape, OAC, OIDC trust policies) so they don't ambush the build.
 
+Standing up the `prod` environment is tracked separately in [PROD_PLAN.md](./PROD_PLAN.md).
+
 ---
 
 ## Recommended starting milestone
