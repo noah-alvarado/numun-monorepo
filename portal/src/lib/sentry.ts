@@ -82,9 +82,12 @@ function beforeSend(event: ErrorEvent): ErrorEvent | null {
 export function initSentry(): boolean {
   const dsn = import.meta.env.VITE_SENTRY_DSN;
   if (!dsn) return false;
+  const apiBase = import.meta.env.VITE_API_BASE_URL;
 
   Sentry.init({
     dsn,
+    // Relay via the API (observability.TunnelPath) so ad blockers can't drop events.
+    tunnel: apiBase ? `${apiBase}/v1/diag` : undefined,
     environment: import.meta.env.VITE_ENV_NAME ?? "unknown",
     release: import.meta.env.VITE_RELEASE_VERSION,
     sendDefaultPii: false,

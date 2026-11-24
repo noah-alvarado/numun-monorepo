@@ -129,6 +129,10 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	mux.HandleFunc("GET /cms-oauth/auth", cms.Auth)
 	mux.HandleFunc("GET /cms-oauth/callback", cms.Callback)
 
+	if tunnel := observability.TunnelFromEnv(logger); tunnel != nil {
+		mux.Handle("POST "+observability.TunnelPath, tunnel)
+	}
+
 	validate, err := handlers.NewValidationInterceptor()
 	if err != nil {
 		logger.Error("init validation interceptor", "err", err)

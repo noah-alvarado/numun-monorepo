@@ -51,6 +51,17 @@ Rotation: `aws ssm put-parameter --overwrite` updates the value. The
 next deploy picks it up (Lambda reads at cold-start; portal at build).
 No code or IAM change.
 
+**Portal tunnel.** Ad blockers and Firefox tracking protection block
+`*.ingest.sentry.io`, so the portal sends envelopes to the API at
+`POST /v1/diag` (`observability.TunnelPath`; named to dodge blocklists),
+which relays them to Sentry. The route is public (no session) and
+rate-limited at the anonymous 60/min/IP tier. It only forwards envelopes
+whose header DSN matches `dsn_portal`'s host and project, always to the
+upstream URL built from `dsn_portal`, through the SSRF-hardened
+`httpclient` with that one host allowlisted; bodies over 512 KiB get 413. The API also reads `dsn_portal` at cold start, so rotating it needs
+both a portal and an API deploy. Without `dsn_portal` the route isn't
+mounted.
+
 ## 3. Verify
 
 After the next deploy:

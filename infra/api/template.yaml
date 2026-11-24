@@ -54,7 +54,7 @@ Parameters:
 
   # Sentry DSN is no longer a stack parameter (was set in M12). Under M14
   # the Lambda reads it at cold-start from SSM SecureString
-  # `/numun/${Env}/sentry/dsn` via observability.fetchDSNFromSSM, falling
+  # `/numun/${Env}/sentry/dsn` via observability.fetchSSMParam, falling
   # back to the SENTRY_DSN env var if set for local-dev override. See
   # api/internal/observability/sentry.go + docs/runbooks/sentry-setup.md.
 

@@ -87,7 +87,7 @@ jobs:
         run: |
           # Sentry DSN is no longer passed as a stack parameter (M14).
           # The Lambda reads it at cold-start from
-          # /numun/${ENV}/sentry/dsn via observability.fetchDSNFromSSM.
+          # /numun/${ENV}/sentry/dsn via observability.fetchSSMParam.
           sam deploy \
             --stack-name "$STACK_NAME" \
             --region "$AWS_REGION" \
