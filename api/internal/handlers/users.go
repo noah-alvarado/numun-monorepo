@@ -3,10 +3,8 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 
 	"connectrpc.com/connect"
 
@@ -54,10 +52,6 @@ func (s *UserService) GetUser(ctx context.Context, req *connect.Request[usersv1.
 		// Anti-enumeration: a non-admin asking about another user gets not_found
 		// regardless of whether the user exists (AUTH.md §7.3).
 		return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
-	}
-	// TEMPORARY: Sentry end-to-end check (sentry-setup.md §3). Remove after verifying.
-	if target == "sentry-test-error" {
-		return nil, connect.NewError(connect.CodeInternal, fmt.Errorf("Sentry test error %d", time.Now().UnixMilli()))
 	}
 	u, err := s.Store.GetUser(ctx, target)
 	if err != nil {
