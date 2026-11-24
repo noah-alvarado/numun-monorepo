@@ -1,0 +1,56 @@
+---
+import { getEntry, render } from "astro:content";
+import Layout from "../layouts/Layout.astro";
+import Container from "../components/Container.astro";
+import PageHeader from "../components/PageHeader.astro";
+
+const about = await getEntry("about", "about");
+if (!about) throw new Error("content/pages/about.md is required");
+const { Content } = await render(about);
+const { title, heroImage, mission, vision, seo } = about.data;
+---
+
+<Layout
+  title={seo?.title ?? title}
+  description={seo?.description}
+  ogImage={seo?.ogImage}
+  noindex={seo?.noindex}
+  canonicalPath="/about"
+>
+  <Container class="py-16">
+    <PageHeader title={title} />
+
+    {
+      heroImage && (
+        <img
+          src={heroImage.src}
+          alt={heroImage.alt}
+          class="mb-10 aspect-[21/9] w-full rounded-lg object-cover"
+        />
+      )
+    }
+
+    <div class="grid gap-6 md:grid-cols-2">
+      <section
+        class="rounded-lg border border-nu-purple-100 bg-nu-purple-50/40 p-6"
+      >
+        <h2 class="font-display text-xl font-semibold text-nu-purple">
+          Mission
+        </h2>
+        <p class="mt-2 text-nu-black-700">{mission}</p>
+      </section>
+      <section
+        class="rounded-lg border border-nu-purple-100 bg-nu-purple-50/40 p-6"
+      >
+        <h2 class="font-display text-xl font-semibold text-nu-purple">
+          Vision
+        </h2>
+        <p class="mt-2 text-nu-black-700">{vision}</p>
+      </section>
+    </div>
+
+    <div class="rich-text mt-10 max-w-3xl">
+      <Content />
+    </div>
+  </Container>
+</Layout>

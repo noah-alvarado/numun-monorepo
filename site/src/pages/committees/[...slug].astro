@@ -1,0 +1,142 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import Container from "../../components/Container.astro";
+import StaffList from "../../components/StaffList.astro";
+import ChairLetter from "../../components/ChairLetter.astro";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("background-guides");
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<"background-guides">;
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const d = entry.data;
+
+const typeLabel = d.committeeType === "crisis" ? "Crisis" : "General assembly";
+---
+
+<Layout
+  title={d.committeeName}
+  description={d.description ?? `${d.committeeName} at ${d.conferenceName}.`}
+  canonicalPath={`/committees/${entry.id}`}
+>
+  <Container class="py-16">
+    <a
+      href="/committees"
+      class="text-sm font-medium text-nu-purple hover:underline"
+    >
+      ← All committees
+    </a>
+
+    {
+      d.headerImage && (
+        <img
+          src={d.headerImage.src}
+          alt={d.headerImage.alt}
+          class="mt-4 aspect-[21/9] w-full rounded-lg object-cover"
+        />
+      )
+    }
+
+    <header class="mt-6">
+      <p
+        class="text-sm font-semibold uppercase tracking-wide text-nu-purple-400"
+      >
+        {d.conferenceName}
+      </p>
+      <h1 class="font-display text-4xl font-bold text-nu-purple">
+        {d.committeeName}
+        {
+          d.abbreviation && d.abbreviation !== d.committeeName && (
+            <span class="ml-2 align-middle text-lg font-medium text-nu-black-400">
+              {d.abbreviation}
+            </span>
+          )
+        }
+      </h1>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <span
+          class="rounded-full bg-nu-purple-50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-nu-purple"
+        >
+          {typeLabel}
+        </span>
+        <span
+          class="rounded-full bg-nu-black-50 px-3 py-1 text-xs font-medium uppercase tracking-wide text-nu-black-600"
+        >
+          {d.committeeSize}
+        </span>
+      </div>
+    </header>
+
+    {
+      d.description && (
+        <p class="mt-6 max-w-3xl text-lg text-nu-black-700">{d.description}</p>
+      )
+    }
+
+    <div class="rich-text mt-6 max-w-3xl">
+      <Content />
+    </div>
+
+    {
+      d.pdfFile && (
+        <p class="mt-8">
+          <a
+            href={d.pdfFile}
+            class="inline-flex items-center gap-2 rounded bg-nu-purple px-5 py-2 font-semibold text-white transition hover:bg-nu-purple-700"
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            Download background guide (PDF)
+          </a>
+        </p>
+      )
+    }
+
+    {
+      d.positions && d.positions.length > 0 && (
+        <section class="mt-12 max-w-3xl">
+          <h2 class="font-display text-xl font-semibold text-nu-purple">
+            Positions
+          </h2>
+          <ul class="mt-3 grid grid-cols-1 gap-1 sm:grid-cols-2">
+            {d.positions.map((p) => (
+              <li class="rounded border border-nu-purple-100 bg-white px-3 py-1.5 text-sm text-nu-black-700">
+                {p}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      (d.daisStaff.length > 0 || d.crisisStaff.length > 0) && (
+        <div class="mt-12 grid max-w-3xl gap-8 md:grid-cols-2">
+          <StaffList title="Dais" staff={d.daisStaff} />
+          <StaffList title="Crisis team" staff={d.crisisStaff} />
+        </div>
+      )
+    }
+
+    {
+      d.chairLetter && (
+        <section class="mt-12 max-w-3xl">
+          <h2 class="mb-4 font-display text-2xl font-bold text-nu-purple">
+            Letter from the chair
+          </h2>
+          <ChairLetter letter={d.chairLetter} />
+        </section>
+      )
+    }
+  </Container>
+</Layout>

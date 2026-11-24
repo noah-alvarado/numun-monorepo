@@ -1,0 +1,117 @@
+---
+import { getEntry, render } from "astro:content";
+import Layout from "../layouts/Layout.astro";
+import Container from "../components/Container.astro";
+import PageHeader from "../components/PageHeader.astro";
+
+const contact = await getEntry("contact", "contact");
+if (!contact) throw new Error("content/pages/contact.md is required");
+const { Content } = await render(contact);
+const { title, generalEmail, inquiryRouting, seo } = contact.data;
+
+const links = await getEntry("contact-links", "contact-links");
+const social = links?.data.socialLinks ?? [];
+const mailingAddress = links?.data.mailingAddress;
+
+const platformLabel: Record<string, string> = {
+  instagram: "Instagram",
+  twitter: "Twitter",
+  linkedin: "LinkedIn",
+  facebook: "Facebook",
+  youtube: "YouTube",
+  other: "Link",
+};
+---
+
+<Layout
+  title={seo?.title ?? title}
+  description={seo?.description}
+  ogImage={seo?.ogImage}
+  noindex={seo?.noindex}
+  canonicalPath="/contact"
+>
+  <Container class="py-16">
+    <PageHeader title={title} />
+
+    <div class="grid gap-10 md:grid-cols-2">
+      <div>
+        <div class="rich-text max-w-prose">
+          <Content />
+        </div>
+
+        <h2 class="mt-8 font-display text-lg font-semibold text-nu-purple">
+          General inquiries
+        </h2>
+        <a
+          href={`mailto:${generalEmail}`}
+          class="text-nu-purple hover:underline"
+        >
+          {generalEmail}
+        </a>
+
+        {
+          inquiryRouting && inquiryRouting.length > 0 && (
+            <div class="mt-6">
+              <h2 class="font-display text-lg font-semibold text-nu-purple">
+                Reach the right person
+              </h2>
+              <ul class="mt-2 divide-y divide-nu-purple-100 rounded border border-nu-purple-100">
+                {inquiryRouting.map((row) => (
+                  <li class="flex flex-wrap items-baseline justify-between gap-2 px-3 py-2 text-sm">
+                    <span class="text-nu-black-700">{row.label}</span>
+                    <a
+                      href={`mailto:${row.email}`}
+                      class="text-nu-purple hover:underline"
+                    >
+                      {row.email}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
+      </div>
+
+      <aside
+        class="rounded-lg border border-nu-purple-100 bg-nu-purple-50/40 p-6"
+      >
+        {
+          mailingAddress && (
+            <div class="mb-6">
+              <h2 class="font-display text-lg font-semibold text-nu-purple">
+                Mailing address
+              </h2>
+              <p class="mt-2 whitespace-pre-line text-nu-black-700">
+                {mailingAddress}
+              </p>
+            </div>
+          )
+        }
+        {
+          social.length > 0 && (
+            <div>
+              <h2 class="font-display text-lg font-semibold text-nu-purple">
+                Follow us
+              </h2>
+              <ul class="mt-2 flex flex-wrap gap-3 text-sm">
+                {social.map((s) => (
+                  <li>
+                    <a
+                      class="text-nu-purple hover:underline"
+                      href={s.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {s.label ?? platformLabel[s.platform] ?? s.platform}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )
+        }
+      </aside>
+    </div>
+  </Container>
+</Layout>

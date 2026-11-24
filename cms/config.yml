@@ -559,7 +559,7 @@ collections:
         widget: image
         fields:
           - { name: alt, label: Alt text, widget: string }
-      - { name: bio, label: Bio, widget: markdown, required: false }
+      - { name: body, label: Bio, widget: markdown, required: false }
       - { name: email, label: Email, widget: string, required: false }
       - { name: linkedIn, label: LinkedIn URL, widget: string, required: false }
 
@@ -891,6 +891,121 @@ collections:
           media_library: { config: { max_file_size: 26214400 } },
         }
       - { name: summary, label: Summary, widget: markdown, required: false }
+      # Committee-detail display fields (optional; power the public
+      # /committees/<slug> page ported from the old Angular site).
+      - {
+          name: abbreviation,
+          label: Abbreviation,
+          widget: string,
+          required: false,
+          pattern: ["^.{0,20}$", "Max 20 characters"],
+        }
+      - {
+          name: description,
+          label: Committee description,
+          widget: markdown,
+          required: false,
+        }
+      - name: headerImage
+        label: Header image
+        widget: image
+        required: false
+        fields:
+          - { name: alt, label: Alt text, widget: string }
+      - name: accentColor
+        label: Accent color
+        widget: select
+        default: purple
+        options:
+          - { label: Purple, value: purple }
+          - { label: Green, value: green }
+          - { label: Teal, value: teal }
+          - { label: Blue, value: blue }
+          - { label: Yellow, value: yellow }
+          - { label: Gold, value: gold }
+          - { label: Orange, value: orange }
+      - name: daisStaff
+        label: Dais staff
+        widget: list
+        required: false
+        summary: "{{fields.role}} — {{fields.name}}"
+        fields:
+          - {
+              name: role,
+              label: Role,
+              widget: string,
+              pattern: ["^.{1,60}$", "Max 60 characters"],
+            }
+          - {
+              name: name,
+              label: Name,
+              widget: string,
+              pattern: ["^.{1,80}$", "Max 80 characters"],
+            }
+      - name: crisisStaff
+        label: Crisis staff
+        widget: list
+        required: false
+        summary: "{{fields.role}} — {{fields.name}}"
+        fields:
+          - {
+              name: role,
+              label: Role,
+              widget: string,
+              pattern: ["^.{1,60}$", "Max 60 characters"],
+            }
+          - {
+              name: name,
+              label: Name,
+              widget: string,
+              pattern: ["^.{1,80}$", "Max 80 characters"],
+            }
+      - name: chairLetter
+        label: Letter from the chair
+        widget: object
+        required: false
+        collapsed: true
+        fields:
+          - {
+              name: salutation,
+              label: Salutation,
+              widget: string,
+              pattern: ["^.{1,120}$", "Max 120 characters"],
+            }
+          - name: paragraphs
+            label: Paragraphs
+            widget: list
+            field: { name: text, label: Paragraph, widget: text }
+          - {
+              name: signoff,
+              label: Sign-off,
+              widget: string,
+              required: false,
+              pattern: ["^.{0,120}$", "Max 120 characters"],
+            }
+          - {
+              name: chairName,
+              label: Chair name,
+              widget: string,
+              pattern: ["^.{1,80}$", "Max 80 characters"],
+            }
+          - {
+              name: email,
+              label: Committee email,
+              widget: string,
+              required: false,
+            }
+      - name: positions
+        label: Positions / countries
+        widget: list
+        required: false
+      - {
+          name: order,
+          label: Sort order,
+          widget: number,
+          value_type: int,
+          required: false,
+        }
       - {
           name: updatedAt,
           label: Updated at,
@@ -933,6 +1048,336 @@ collections:
           widget: number,
           value_type: int,
         }
+
+  # -------------------------------------------------------------------------
+  # Travel-team roster — folder collection (CMS_CONTENT_MODEL.md §4.9)
+  #
+  # Members of Northwestern's competitive collegiate delegation (old site's
+  # /collegiate-delegation page). Distinct from the `travel-team` singleton,
+  # which lists the conferences the team attends.
+  # -------------------------------------------------------------------------
+  - name: travel-team-roster
+    label: Travel-team roster
+    label_singular: Roster member
+    folder: content/travel-team-roster
+    create: true
+    slug: "{{slug}}"
+    summary: "{{fields.name}}{{#if fields.teamRole}} — {{fields.teamRole}}{{/if}}"
+    sortable_fields: [order, name, gradYear]
+    fields:
+      - {
+          name: name,
+          label: Name,
+          widget: string,
+          pattern: ["^.{1,80}$", "Max 80 characters"],
+        }
+      - {
+          name: teamRole,
+          label: Team role,
+          widget: string,
+          required: false,
+          pattern: ["^.{0,80}$", "Max 80 characters"],
+        }
+      - name: headshot
+        label: Headshot
+        widget: image
+        required: false
+        fields:
+          - { name: alt, label: Alt text, widget: string }
+      - {
+          name: school,
+          label: School / college,
+          widget: string,
+          required: false,
+          pattern: ["^.{0,120}$", "Max 120 characters"],
+        }
+      - {
+          name: gradYear,
+          label: Graduation year,
+          widget: number,
+          value_type: int,
+          required: false,
+          min: 2000,
+          max: 2100,
+        }
+      - name: majors
+        label: Majors
+        widget: list
+        required: false
+      - name: minors
+        label: Minors
+        widget: list
+        required: false
+      - {
+          name: yearsOnTeam,
+          label: Years on team,
+          widget: number,
+          value_type: int,
+          required: false,
+        }
+      - name: accentColor
+        label: Accent color
+        widget: select
+        default: purple
+        options:
+          - { label: Purple, value: purple }
+          - { label: Green, value: green }
+          - { label: Teal, value: teal }
+          - { label: Blue, value: blue }
+          - { label: Yellow, value: yellow }
+          - { label: Gold, value: gold }
+          - { label: Orange, value: orange }
+      - {
+          name: quote,
+          label: What they're excited for,
+          widget: text,
+          required: false,
+        }
+      - {
+          name: order,
+          label: Sort order,
+          widget: number,
+          value_type: int,
+          required: false,
+        }
+
+  # -------------------------------------------------------------------------
+  # Info pages — files collection (CMS_CONTENT_MODEL.md §4.10)
+  #
+  # Advisers / delegates / students reference pages (old site's /info/*).
+  # -------------------------------------------------------------------------
+  - name: info
+    label: Info pages
+    description: Advisers, delegates, and students reference pages.
+    files:
+      # NOTE: fields are duplicated across the three files rather than aliased
+      # with a YAML anchor — Decap's parser doesn't reliably resolve anchors
+      # (see the conventions note at the top of this file).
+      - name: advisers
+        label: For advisers
+        file: content/pages/info/advisers.md
+        fields:
+          - {
+              name: title,
+              label: Title,
+              widget: string,
+              pattern: ["^.{1,100}$", "Max 100 characters"],
+            }
+          - { name: intro, label: Intro, widget: markdown, required: false }
+          - { name: body, label: Body, widget: markdown, required: false }
+          - name: sections
+            label: Sections
+            widget: list
+            required: false
+            summary: "{{fields.heading}}"
+            fields:
+              - {
+                  name: heading,
+                  label: Heading,
+                  widget: string,
+                  pattern: ["^.{1,100}$", "Max 100 characters"],
+                }
+              - { name: body, label: Body, widget: markdown }
+          - name: timeline
+            label: Timeline
+            widget: list
+            required: false
+            summary: "{{fields.date}} — {{fields.label}}"
+            fields:
+              - { name: date, label: Date, widget: string }
+              - { name: label, label: Label, widget: string }
+          - name: feeTable
+            label: Fee table
+            widget: list
+            required: false
+            summary: "{{fields.item}} — {{fields.amount}}"
+            fields:
+              - { name: item, label: Item, widget: string }
+              - { name: amount, label: Amount, widget: string }
+              - { name: notes, label: Notes, widget: string, required: false }
+          - name: documentLinks
+            label: Document links
+            widget: list
+            required: false
+            summary: "{{fields.label}}"
+            fields:
+              - { name: label, label: Label, widget: string }
+              - { name: href, label: URL or file path, widget: string }
+              - {
+                  name: description,
+                  label: Description,
+                  widget: string,
+                  required: false,
+                }
+          - name: seo
+            label: SEO
+            widget: object
+            required: false
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+      - name: delegates
+        label: For delegates
+        file: content/pages/info/delegates.md
+        fields:
+          - {
+              name: title,
+              label: Title,
+              widget: string,
+              pattern: ["^.{1,100}$", "Max 100 characters"],
+            }
+          - { name: intro, label: Intro, widget: markdown, required: false }
+          - { name: body, label: Body, widget: markdown, required: false }
+          - name: sections
+            label: Sections
+            widget: list
+            required: false
+            summary: "{{fields.heading}}"
+            fields:
+              - {
+                  name: heading,
+                  label: Heading,
+                  widget: string,
+                  pattern: ["^.{1,100}$", "Max 100 characters"],
+                }
+              - { name: body, label: Body, widget: markdown }
+          - name: timeline
+            label: Timeline
+            widget: list
+            required: false
+            summary: "{{fields.date}} — {{fields.label}}"
+            fields:
+              - { name: date, label: Date, widget: string }
+              - { name: label, label: Label, widget: string }
+          - name: feeTable
+            label: Fee table
+            widget: list
+            required: false
+            summary: "{{fields.item}} — {{fields.amount}}"
+            fields:
+              - { name: item, label: Item, widget: string }
+              - { name: amount, label: Amount, widget: string }
+              - { name: notes, label: Notes, widget: string, required: false }
+          - name: documentLinks
+            label: Document links
+            widget: list
+            required: false
+            summary: "{{fields.label}}"
+            fields:
+              - { name: label, label: Label, widget: string }
+              - { name: href, label: URL or file path, widget: string }
+              - {
+                  name: description,
+                  label: Description,
+                  widget: string,
+                  required: false,
+                }
+          - name: seo
+            label: SEO
+            widget: object
+            required: false
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
+      - name: students
+        label: For students
+        file: content/pages/info/students.md
+        fields:
+          - {
+              name: title,
+              label: Title,
+              widget: string,
+              pattern: ["^.{1,100}$", "Max 100 characters"],
+            }
+          - { name: intro, label: Intro, widget: markdown, required: false }
+          - { name: body, label: Body, widget: markdown, required: false }
+          - name: sections
+            label: Sections
+            widget: list
+            required: false
+            summary: "{{fields.heading}}"
+            fields:
+              - {
+                  name: heading,
+                  label: Heading,
+                  widget: string,
+                  pattern: ["^.{1,100}$", "Max 100 characters"],
+                }
+              - { name: body, label: Body, widget: markdown }
+          - name: timeline
+            label: Timeline
+            widget: list
+            required: false
+            summary: "{{fields.date}} — {{fields.label}}"
+            fields:
+              - { name: date, label: Date, widget: string }
+              - { name: label, label: Label, widget: string }
+          - name: feeTable
+            label: Fee table
+            widget: list
+            required: false
+            summary: "{{fields.item}} — {{fields.amount}}"
+            fields:
+              - { name: item, label: Item, widget: string }
+              - { name: amount, label: Amount, widget: string }
+              - { name: notes, label: Notes, widget: string, required: false }
+          - name: documentLinks
+            label: Document links
+            widget: list
+            required: false
+            summary: "{{fields.label}}"
+            fields:
+              - { name: label, label: Label, widget: string }
+              - { name: href, label: URL or file path, widget: string }
+              - {
+                  name: description,
+                  label: Description,
+                  widget: string,
+                  required: false,
+                }
+          - name: seo
+            label: SEO
+            widget: object
+            required: false
+            fields:
+              - {
+                  name: title,
+                  label: SEO title,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,70}$", "Max 70 characters"],
+                }
+              - {
+                  name: description,
+                  label: SEO description,
+                  widget: string,
+                  required: false,
+                  pattern: ["^.{0,200}$", "Max 200 characters"],
+                }
 
   # -------------------------------------------------------------------------
   # Site config — singleton files (CMS_CONTENT_MODEL.md §4.8)

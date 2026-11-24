@@ -1,0 +1,113 @@
+---
+import { getCollection, render, type CollectionEntry } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import Container from "../../components/Container.astro";
+
+export async function getStaticPaths() {
+  const entries = await getCollection("past-conferences");
+  return entries.map((entry) => ({
+    params: { slug: entry.id },
+    props: { entry },
+  }));
+}
+
+interface Props {
+  entry: CollectionEntry<"past-conferences">;
+}
+
+const { entry } = Astro.props;
+const { Content } = await render(entry);
+const d = entry.data;
+---
+
+<Layout
+  title={d.seo?.title ?? d.conferenceName}
+  description={d.seo?.description ?? `Recap of ${d.conferenceName}.`}
+  ogImage={d.seo?.ogImage ?? d.heroImage?.src}
+  noindex={d.seo?.noindex}
+  canonicalPath={`/past-conferences/${entry.id}`}
+>
+  <Container class="py-16">
+    <a
+      href="/past-conferences"
+      class="text-sm font-medium text-nu-purple hover:underline"
+    >
+      ← All past conferences
+    </a>
+
+    <header class="mt-4">
+      <p
+        class="text-sm font-semibold uppercase tracking-wide text-nu-purple-400"
+      >
+        {d.dateRange}
+      </p>
+      <h1 class="font-display text-4xl font-bold text-nu-purple">
+        {d.conferenceName}
+      </h1>
+    </header>
+
+    {
+      d.heroImage && (
+        <img
+          src={d.heroImage.src}
+          alt={d.heroImage.alt}
+          class="mt-6 aspect-[21/9] w-full rounded-lg object-cover"
+        />
+      )
+    }
+
+    <div class="rich-text mt-8 max-w-3xl">
+      <Content />
+    </div>
+
+    {
+      d.notableAwards && d.notableAwards.length > 0 && (
+        <section class="mt-12 max-w-3xl">
+          <h2 class="font-display text-2xl font-bold text-nu-purple">
+            Notable awards
+          </h2>
+          <ul class="mt-3 divide-y divide-nu-purple-100 rounded border border-nu-purple-100">
+            {d.notableAwards.map((a) => (
+              <li class="flex flex-wrap items-baseline justify-between gap-3 px-4 py-2 text-sm">
+                <span class="font-medium text-nu-black-800">{a.awardName}</span>
+                <span class="text-nu-black-600">
+                  {a.recipient}
+                  <span class="ml-2 text-xs uppercase tracking-wide text-nu-black-400">
+                    {a.kind}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )
+    }
+
+    {
+      d.photoGallery && d.photoGallery.length > 0 && (
+        <section class="mt-12">
+          <h2 class="font-display text-2xl font-bold text-nu-purple">
+            Gallery
+          </h2>
+          <div class="mt-4 grid grid-cols-2 gap-4 md:grid-cols-3">
+            {d.photoGallery.map((p) => (
+              <figure>
+                <img
+                  src={p.image.src}
+                  alt={p.image.alt}
+                  class="aspect-square w-full rounded object-cover"
+                  loading="lazy"
+                />
+                {p.caption && (
+                  <figcaption class="mt-1 text-xs text-nu-black-500">
+                    {p.caption}
+                  </figcaption>
+                )}
+              </figure>
+            ))}
+          </div>
+        </section>
+      )
+    }
+  </Container>
+</Layout>

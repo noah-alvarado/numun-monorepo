@@ -1,0 +1,86 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../layouts/Layout.astro";
+import Container from "../components/Container.astro";
+import PageHeader from "../components/PageHeader.astro";
+import PersonCard from "../components/PersonCard.astro";
+
+const all = await getCollection("leadership");
+
+// Show the most recent year present so the page reflects the current board.
+const maxYear = all.length ? Math.max(...all.map((e) => e.data.year)) : null;
+const current = maxYear ? all.filter((e) => e.data.year === maxYear) : [];
+
+const withContent = await Promise.all(
+  current.map(async (e) => ({
+    data: e.data,
+    Content: (await render(e)).Content,
+  })),
+);
+
+const categories = [
+  { key: "secretariat", label: "Secretariat" },
+  { key: "executive-board", label: "Executive Board" },
+  { key: "staff", label: "Staff" },
+] as const;
+
+type Member = (typeof withContent)[number];
+const sortFn = (a: Member, b: Member) =>
+  a.data.order - b.data.order || a.data.name.localeCompare(b.data.name);
+
+const byCategory = categories
+  .map((c) => ({
+    ...c,
+    members: withContent
+      .filter((m) => m.data.roleCategory === c.key)
+      .sort(sortFn),
+  }))
+  .filter((c) => c.members.length > 0);
+---
+
+<Layout
+  title="Leadership"
+  description="Meet the Secretariat and executive board of Northwestern University Model United Nations."
+  canonicalPath="/leadership"
+>
+  <Container class="py-16">
+    <PageHeader
+      title="Leadership"
+      intro="The students who plan and run NUMUN."
+    />
+
+    {
+      byCategory.length === 0 && (
+        <p class="text-nu-black-500">Leadership profiles are coming soon.</p>
+      )
+    }
+
+    {
+      byCategory.map((cat) => (
+        <section class="mb-14">
+          <h2 class="mb-5 font-display text-2xl font-bold text-nu-purple">
+            {cat.label}
+          </h2>
+          <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            {cat.members.map((m) => {
+              const Bio = m.Content;
+              return (
+                <PersonCard
+                  name={m.data.name}
+                  subtitle={m.data.role}
+                  image={m.data.headshot}
+                  email={m.data.email}
+                  linkedIn={m.data.linkedIn}
+                >
+                  <div class="rich-text text-sm">
+                    <Bio />
+                  </div>
+                </PersonCard>
+              );
+            })}
+          </div>
+        </section>
+      ))
+    }
+  </Container>
+</Layout>

@@ -37,7 +37,7 @@ This doc is **schema and process**. The literal site copy (mission statement wor
     active-conference.json
   /awards-archive/              — collection: curated awards highlights (v1)
     YYYY-<slug>.md
-  /background-guides/           — collection: BG-guide metadata + PDF reference
+  /background-guides/           — collection: committee detail + BG-guide PDF
     <conference-slug>/<committee-slug>.md
   /config/                      — single-file site-wide settings
     contact-links.md
@@ -56,8 +56,14 @@ This doc is **schema and process**. The literal site copy (mission statement wor
     hosted-conference.md
     resources.md
     travel-team.md
+    /info/                      — files collection: advisers / delegates / students
+      advisers.md
+      delegates.md
+      students.md
   /past-conferences/            — collection: completed-conference summaries
     numun-XX-<slug>.md
+  /travel-team-roster/          — collection: collegiate delegation members
+    <slug>.md
   /uploads/                     — media (Git-committed) — see §6
 ```
 
@@ -269,9 +275,14 @@ award.
 
 Default sort on the public `/awards` page: `year DESC`, then `awardName ASC`.
 
-### 4.6 Background guides (folder collection)
+### 4.6 Background guides + committee detail (folder collection)
 
 One file per `(conference, committee)` pair. Stored under `/content/background-guides/<conference-slug>/<committee-slug>.md`.
+
+This collection backs both the public background-guide download **and** the
+committee detail page (`/committees/<slug>`) ported from the old Angular site.
+The core fields (PDF metadata) are required; the committee-detail fields are
+optional so a bare PDF-only entry still validates.
 
 | Field | Widget | Notes |
 |---|---|---|
@@ -281,11 +292,20 @@ One file per `(conference, committee)` pair. Stored under `/content/background-g
 | `conferenceName` | string (≤80) | e.g., `"NUMUN XXIII"` — display label |
 | `pdfFile` | file | required; the actual BG guide PDF |
 | `summary` | markdown | optional, shown on the listing page |
+| `abbreviation` | string (≤20) | optional, short label for cards |
+| `description` | markdown | optional, committee overview on the detail page |
+| `headerImage` | image | optional, committee banner |
+| `accentColor` | select | `purple` (default) / `green` / `teal` / `blue` / `yellow` / `gold` / `orange` — maps to a Northwestern secondary token; replaces the old node-vibrant color extraction |
+| `daisStaff` | list of object | each: `{ role (≤60), name (≤80) }` |
+| `crisisStaff` | list of object | each: `{ role (≤60), name (≤80) }` |
+| `chairLetter` | object | optional: `{ salutation (≤120), paragraphs (list of text), signoff (≤120, optional), chairName (≤80), email (optional) }` |
+| `positions` | list of string | optional, countries / roles available in the committee |
+| `order` | number | optional, sort order on the committees grid |
 | `updatedAt` | datetime | auto-set on save |
 
 Background guides are **publicly readable** per PROJECT.md. The PDF lives in `/content/uploads/background-guides/<conference-slug>/<committee-slug>.pdf` and is served publicly via CloudFront (`assets.numun.org`).
 
-The DDB `Committee.backgroundGuideRef` (DATA_MODEL.md §2.8) references the canonical content path; the relationship between CMS BG-guide entries and DDB Committee rows is **by convention, not enforced**. Staff are responsible for keeping the slug consistent.
+The DDB `Committee.backgroundGuideRef` (DATA_MODEL.md §2.8) references the canonical content path; the relationship between CMS BG-guide entries and DDB Committee rows is **by convention, not enforced**. Staff are responsible for keeping the slug consistent. **The directory name `background-guides` must not be renamed** — the API and portal hard-code it.
 
 ### 4.7 FAQ (folder collection)
 
@@ -297,6 +317,46 @@ The DDB `Committee.backgroundGuideRef` (DATA_MODEL.md §2.8) references the cano
 | `order` | number | within category |
 
 Default sort: `(category ASC, order ASC)`.
+
+### 4.9 Travel-team roster (folder collection)
+
+Members of Northwestern's competitive collegiate delegation — the old Angular
+site's `/collegiate-delegation` page. One file per member under
+`/content/travel-team-roster/<slug>.md`. Distinct from the `travel-team.md`
+singleton (§4.1.4), which lists the *conferences* the team attends.
+
+| Field | Widget | Notes |
+|---|---|---|
+| `name` | string (≤80) | |
+| `teamRole` | string (≤80) | optional, e.g., `"Head Delegate"` |
+| `headshot` | image | optional, alt text required |
+| `school` | string (≤120) | optional, school / college within NU |
+| `gradYear` | number | optional |
+| `majors` | list of string | optional |
+| `minors` | list of string | optional |
+| `yearsOnTeam` | number | optional |
+| `accentColor` | select | same palette as §4.6 |
+| `quote` | text | optional, "what they're excited for" |
+| `order` | number | optional, sort order |
+
+Default sort: `(order ASC, name ASC)`.
+
+### 4.10 Info pages — files collection
+
+Audience-targeted reference pages — the old site's `/info/advisers`,
+`/info/delegates`, `/info/students`. A fixed "files" collection under
+`/content/pages/info/`. All three share one schema.
+
+| Field | Widget | Notes |
+|---|---|---|
+| `title` | string (≤100) | |
+| `intro` | markdown | optional |
+| `body` | markdown | optional, long-form prose |
+| `sections` | list of object | each: `{ heading (≤100), body (markdown) }` |
+| `timeline` | list of object | optional; each: `{ date, label }` |
+| `feeTable` | list of object | optional; each: `{ item, amount, notes (optional) }` |
+| `documentLinks` | list of object | optional; each: `{ label, href, description (optional) }` |
+| `seo` | object | per §7, optional |
 
 ### 4.8 Site config — singleton files
 
