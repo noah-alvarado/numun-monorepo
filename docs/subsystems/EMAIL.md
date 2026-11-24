@@ -20,10 +20,10 @@ Two origins: **Cognito** (auth flows, sent on our behalf via SES) and **the appl
 
 | ID | Trigger | Recipient | Sender |
 |---|---|---|---|
-| **C1** | Sign-up verification code | New advisor | `cognito@mail.numun.org` |
-| **C2** | Password reset code | Any user | `cognito@mail.numun.org` |
-| **C3** | Staff invite (temp password) | New staff member | `cognito@mail.numun.org` |
-| **C4** | Email change verification | Any user | `cognito@mail.numun.org` |
+| **C1** | Sign-up verification code | New advisor | `accounts@mail.numun.org` |
+| **C2** | Password reset code | Any user | `accounts@mail.numun.org` |
+| **C3** | Staff invite (temp password) | New staff member | `accounts@mail.numun.org` |
+| **C4** | Email change verification | Any user | `accounts@mail.numun.org` |
 
 Cognito is configured to send via SES (§4.1), not via Cognito's default low-rate sender. Templates use Cognito's defaults in v1; custom-message Lambda trigger for branding is deferred to v1.1.
 
@@ -74,7 +74,7 @@ Deferred to v1.1:
 | Sending subdomain | `mail.numun.org` (isolated from any future `@numun.org` human mailboxes) |
 | Primary sender (transactional) | `noreply@mail.numun.org` |
 | Announcements sender | `announcements@mail.numun.org` |
-| Cognito sender | `cognito@mail.numun.org` |
+| Cognito sender | `accounts@mail.numun.org` |
 | Reply-To (transactional + announcements) | Omitted. `mail.<apex>` has no MX, so replies bounce; the footer says replies aren't monitored and templates that invite follow-up link `mailto:registration@numun.org` (Zoho) instead. |
 | Bounce / complaint feedback loop | SES → SNS topic `numun-prod-email-feedback` → handler Lambda (§6). |
 
@@ -192,7 +192,7 @@ Tokens used in `_layout.html.tmpl` (brand color, font stack, asset URLs) are der
 
 - Configured in `infra/base-data/template.yaml` via the `CognitoEmailSender` parameter, set per env as `COGNITO_EMAIL_SENDER` in `infra/envs/<env>.yaml`:
   - `cognito` (current, works in the SES sandbox): `COGNITO_DEFAULT`, sender `no-reply@verificationemail.com`, 50 emails/day. Bounces don't reach our feedback topic.
-  - `ses` (after SES production access): `DEVELOPER` mode, `From: NUMUN <cognito@mail.<apex>>` via the `mail.<apex>` domain identity, through the `numun-<env>-email` configuration set so bounces reach the feedback Lambda. Switch procedure: [ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a.
+  - `ses` (after SES production access): `DEVELOPER` mode, `From: NUMUN Portal <accounts@mail.<apex>>` via the `mail.<apex>` domain identity, through the `numun-<env>-email` configuration set so bounces reach the feedback Lambda. Switch procedure: [ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a.
 - No Reply-To.
 
 ### 4.2 Cognito email content in v1

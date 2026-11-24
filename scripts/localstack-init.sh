@@ -24,6 +24,6 @@ awslocal sns create-topic --name      numun-test-alarms                  >/dev/n
 # up for real staging email (`mail.test.numun.org`).
 awslocal ses verify-email-identity --email-address noreply@mail.test.numun.org        >/dev/null 2>&1 || true
 awslocal ses verify-email-identity --email-address announcements@mail.test.numun.org  >/dev/null 2>&1 || true
-awslocal ses verify-email-identity --email-address cognito@mail.test.numun.org        >/dev/null 2>&1 || true
+awslocal ses verify-email-identity --email-address accounts@mail.test.numun.org        >/dev/null 2>&1 || true
 
 echo "LocalStack init complete."

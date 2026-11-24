@@ -14,7 +14,7 @@ CAPTCHA / Turnstile is **not** enabled in v1. This runbook is the activation pro
 
 Investigate when any of the following fire:
 
-- **SES bounce-rate spike on `cognito@mail.numun.org`** — verification codes sent to non-existent inboxes. CloudWatch SES `Reputation.BounceRate` > 2% sustained, or `EmailEvent` rows of `kind = bounce` clustered in time. This is the strongest leading indicator and the link to [`./email-reputation-collapse.md`](./email-reputation-collapse.md).
+- **SES bounce-rate spike on `accounts@mail.numun.org`** — verification codes sent to non-existent inboxes. CloudWatch SES `Reputation.BounceRate` > 2% sustained, or `EmailEvent` rows of `kind = bounce` clustered in time. This is the strongest leading indicator and the link to [`./email-reputation-collapse.md`](./email-reputation-collapse.md).
 - **`User` row count jumps vs. baseline.** Baseline growth is single-digit per day; sustained double- or triple-digit per-hour growth is anomalous outside the late-summer registration window.
 - **`AuthAuditEvent` of `kind = signup_completed` clustering** from one source IP, one ASN, or one email domain (lots of `@mailinator.com` etc.).
 - **Cognito `SignUpAttempts` metric** spiking in the Cognito console (succeeded + failed), especially when failures dominate (rate-limit rejections from Cognito's built-in caps).
@@ -104,7 +104,7 @@ Query the `entity = "User"` GSI for `createdAt BETWEEN` the suspect window. List
 
 ### 3.3 Cross-reference `EmailEvent`
 
-Bounce / delivery events on `cognito@mail.numun.org` are written as `EmailEvent` rows under `EMAIL_FEEDBACK#<emailLowercase>` (orphan-recipient variant, since these often have no real `User`). Pull these for the same window to see which target inboxes were hit.
+Bounce / delivery events on `accounts@mail.numun.org` are written as `EmailEvent` rows under `EMAIL_FEEDBACK#<emailLowercase>` (orphan-recipient variant, since these often have no real `User`). Pull these for the same window to see which target inboxes were hit.
 
 ### 3.4 Check CloudTrail if abuse precedes our Lambda
 
