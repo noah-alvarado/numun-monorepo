@@ -1,0 +1,116 @@
+name: site preview
+
+# Builds the site for a PR and serves it at https://pr-<n>.preview.<test apex>.
+# Decap's editorial workflow shows the `deploy/preview` commit status as its
+# "View preview" link. Previews always deploy to the test account; the
+# deploy-preview role can only write the previews bucket.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, closed]
+    paths:
+      - "site/**"
+      - "content/**"
+      - "packages/tailwind-tokens/**"
+      - ".github/workflows/site-preview.yml"
+
+permissions:
+  id-token: write
+  contents: read
+  statuses: write
+
+concurrency:
+  group: site-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+env:
+  ENV: test
+  PR: pr-${{ github.event.pull_request.number }}
+  HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+jobs:
+  deploy:
+    # Fork PRs get no OIDC token; skip them instead of failing.
+    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment:
+      name: test-preview
+      url: ${{ steps.urls.outputs.preview }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - id: urls
+        name: derive preview URL + role
+        run: |
+          echo "preview=https://${PR}.preview.${APEX_DOMAIN}" >> "$GITHUB_OUTPUT"
+          echo "PREVIEW_URL=https://${PR}.preview.${APEX_DOMAIN}" >> "$GITHUB_ENV"
+          echo "DEPLOY_ROLE_PREVIEW_ARN=arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-preview" >> "$GITHUB_ENV"
+          echo "BUCKET=numun-${ENV_NAME}-previews" >> "$GITHUB_ENV"
+      - name: mark preview pending
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state=pending -f context=deploy/preview -f description="Building preview"
+      - name: Fetch active conference
+        # Same fallback behavior as site.yml.
+        run: |
+          mkdir -p content/_generated
+          response=$(curl -sS --max-time 10 -X POST \
+            -H "Content-Type: application/json" -H "Accept: application/json" \
+            --data '{}' \
+            "https://api.${APEX_DOMAIN}/numun.v1.PublicService/GetActiveConference" \
+            || true)
+          if echo "$response" | jq -e '.conference' >/dev/null 2>&1; then
+            echo "$response" | jq '.conference // null' > content/_generated/active-conference.json
+          else
+            echo '{"conferenceId": null}' > content/_generated/active-conference.json
+          fi
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: "pnpm"
+      - run: pnpm install --frozen-lockfile
+      - name: build site
+        env:
+          SITE_BASE: ${{ env.PREVIEW_URL }}
+          PUBLIC_VERSION: ${{ env.PR }}
+        run: pnpm --filter @numun/site build
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ env.DEPLOY_ROLE_PREVIEW_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+      - name: upload preview
+        run: aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" --delete --cache-control "no-cache"
+      - name: mark preview ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state=success -f context=deploy/preview \
+            -f target_url="$PREVIEW_URL" -f description="Preview ready"
+      - name: mark preview failed
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+            -f state=failure -f context=deploy/preview \
+            -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
+            -f description="Preview build failed"
+
+  cleanup:
+    if: github.event.action == 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: test-preview
+    steps:
+      - uses: actions/checkout@v4
+      - name: load env config
+        run: scripts/load-env.sh "$ENV"
+      - uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::${{ env.AWS_ACCOUNT_ID }}:role/numun-${{ env.ENV_NAME }}-deploy-preview
+          aws-region: ${{ env.AWS_REGION }}
+      - name: delete preview
+        run: aws s3 rm "s3://numun-${ENV_NAME}-previews/${PR}/" --recursive

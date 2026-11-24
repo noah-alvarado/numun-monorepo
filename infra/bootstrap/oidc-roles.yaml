@@ -423,6 +423,39 @@ Resources:
                 Resource:
                   - !Sub "arn:aws:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/numun-${Env}-base-cdn/*"
 
+  # PR previews run on unreviewed branches, so this role reaches only the
+  # previews bucket. Its GitHub Environment (`<env>-preview`) allows any branch.
+  DeployRolePreview:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub "numun-${Env}-deploy-preview"
+      Description: GitHub Actions OIDC role for PR site previews (.github/workflows/site-preview.yml).
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOIDCProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            Condition:
+              StringEquals:
+                "token.actions.githubusercontent.com:aud": sts.amazonaws.com
+                "token.actions.githubusercontent.com:sub": !Sub "repo:${GitHubOrg}/${GitHubRepo}:environment:${GitHubEnvironment}-preview"
+      Policies:
+        - PolicyName: preview-deploy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:DeleteObject
+                  - s3:GetObject
+                  - s3:ListBucket
+                Resource:
+                  - !Sub "arn:aws:s3:::numun-${Env}-previews"
+                  - !Sub "arn:aws:s3:::numun-${Env}-previews/*"
+
   DeployRolePortal:
     Type: AWS::IAM::Role
     Properties:
@@ -739,6 +772,9 @@ Outputs:
   DeployRoleSiteArn:
     Description: ARN to set as role-to-assume in .github/workflows/site.yml.
     Value: !GetAtt DeployRoleSite.Arn
+  DeployRolePreviewArn:
+    Description: ARN to set as role-to-assume in .github/workflows/site-preview.yml.
+    Value: !GetAtt DeployRolePreview.Arn
   DeployRolePortalArn:
     Description: ARN to set as role-to-assume in .github/workflows/portal.yml.
     Value: !GetAtt DeployRolePortal.Arn

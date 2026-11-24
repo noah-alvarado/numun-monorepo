@@ -39,3 +39,5 @@ API_CERTIFICATE_ARN: arn:aws:acm:us-east-2:034083889387:certificate/ba2da586-da1
 # CloudFront cert (covers `test.numun.org`, `*.test.numun.org`), must be
 # in us-east-1 per the CloudFront requirement.
 CDN_CERTIFICATE_ARN: arn:aws:acm:us-east-1:034083889387:certificate/3c72a813-d7e9-4b2b-9f84-5f0e786533df
+# PR preview cert (`*.preview.test.numun.org`, us-east-1). Empty disables previews.
+PREVIEW_CERTIFICATE_ARN: arn:aws:acm:us-east-1:034083889387:certificate/58980df4-3b25-4c2a-a38a-b2c7c91d925b

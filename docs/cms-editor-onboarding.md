@@ -46,8 +46,12 @@ To edit:
 2. Pick an existing entry, or click **New** to add one.
 3. Fill in the fields. Required fields are marked.
 4. Images: drag-drop into the upload widget. Every image **requires alt text** — describe the image in one sentence; this is for accessibility and search.
-5. Click **Publish** (top right). Your change is committed to the site repository immediately.
-6. A **GitHub Actions** build kicks off automatically — within ~2 minutes your change will appear on https://numun.org.
+5. Click **Save**. This opens a draft (a pull request on GitHub) and starts a **preview build**. It doesn't change the live site.
+6. Open the **Workflow** tab. After ~2 minutes your entry shows **View preview**, a private copy of the site with your change at `https://pr-<number>.preview.test.numun.org`.
+7. Review the preview:
+   - **Needs changes:** edit the entry and **Save** again. The preview rebuilds.
+   - **Looks right:** set the status to **Ready**, then **Publish**. Your change merges and the live site rebuilds within ~2 minutes.
+   - **Abandon it:** **Delete unpublished entry**. The draft and its preview are removed.
 
 ---
 
@@ -93,9 +97,13 @@ The deploy takes 1–2 minutes. Check the build status at:
 
 If the build failed, click in for the logs — usually a missing required field. Edit the offending entry, fix, and publish again.
 
-### I can't see my change locally / on preview
+### I can't see my change on the preview
 
-There is no separate preview environment. The CMS edits commit directly to `main` and the site rebuilds. If you'd like a draft-and-review flow, raise it with an admin — it's a configuration change we can apply.
+The preview builds after each **Save** and takes ~2 minutes. If **View preview** doesn't appear, or the entry shows a failed check, open the draft's pull request on GitHub (linked from the Workflow card) and click the failed **site preview** check for its log. A missing required field is the usual cause.
+
+### Publish is greyed out or fails
+
+Publishing merges only content changes. If an entry's draft also touches files outside `content/` (it shouldn't, through the CMS), an admin has to review it. The **Content file check** also blocks anything under `content/` that isn't Markdown, an image, or a PDF.
 
 ---
 

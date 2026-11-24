@@ -1,0 +1,7 @@
+# Any PR that touches code, workflows, infra or this file needs the
+# maintainer's approval before merge (ruleset on `main`, SECURITY.md §3.2.1).
+*           @noah-alvarado
+
+# Editor-owned content is deliberately unowned, so Decap can publish a
+# content-only PR without a code-owner review.
+/content/

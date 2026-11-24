@@ -62,7 +62,7 @@ Node is pinned to **24.16.0** (`.nvmrc`); Go to the version in `api/go.mod`. Use
 
 **Multi-env via parameterized SAM.** Templates accept `Env`, `RootDomain`, `EnvSubdomain` and compose the effective apex via a `HasSubdomain` condition. Every named resource, Export, cookie domain, CORS origin, CloudFront alias, and API GW domain derives from these. Current deployed env is `test` at `test.numun.org`; the same templates stand up `prod` in a different AWS account. Do not hardcode `numun-prod-*` or `numun.org` — thread `Env` and the composed apex through instead. See `docs/runbooks/fresh-environment-deploy.md`.
 
-**Trunk-based, prod-only deploys.** Every merge to `main` deploys via path-filtered workflows (`api.yml`, `site.yml`, `portal.yml`, `cms.yml`). No PR previews, no staging gate. Ship behind flags or in small PRs. `ci.yml` blocks merge on lint/typecheck/tests/`buf lint`/`buf breaking`. `/content/**` direct-to-main is allowed (Decap requires it); code paths are not.
+**Trunk-based, prod-only deploys.** Every merge to `main` deploys via path-filtered workflows (`api.yml`, `site.yml`, `portal.yml`, `cms.yml`). No staging gate. Ship behind flags or in small PRs. `ci.yml` blocks merge on lint/typecheck/tests/`buf lint`/`buf breaking`. A ruleset on `main` requires a PR; `.github/CODEOWNERS` leaves `/content/` unowned, so Decap content PRs merge without review while anything else needs the maintainer. PRs touching `site/` or `content/` get a preview at `pr-<n>.preview.test.numun.org` (`site-preview.yml`).
 
 **Cost ceiling is real.** Target under $100/yr AWS spend; billing alarm at $10/mo. Prefer serverless/on-demand; avoid always-on resources. If a design choice would push past the ceiling, flag it.
 

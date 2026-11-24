@@ -610,8 +610,8 @@ These checks live in the Astro build pipeline, not in Decap, because Decap's run
 - **OAuth app registration runbook** (`docs/cms-oauth-app-setup.md`) — one-time GitHub setup steps for new deployments / regeneration.
 - **Migrating media to S3** — if `/content/uploads/` ever bloats Git history meaningfully (likely after several years of news posts), shift to a Decap S3 media library backend. Schema unchanged; deployment + a proxy Lambda required.
 - **Awards archive as DDB-derived render** — defer until enough DDB-tracked Award data exists across multiple years to justify the change.
-- **Editorial workflow upgrade path** — if an unreviewed bad edit ever ships, switch `publish_mode` to `editorial_workflow` and document the PR-review flow.
-- **Preview deploys** — full-component preview (a temporary CloudFront for each in-progress draft) would help editors see their changes before commit. Not in v1; revisit when content volume warrants it.
+- **Editorial workflow** — ✅ adopted 2026-11-24: `publish_mode: editorial_workflow`; each save opens a PR with a site preview, Publish merges it (cms-editor-onboarding.md §3).
+- **Preview deploys** — ✅ adopted 2026-11-24: `site-preview.yml` serves each PR at `pr-<n>.preview.test.numun.org` and posts the `deploy/preview` status Decap links to.
 - **Per-section editor permissions** — Decap can be extended with custom plugins or hosted on top of a CMS that supports finer-grained roles. Not v1.
 - **i18n** — Decap supports it; data model would need locale prefixes on every collection. Not v1.
 - **Site search** — Pagefind or Algolia DocSearch can be wired in at build time when news/archive volume justifies it.

@@ -238,7 +238,7 @@ Reviewed 2026-11-24 to answer: should `infra.yml` deploy `numun-${Env}-oidc-role
 
 1. Set a deployment branch policy on every deploy environment (`test`, future `prod`) restricting it to `main`. *(`test` done 2026-11-24.)*
 2. Add a permissions boundary for Lambda execution roles: a managed policy `numun-${Env}-lambda-boundary` defined in the bootstrap stack (outside anything deploy-api can modify), set as `PermissionsBoundary` on every role in `infra/api/template.yaml`, and required via an `iam:PermissionsBoundary` condition on deploy-api's `CreateRole` / `PutRolePolicy` / `AttachRolePolicy`. *(`test` done 2026-11-24.)*
-3. Separate content-editing access from code-push access so CMS editors cannot run workflows (e.g. editors commit only through a Decap-owned path enforced by a ruleset, or content moves to its own repo).
+3. Separate content-editing access from code-push access so CMS editors cannot run workflows (e.g. editors commit only through a Decap-owned path enforced by a ruleset, or content moves to its own repo). *(Done 2026-11-24: ruleset on `main` requires a PR and code-owner review; `.github/CODEOWNERS` owns everything except `/content/`; Decap uses `editorial_workflow` so editors publish by merging content-only PRs; the required **Content file check** limits `/content` to Markdown and media. PR previews use a `deploy-preview` role scoped to the previews bucket.)*
 
 ### 3.3 Secrets
 
