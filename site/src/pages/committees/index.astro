@@ -1,0 +1,67 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import Container from "../../components/Container.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import CommitteeCard from "../../components/CommitteeCard.astro";
+
+const all = await getCollection("background-guides");
+
+const sorted = [...all].sort(
+  (a, b) =>
+    (a.data.order ?? 999) - (b.data.order ?? 999) ||
+    a.data.committeeName.localeCompare(b.data.committeeName),
+);
+
+const conferenceNames = [...new Set(sorted.map((e) => e.data.conferenceName))];
+const groups = conferenceNames.map((name) => ({
+  name,
+  items: sorted.filter((e) => e.data.conferenceName === name),
+}));
+---
+
+<Layout
+  title="Committees"
+  description="Explore the committees offered at NUMUN, their dais staff, and background guides."
+  canonicalPath="/committees"
+>
+  <Container class="py-16">
+    <PageHeader
+      title="Committees"
+      intro="From global assemblies to fast-paced crisis rooms — find the committee that's right for you."
+    />
+
+    {
+      groups.length === 0 && (
+        <p class="text-nu-black-500">
+          Committees for the next conference will be announced soon.
+        </p>
+      )
+    }
+
+    {
+      groups.map((group) => (
+        <section class="mb-14">
+          {groups.length > 1 && (
+            <h2 class="mb-5 font-display text-2xl font-bold text-nu-purple">
+              {group.name}
+            </h2>
+          )}
+          <div class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {group.items.map((e) => (
+              <CommitteeCard
+                name={e.data.committeeName}
+                href={`/committees/${e.id}`}
+                committeeType={e.data.committeeType}
+                committeeSize={e.data.committeeSize}
+                accent={e.data.accentColor}
+                image={e.data.headerImage}
+                summary={e.data.description}
+              />
+            ))}
+          </div>
+        </section>
+      ))
+    }
+  </Container>
+</Layout>

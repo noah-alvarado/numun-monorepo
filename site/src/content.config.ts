@@ -48,6 +48,29 @@ const heroPrimaryCtaShape = z.object({
   href: z.string().optional(),
 });
 
+// Accent token for committee / roster cards. Maps to a Northwestern secondary
+// palette color in the renderer (e.g. "green" → bg-nu-green). Replaces the old
+// Angular site's node-vibrant per-image color extraction with a fixed,
+// brand-approved set chosen by editors. "purple" is the default primary.
+const accentColor = z
+  .enum(["purple", "green", "teal", "blue", "yellow", "gold", "orange"])
+  .default("purple");
+
+// A single staff member on a committee dais or crisis team.
+const staffer = z.object({
+  role: z.string().max(60),
+  name: z.string().max(80),
+});
+
+// Letter from the committee chair shown on the committee detail page.
+const chairLetter = z.object({
+  salutation: z.string().max(120),
+  paragraphs: z.array(z.string()),
+  signoff: z.string().max(120).optional(),
+  chairName: z.string().max(80),
+  email: z.email().optional(),
+});
+
 // ── singletons under /content/pages/ ────────────────────────────────────────
 
 const home = defineCollection({
@@ -261,6 +284,13 @@ const awardsArchive = defineCollection({
   }),
 });
 
+// Background guides double as the public committee-detail content. The
+// directory name `background-guides` is a cross-system contract: DDB
+// `Committee.backgroundGuideRef` (DATA_MODEL.md §2.8, committees.proto) and the
+// portal reference `/content/background-guides/<conf>/<committee>.md` paths, so
+// it must NOT be renamed. The optional fields below carry the richer committee
+// page (description, staff, chair letter) ported from the old Angular site;
+// entries that only supply the PDF still validate.
 const backgroundGuides = defineCollection({
   loader: glob({ pattern: "**/*.md", base: root("background-guides") }),
   schema: z.object({
@@ -270,6 +300,82 @@ const backgroundGuides = defineCollection({
     conferenceName: z.string().max(80),
     pdfFile: z.string(),
     updatedAt: z.coerce.date().optional(),
+    // Committee-detail display fields (optional; ported from old site).
+    abbreviation: z.string().max(20).optional(),
+    description: z.string().optional(),
+    headerImage: image.optional(),
+    accentColor: accentColor,
+    daisStaff: z.array(staffer).default([]),
+    crisisStaff: z.array(staffer).default([]),
+    chairLetter: chairLetter.optional(),
+    positions: z.array(z.string()).optional(),
+    order: z.number().int().optional(),
+  }),
+});
+
+// Collegiate travel-team roster — members of Northwestern's competitive
+// delegation (the old site's /collegiate-delegation page). Distinct from the
+// `travel-team` singleton, which lists the conferences the team attends.
+const travelTeamRoster = defineCollection({
+  loader: glob({ pattern: "**/*.md", base: root("travel-team-roster") }),
+  schema: z.object({
+    name: z.string().max(80),
+    teamRole: z.string().max(80).optional(),
+    headshot: image.optional(),
+    school: z.string().max(120).optional(),
+    gradYear: z.number().int().optional(),
+    majors: z.array(z.string()).default([]),
+    minors: z.array(z.string()).default([]),
+    yearsOnTeam: z.number().int().optional(),
+    accentColor: accentColor,
+    quote: z.string().optional(),
+    order: z.number().int().optional(),
+  }),
+});
+
+// Info pages — advisers / delegates / students. A fixed "files" set under
+// /content/pages/info/. Faithful port of the old Angular /info/* pages
+// (timelines, fee tables, document links) into structured, CMS-editable fields.
+const info = defineCollection({
+  loader: glob({ pattern: "*.md", base: root("pages/info") }),
+  schema: z.object({
+    title: z.string().max(100),
+    intro: z.string().optional(),
+    sections: z
+      .array(
+        z.object({
+          heading: z.string().max(100),
+          body: z.string(),
+        }),
+      )
+      .default([]),
+    timeline: z
+      .array(
+        z.object({
+          date: z.string().max(80),
+          label: z.string().max(200),
+        }),
+      )
+      .optional(),
+    feeTable: z
+      .array(
+        z.object({
+          item: z.string().max(120),
+          amount: z.string().max(60),
+          notes: z.string().max(200).optional(),
+        }),
+      )
+      .optional(),
+    documentLinks: z
+      .array(
+        z.object({
+          label: z.string().max(120),
+          href: z.string(),
+          description: z.string().max(200).optional(),
+        }),
+      )
+      .optional(),
+    seo,
   }),
 });
 
@@ -360,6 +466,8 @@ export const collections = {
   "past-conferences": pastConferences,
   "awards-archive": awardsArchive,
   "background-guides": backgroundGuides,
+  "travel-team-roster": travelTeamRoster,
+  info,
   faq,
   "seo-defaults": seoDefaults,
   footer,

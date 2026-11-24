@@ -1,0 +1,36 @@
+---
+interface Letter {
+  salutation: string;
+  paragraphs: string[];
+  signoff?: string;
+  chairName: string;
+  email?: string;
+}
+interface Props {
+  letter: Letter;
+}
+const { letter } = Astro.props;
+---
+
+<div class="rounded-lg border border-nu-purple-100 bg-nu-purple-50/40 p-6">
+  <p class="font-display text-lg font-semibold text-nu-purple">
+    {letter.salutation}
+  </p>
+  <div class="mt-3 space-y-3 leading-relaxed text-nu-black-700">
+    {letter.paragraphs.map((p) => <p>{p}</p>)}
+  </div>
+  {letter.signoff && <p class="mt-4 text-nu-black-700">{letter.signoff}</p>}
+  <p class="mt-1 font-display font-semibold text-nu-purple">
+    {letter.chairName}
+  </p>
+  {
+    letter.email && (
+      <a
+        class="text-sm text-nu-purple hover:underline"
+        href={`mailto:${letter.email}`}
+      >
+        {letter.email}
+      </a>
+    )
+  }
+</div>

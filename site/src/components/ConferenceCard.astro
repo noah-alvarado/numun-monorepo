@@ -1,0 +1,33 @@
+---
+interface Props {
+  conferenceName: string;
+  editionNumber: number;
+  year: number;
+  dateRange: string;
+  image?: { src: string; alt: string };
+  summary?: string;
+}
+const { conferenceName, dateRange, image, summary } = Astro.props;
+---
+
+<article
+  class="flex flex-col overflow-hidden rounded-lg border border-nu-purple-100 bg-white"
+>
+  {
+    image && (
+      <img
+        src={image.src}
+        alt={image.alt}
+        class="aspect-[16/9] w-full object-cover"
+        loading="lazy"
+      />
+    )
+  }
+  <div class="flex flex-1 flex-col p-5">
+    <p class="text-xs uppercase tracking-wide text-nu-black-500">{dateRange}</p>
+    <h3 class="mt-1 font-display text-xl font-semibold text-nu-purple">
+      {conferenceName}
+    </h3>
+    {summary && <p class="mt-2 text-sm text-nu-black-600">{summary}</p>}
+  </div>
+</article>

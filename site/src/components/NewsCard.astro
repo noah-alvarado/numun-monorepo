@@ -1,0 +1,43 @@
+---
+interface Props {
+  title: string;
+  href: string;
+  date: Date;
+  summary: string;
+  author?: string;
+  image?: { src: string; alt: string };
+}
+const { title, href, date, summary, author, image } = Astro.props;
+const dateStr = date.toLocaleDateString("en-US", {
+  year: "numeric",
+  month: "long",
+  day: "numeric",
+});
+---
+
+<article
+  class="flex flex-col overflow-hidden rounded-lg border border-nu-purple-100 bg-white transition hover:shadow-md"
+>
+  {
+    image && (
+      <a href={href}>
+        <img
+          src={image.src}
+          alt={image.alt}
+          class="aspect-[16/9] w-full object-cover"
+          loading="lazy"
+        />
+      </a>
+    )
+  }
+  <div class="flex flex-1 flex-col p-5">
+    <p class="text-xs uppercase tracking-wide text-nu-black-500">
+      <time datetime={date.toISOString()}>{dateStr}</time>
+      {author && ` · ${author}`}
+    </p>
+    <h3 class="mt-1 font-display text-xl font-semibold text-nu-purple">
+      <a href={href} class="hover:underline">{title}</a>
+    </h3>
+    <p class="mt-2 text-sm text-nu-black-600">{summary}</p>
+  </div>
+</article>

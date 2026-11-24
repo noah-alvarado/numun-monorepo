@@ -1,0 +1,51 @@
+---
+import { getCollection } from "astro:content";
+import Layout from "../../layouts/Layout.astro";
+import Container from "../../components/Container.astro";
+import PageHeader from "../../components/PageHeader.astro";
+import NewsCard from "../../components/NewsCard.astro";
+
+const all = await getCollection("news");
+const posts = [...all].sort(
+  (a, b) => b.data.date.getTime() - a.data.date.getTime(),
+);
+---
+
+<Layout
+  title="News"
+  description="Announcements and updates from Northwestern University Model United Nations."
+  canonicalPath="/news"
+>
+  <Container class="py-16">
+    <div class="flex items-start justify-between gap-4">
+      <PageHeader title="News" intro="Announcements and updates from NUMUN." />
+      <a
+        href="/news/rss.xml"
+        class="mt-2 shrink-0 text-sm font-medium text-nu-purple hover:underline"
+      >
+        RSS
+      </a>
+    </div>
+
+    {
+      posts.length === 0 && (
+        <p class="text-nu-black-500">No news posts yet. Check back soon.</p>
+      )
+    }
+
+    <div class="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+      {
+        posts.map((p) => (
+          <NewsCard
+            title={p.data.title}
+            href={`/news/${p.id}`}
+            date={p.data.date}
+            summary={p.data.summary}
+            author={p.data.author}
+            image={p.data.heroImage}
+          />
+        ))
+      }
+    </div>
+  </Container>
+</Layout>

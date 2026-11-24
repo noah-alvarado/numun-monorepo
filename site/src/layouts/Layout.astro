@@ -12,6 +12,9 @@
 
 import { getEntry } from "astro:content";
 
+import SiteHeader from "../components/SiteHeader.astro";
+import SiteFooter from "../components/SiteFooter.astro";
+
 // Global Tailwind v4 stylesheet (preflight + utilities + brand tokens).
 // Pulled in via a side-effect import so Astro emits a single CSS bundle
 // linked from every page that uses this layout.
@@ -80,7 +83,13 @@ const canonical = canonicalPath
     for longer chunks of copy at smaller sizes." Headlines opt into
     `font-display` / `font-sans` (Poppins / Campton) explicitly.
   -->
-  <body class="bg-white text-nu-black-800 font-serif">
-    <slot />
+  <body
+    class="flex min-h-screen flex-col bg-white text-nu-black-800 font-serif"
+  >
+    <SiteHeader />
+    <div class="flex-1">
+      <slot />
+    </div>
+    <SiteFooter />
   </body>
 </html>

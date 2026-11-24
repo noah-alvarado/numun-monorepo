@@ -1,0 +1,144 @@
+---
+// Site-wide header + primary navigation.
+//
+// No-JS responsive pattern: a hidden checkbox (`#nav-toggle`) drives the
+// mobile menu via Tailwind's `peer-checked:` variant; on `lg` the nav is
+// always shown. Dropdowns use native hover/focus-within on desktop and
+// render expanded inline on mobile.
+import { portalUrl } from "../lib/site-urls";
+
+if (!Astro.site) throw new Error("Astro.site is required (set SITE_BASE)");
+const registerUrl = portalUrl(Astro.site, "/sign-up");
+
+interface NavChild {
+  label: string;
+  href: string;
+}
+interface NavItem {
+  label: string;
+  href: string;
+  children?: NavChild[];
+}
+
+const nav: NavItem[] = [
+  { label: "About", href: "/about" },
+  { label: "Leadership", href: "/leadership" },
+  { label: "Committees", href: "/committees" },
+  {
+    label: "Conference",
+    href: "/hosted-conference",
+    children: [
+      { label: "Overview", href: "/hosted-conference" },
+      { label: "For Advisers", href: "/info/advisers" },
+      { label: "For Delegates", href: "/info/delegates" },
+      { label: "For Students", href: "/info/students" },
+    ],
+  },
+  { label: "Travel Team", href: "/travel-team" },
+  {
+    label: "Resources",
+    href: "/resources",
+    children: [
+      { label: "Resources", href: "/resources" },
+      { label: "FAQ", href: "/faq" },
+      { label: "News", href: "/news" },
+      { label: "Past Conferences", href: "/past-conferences" },
+      { label: "Awards", href: "/awards" },
+    ],
+  },
+  { label: "Contact", href: "/contact" },
+];
+
+const path = Astro.url.pathname;
+const isActive = (href: string) =>
+  href === "/" ? path === "/" : path === href || path.startsWith(href + "/");
+---
+
+<header
+  class="sticky top-0 z-50 border-b border-nu-purple-100 bg-white/95 backdrop-blur"
+>
+  <input type="checkbox" id="nav-toggle" class="peer sr-only" />
+
+  <div
+    class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-3"
+  >
+    <a
+      href="/"
+      class="font-display text-lg font-bold tracking-tight text-nu-purple"
+    >
+      NUMUN
+    </a>
+
+    <div class="flex items-center gap-3">
+      <a
+        href={registerUrl}
+        class="rounded bg-nu-purple px-4 py-1.5 text-sm font-semibold text-white transition hover:bg-nu-purple-700"
+      >
+        Register
+      </a>
+      <label
+        for="nav-toggle"
+        class="flex h-9 w-9 cursor-pointer items-center justify-center rounded border border-nu-purple-200 text-nu-purple lg:hidden"
+        aria-label="Toggle navigation menu"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          class="h-5 w-5"
+        >
+          <line x1="3" y1="6" x2="21" y2="6"></line>
+          <line x1="3" y1="12" x2="21" y2="12"></line>
+          <line x1="3" y1="18" x2="21" y2="18"></line>
+        </svg>
+      </label>
+    </div>
+  </div>
+
+  <nav
+    aria-label="Primary"
+    class="hidden border-t border-nu-purple-100 peer-checked:block lg:block lg:border-0"
+  >
+    <ul
+      class="mx-auto flex max-w-6xl flex-col gap-1 px-6 pb-4 lg:flex-row lg:items-center lg:justify-center lg:gap-1 lg:pb-2"
+    >
+      {
+        nav.map((item) => (
+          <li class="group relative">
+            <a
+              href={item.href}
+              class:list={[
+                "block rounded px-3 py-2 text-sm font-medium transition hover:bg-nu-purple-50 hover:text-nu-purple",
+                isActive(item.href) ? "text-nu-purple" : "text-nu-black-700",
+              ]}
+            >
+              {item.label}
+              {item.children && <span class="ml-1 text-xs">▾</span>}
+            </a>
+            {item.children && (
+              <ul class="mt-0.5 ml-3 border-l border-nu-purple-100 lg:absolute lg:left-0 lg:z-10 lg:mt-0 lg:ml-0 lg:hidden lg:min-w-52 lg:rounded lg:border lg:border-nu-purple-100 lg:bg-white lg:py-1 lg:shadow-lg lg:group-hover:block lg:group-focus-within:block">
+                {item.children.map((child) => (
+                  <li>
+                    <a
+                      href={child.href}
+                      class:list={[
+                        "block px-3 py-2 text-sm transition hover:bg-nu-purple-50 hover:text-nu-purple",
+                        isActive(child.href)
+                          ? "text-nu-purple"
+                          : "text-nu-black-600",
+                      ]}
+                    >
+                      {child.label}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </li>
+        ))
+      }
+    </ul>
+  </nav>
+</header>

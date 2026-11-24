@@ -1,0 +1,79 @@
+---
+import { getCollection, render } from "astro:content";
+import Layout from "../layouts/Layout.astro";
+import Container from "../components/Container.astro";
+import PageHeader from "../components/PageHeader.astro";
+
+const all = await getCollection("faq");
+
+const categories = [
+  { key: "general", label: "General" },
+  { key: "registration", label: "Registration" },
+  { key: "payment", label: "Payment" },
+  { key: "day-of", label: "Day of conference" },
+  { key: "delegates", label: "Delegates" },
+  { key: "advisors", label: "Advisors" },
+] as const;
+
+const withContent = await Promise.all(
+  all.map(async (e) => ({
+    data: e.data,
+    Content: (await render(e)).Content,
+  })),
+);
+
+const byCategory = categories
+  .map((c) => ({
+    ...c,
+    items: withContent
+      .filter((q) => q.data.category === c.key)
+      .sort((a, b) => a.data.order - b.data.order),
+  }))
+  .filter((c) => c.items.length > 0);
+---
+
+<Layout
+  title="FAQ"
+  description="Answers to common questions about NUMUN registration, payment, and conference logistics."
+  canonicalPath="/faq"
+>
+  <Container class="py-16">
+    <PageHeader title="Frequently asked questions" />
+
+    {
+      byCategory.length === 0 && (
+        <p class="text-nu-black-500">No FAQs have been published yet.</p>
+      )
+    }
+
+    {
+      byCategory.map((cat) => (
+        <section class="mb-10">
+          <h2 class="mb-3 font-display text-xl font-semibold text-nu-purple">
+            {cat.label}
+          </h2>
+          <ul class="space-y-2">
+            {cat.items.map((q) => {
+              const Answer = q.Content;
+              return (
+                <li class="rounded-lg border border-nu-purple-100 bg-white">
+                  <details class="group">
+                    <summary class="flex cursor-pointer items-center justify-between gap-4 px-4 py-3 font-medium text-nu-black-800">
+                      {q.data.question}
+                      <span class="text-nu-purple transition group-open:rotate-180">
+                        ▾
+                      </span>
+                    </summary>
+                    <div class="rich-text border-t border-nu-purple-100 px-4 py-3 text-sm">
+                      <Answer />
+                    </div>
+                  </details>
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      ))
+    }
+  </Container>
+</Layout>

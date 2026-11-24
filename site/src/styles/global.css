@@ -8,3 +8,70 @@
  */
 @import "tailwindcss";
 @import "@numun/tailwind-tokens/theme.css";
+
+/*
+ * Rendered Markdown (CMS-authored bodies via Astro's <Content />).
+ * Tailwind's preflight resets headings, lists, and links to unstyled, so we
+ * restore readable, on-brand typography for long-form content. Scoped to a
+ * `.rich-text` wrapper so utility-driven layout markup is unaffected. This
+ * stands in for @tailwindcss/typography to avoid an extra dependency.
+ */
+.rich-text {
+  color: var(--color-nu-black-800);
+  line-height: 1.7;
+}
+.rich-text > :first-child {
+  margin-top: 0;
+}
+.rich-text h1,
+.rich-text h2,
+.rich-text h3,
+.rich-text h4 {
+  font-family: var(--font-display);
+  color: var(--color-nu-purple);
+  font-weight: 600;
+  line-height: 1.25;
+}
+.rich-text h1 {
+  font-size: 1.875rem;
+  margin-top: 2rem;
+}
+.rich-text h2 {
+  font-size: 1.5rem;
+  margin-top: 1.75rem;
+}
+.rich-text h3 {
+  font-size: 1.25rem;
+  margin-top: 1.5rem;
+}
+.rich-text p,
+.rich-text ul,
+.rich-text ol,
+.rich-text blockquote,
+.rich-text table {
+  margin-top: 1rem;
+}
+.rich-text a {
+  color: var(--color-nu-purple);
+  text-decoration: underline;
+}
+.rich-text ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+.rich-text ol {
+  list-style: decimal;
+  padding-left: 1.5rem;
+}
+.rich-text li {
+  margin-top: 0.25rem;
+}
+.rich-text blockquote {
+  border-left: 3px solid var(--color-nu-purple-200);
+  padding-left: 1rem;
+  color: var(--color-nu-black-600);
+  font-style: italic;
+}
+.rich-text strong {
+  font-weight: 700;
+}

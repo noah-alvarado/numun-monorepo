@@ -1,0 +1,61 @@
+---
+import { asAccent, accentStrip, accentBorder } from "../lib/accent";
+
+interface Props {
+  name: string;
+  href: string;
+  committeeType: "crisis" | "non-crisis";
+  committeeSize: "small" | "medium" | "large";
+  accent?: string;
+  image?: { src: string; alt: string };
+  summary?: string;
+}
+const { name, href, committeeType, committeeSize, accent, image, summary } =
+  Astro.props;
+const a = asAccent(accent);
+---
+
+<a
+  href={href}
+  class:list={[
+    "group block overflow-hidden rounded-lg border border-nu-purple-100 bg-white transition hover:shadow-md",
+    accentBorder[a],
+  ]}
+>
+  <div class:list={["h-1.5", accentStrip[a]]}></div>
+  {
+    image && (
+      <img
+        src={image.src}
+        alt={image.alt}
+        class="aspect-[16/9] w-full object-cover"
+        loading="lazy"
+      />
+    )
+  }
+  <div class="p-4">
+    <div class="flex flex-wrap items-center gap-2">
+      <span
+        class="rounded-full bg-nu-purple-50 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-nu-purple"
+      >
+        {committeeType === "crisis" ? "Crisis" : "General"}
+      </span>
+      <span
+        class="rounded-full bg-nu-black-50 px-2 py-0.5 text-xs font-medium uppercase tracking-wide text-nu-black-600"
+      >
+        {committeeSize}
+      </span>
+    </div>
+    <h3 class="mt-2 font-display text-lg font-semibold text-nu-purple">
+      {name}
+    </h3>
+    {
+      summary && (
+        <p class="mt-1 line-clamp-3 text-sm text-nu-black-600">{summary}</p>
+      )
+    }
+    <span class="mt-3 inline-block text-sm font-semibold text-nu-purple">
+      View committee →
+    </span>
+  </div>
+</a>

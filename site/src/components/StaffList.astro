@@ -1,0 +1,27 @@
+---
+interface Staffer {
+  role: string;
+  name: string;
+}
+interface Props {
+  title: string;
+  staff: Staffer[];
+}
+const { title, staff } = Astro.props;
+---
+
+{
+  staff.length > 0 && (
+    <div>
+      <h2 class="font-display text-lg font-semibold text-nu-purple">{title}</h2>
+      <ul class="mt-2 divide-y divide-nu-purple-100 rounded border border-nu-purple-100">
+        {staff.map((s) => (
+          <li class="flex items-baseline justify-between gap-4 px-3 py-2 text-sm">
+            <span class="font-medium text-nu-black-800">{s.name}</span>
+            <span class="text-nu-black-500">{s.role}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
