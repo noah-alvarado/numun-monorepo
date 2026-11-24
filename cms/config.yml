@@ -23,8 +23,15 @@ backend:
   # the placeholder; never commit a resolved hostname.
   base_url: https://api.__APEX_DOMAIN__
   auth_endpoint: cms-oauth/auth
+  # Publish merges the entry's PR; match the repo's squash-merge convention.
+  squash_merges: true
+  # Commit status posted by .github/workflows/site-preview.yml; Decap turns
+  # it into the entry's "View preview" link.
+  preview_context: deploy/preview
 
-publish_mode: simple
+# Every save opens a PR (cms/<collection>/<slug>) that gets a preview deploy;
+# Publish merges it. Code owners don't own /content, so no approval is needed.
+publish_mode: editorial_workflow
 
 site_url: https://__APEX_DOMAIN__
 display_url: https://__APEX_DOMAIN__

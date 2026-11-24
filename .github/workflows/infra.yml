@@ -110,7 +110,8 @@ jobs:
               "RootDomain=$ROOT_DOMAIN" \
               "EnvSubdomain=$ENV_SUBDOMAIN" \
               "HostedZoneId=$HOSTED_ZONE_ID" \
-              "CloudFrontCertificateArn=$CDN_CERTIFICATE_ARN"
+              "CloudFrontCertificateArn=$CDN_CERTIFICATE_ARN" \
+              "PreviewCertificateArn=$PREVIEW_CERTIFICATE_ARN"
 
   billing-alarm:
     if: ${{ inputs.stack == 'all' || inputs.stack == 'billing-alarm' }}

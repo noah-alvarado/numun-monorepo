@@ -13,6 +13,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  content:
+    # Required check on `main`: content PRs merge without code review, so
+    # /content may only hold Markdown and media (no MDX/JS/SVG).
+    name: Content file check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          bad=$(git ls-files content | grep -Ev '\.(md|jpe?g|png|webp|gif|pdf)$|/\.gitkeep$' || true)
+          if [ -n "$bad" ]; then
+            echo "::error::Only .md and media files are allowed under content/:"
+            echo "$bad"
+            exit 1
+          fi
+
   proto:
     name: Proto lint + breaking-change check
     runs-on: ubuntu-latest

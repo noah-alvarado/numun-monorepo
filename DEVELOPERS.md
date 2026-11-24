@@ -301,7 +301,7 @@ Each merge to `main` triggers a path-filtered workflow:
 | `/api/**`, `/infra/**` | `.github/workflows/api.yml` | SAM deploy to the API stack |
 | `/cms/**` | `.github/workflows/cms.yml` | S3 `numun-org-cms` + invalidation |
 
-No PR previews, no staging environment — see [APPLICATION.md §8](./docs/APPLICATION.md).
+No staging environment — see [APPLICATION.md §8](./docs/APPLICATION.md). PRs touching `site/` or `content/` get a throwaway site preview at `https://pr-<n>.preview.test.numun.org` (`.github/workflows/site-preview.yml`), removed when the PR closes.
 
 ### 8.2 Manual deploys
 
