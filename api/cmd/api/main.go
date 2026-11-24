@@ -238,7 +238,19 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	limits := ratelimit.DefaultLimits()
 	idem := idempotency.New(st, logger)
 	chain := ratelimit.PerIP(limits)(mw(ratelimit.PerUser(limits)(idem(mux))))
-	return observability.HTTPMiddleware(chain)
+	return observability.HTTPMiddleware(corsPreflight(chain))
+}
+
+// corsPreflight answers browser preflights with 204. The ANY /{proxy+} route forwards OPTIONS
+// here; API Gateway's CorsConfiguration adds the Access-Control-* headers to the response.
+func corsPreflight(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 type healthServer struct{}
