@@ -237,7 +237,7 @@ Reviewed 2026-11-24 to answer: should `infra.yml` deploy `numun-${Env}-oidc-role
 **Recommendation.** Keep break-glass (A) for bootstrap. Revisit C only if bootstrap changes become frequent or Identity Center replaces break-glass (§10). Regardless of item 7, close the escalation path before onboarding any CMS editor:
 
 1. Set a deployment branch policy on every deploy environment (`test`, future `prod`) restricting it to `main`. *(`test` done 2026-11-24.)*
-2. Add a permissions boundary for Lambda execution roles: a managed policy `numun-${Env}-lambda-boundary` defined in the bootstrap stack (outside anything deploy-api can modify), set as `PermissionsBoundary` on every role in `infra/api/template.yaml`, and required via an `iam:PermissionsBoundary` condition on deploy-api's `CreateRole` / `PutRolePolicy` / `AttachRolePolicy`.
+2. Add a permissions boundary for Lambda execution roles: a managed policy `numun-${Env}-lambda-boundary` defined in the bootstrap stack (outside anything deploy-api can modify), set as `PermissionsBoundary` on every role in `infra/api/template.yaml`, and required via an `iam:PermissionsBoundary` condition on deploy-api's `CreateRole` / `PutRolePolicy` / `AttachRolePolicy`. *(`test` done 2026-11-24.)*
 3. Separate content-editing access from code-push access so CMS editors cannot run workflows (e.g. editors commit only through a Decap-owned path enforced by a ruleset, or content moves to its own repo).
 
 ### 3.3 Secrets

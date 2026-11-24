@@ -242,11 +242,8 @@ Resources:
               # IAM ops on stack-managed roles (CFN creates these per deploy).
               - Effect: Allow
                 Action:
-                  - iam:CreateRole
                   - iam:DeleteRole
-                  - iam:AttachRolePolicy
                   - iam:DetachRolePolicy
-                  - iam:PutRolePolicy
                   - iam:DeleteRolePolicy
                   - iam:GetRole
                   - iam:GetRolePolicy
@@ -254,9 +251,13 @@ Resources:
                   - iam:UntagRole
                 Resource:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
-              # Only the lambda boundary may be attached (SECURITY.md §3.2.1).
+              # Granting permissions requires the lambda boundary (SECURITY.md §3.2.1).
               - Effect: Allow
-                Action: iam:PutRolePermissionsBoundary
+                Action:
+                  - iam:CreateRole
+                  - iam:AttachRolePolicy
+                  - iam:PutRolePolicy
+                  - iam:PutRolePermissionsBoundary
                 Resource:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
                 Condition:
