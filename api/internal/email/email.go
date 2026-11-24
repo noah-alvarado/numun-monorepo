@@ -71,7 +71,6 @@ type Service interface {
 type Config struct {
 	SenderTransactional string
 	SenderAnnouncements string
-	SenderCognito       string
 	ReplyTo             string // empty → omit Reply-To
 	UnsubscribeBaseURL  string
 	UnsubscribeSecret   string // HMAC key for stateless unsubscribe tokens
@@ -91,7 +90,6 @@ func LoadConfigFromEnv() Config {
 	return Config{
 		SenderTransactional: os.Getenv("EMAIL_SENDER_TRANSACTIONAL"),
 		SenderAnnouncements: os.Getenv("EMAIL_SENDER_ANNOUNCEMENTS"),
-		SenderCognito:       os.Getenv("EMAIL_SENDER_COGNITO"),
 		ReplyTo:             os.Getenv("EMAIL_REPLY_TO"),
 		UnsubscribeBaseURL:  os.Getenv("EMAIL_UNSUBSCRIBE_BASE_URL"),
 		UnsubscribeSecret:   os.Getenv("EMAIL_UNSUBSCRIBE_SECRET"),
@@ -121,7 +119,6 @@ func (c Config) Validate() error {
 	}{
 		{"EMAIL_SENDER_TRANSACTIONAL", c.SenderTransactional},
 		{"EMAIL_SENDER_ANNOUNCEMENTS", c.SenderAnnouncements},
-		{"EMAIL_SENDER_COGNITO", c.SenderCognito},
 		{"EMAIL_UNSUBSCRIBE_BASE_URL", c.UnsubscribeBaseURL},
 		{"PORTAL_BASE_URL", c.PortalBaseURL},
 		{"ASSETS_BASE_URL", c.AssetsBaseURL},

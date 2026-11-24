@@ -207,12 +207,6 @@ Resources:
               !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
               !Sub "announcements@mail.${RootDomain}",
             ]
-          EMAIL_SENDER_COGNITO:
-            !If [
-              HasSubdomain,
-              !Sub "cognito@mail.${EnvSubdomain}.${RootDomain}",
-              !Sub "cognito@mail.${RootDomain}",
-            ]
           EMAIL_UNSUBSCRIBE_BASE_URL: !If
             - HasSubdomain
             - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
@@ -477,6 +471,11 @@ Resources:
                   - !GetAtt EmailSendQueue.Arn
               - Effect: Allow
                 Action:
+                  - ssm:GetParameter
+                Resource:
+                  - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/email/*"
+              - Effect: Allow
+                Action:
                   - ses:SendEmail
                   - ses:SendRawEmail
                 Resource: "*"
@@ -520,6 +519,10 @@ Resources:
               !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
               !Sub "announcements@mail.${RootDomain}",
             ]
+          EMAIL_UNSUBSCRIBE_BASE_URL: !If
+            - HasSubdomain
+            - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
+            - !Sub "https://api.${RootDomain}/v1/email/unsubscribe"
           EMAIL_QUEUE_URL: !Ref EmailSendQueue
           EMAIL_CONFIGURATION_SET: !Ref EmailConfigurationSet
           PORTAL_BASE_URL: !If
