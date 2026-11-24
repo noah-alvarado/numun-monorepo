@@ -65,6 +65,8 @@ aws cognito-idp update-user-pool \
 
 This makes the portal sign-up form return `NotAuthorizedException` until re-enabled.
 
+`update-user-pool` resets every mutable setting you don't pass, including the post-confirmation trigger and the SES email configuration. Prefer the console toggle. To restore after a CLI change, redeploy `base-data` (`infra.yml`, `stack=base-data`).
+
 ### 2.4 Suspend abused recipient addresses
 
 If the same email is being used as the verification target across many sign-ups (outbound-mail-vector pattern), add it to the SES suppression list so we stop sending to it:

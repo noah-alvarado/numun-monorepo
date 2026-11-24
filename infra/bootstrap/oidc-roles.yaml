@@ -358,6 +358,8 @@ Resources:
                   - ses:CreateConfigurationSet
                   - ses:DeleteConfigurationSet
                   - ses:GetConfigurationSet
+                  - ses:DescribeConfigurationSet
+                  - ses:GetConfigurationSetEventDestinations
                   - ses:UpdateConfigurationSetEventDestination
                   - ses:CreateConfigurationSetEventDestination
                   - ses:DeleteConfigurationSetEventDestination

@@ -286,6 +286,13 @@ describe-stacks` (see `scripts/load-stack-outputs.sh`).
 There is no CI workflow for base-data (it's deployed rarely; the
 deploy-api role doesn't carry permissions for Cognito/DDB/S3 creation).
 
+Prerequisite: the SES domain identity for `mail.<apex>` and its Cognito
+sending-authorization policy ([ses-domain-setup.md](./ses-domain-setup.md)
+§1–§4a). The pool's `EmailConfiguration` references it.
+
+The api stack doesn't exist yet, so attach no trigger on this first deploy
+(`PostConfirmationTrigger=disabled`); R11 flips it on.
+
 ```bash
 aws cloudformation deploy \
   --profile "$AWS_PROFILE" --region "$AWS_REGION" \
@@ -295,7 +302,8 @@ aws cloudformation deploy \
     Env="$ENV" \
     RootDomain="$ROOT_DOMAIN" \
     EnvSubdomain="$ENV_SUBDOMAIN" \
-    AlarmEmail=ops@example.com
+    AlarmEmail=ops@example.com \
+    PostConfirmationTrigger=disabled
 
 # Capture Cognito + bucket exports
 aws cloudformation describe-stacks \
@@ -369,8 +377,9 @@ curl -s "$ENDPOINT/v1/health" | jq .
 
 ### R11. Wire the Cognito post-confirmation trigger
 
-Same as `first-admin-bootstrap.md` §1, with the new pool id and function
-ARN. Must preserve all other mutable pool config.
+Re-run the R5 command without `PostConfirmationTrigger=disabled` (default
+`enabled`), or dispatch `infra.yml` with `stack=base-data`. Verify per
+`first-admin-bootstrap.md` §1.
 
 ### R12. Bootstrap the first admin
 

@@ -190,12 +190,9 @@ Tokens used in `_layout.html.tmpl` (brand color, font stack, asset URLs) are der
 
 ### 4.1 Configure Cognito to send via SES
 
-- Cognito user pool's email configuration is set to **`Send email with Amazon SES`**, not the default Cognito-managed sender.
-- `FROM` address: `cognito@mail.numun.org` (verified in SES).
-- `SourceArn`: the SES verified identity ARN for the address.
-- `ReplyToEmailAddress`: `contact@numun.org` (or unset).
-
-This raises the Cognito email send cap from 50/day (default) to the full SES throughput.
+- Configured in `infra/base-data/template.yaml`: `EmailSendingAccount: COGNITO_DEFAULT` with `From: NUMUN <cognito@mail.<apex>>` and `SourceArn` = the `mail.<apex>` domain identity. Cognito sends through its own SES account under our identity's sending-authorization policy ([ses-domain-setup.md](../runbooks/ses-domain-setup.md) §4a), so it works while our account is in the SES sandbox.
+- No Reply-To.
+- Limit: 50 Cognito emails/day. Once prod exits the sandbox, switch to `DEVELOPER` to lift the cap to our SES quota. That mode creates a Cognito service-linked role, so the deploy role needs `iam:CreateServiceLinkedRole`. In `COGNITO_DEFAULT`, bounces of Cognito mail don't reach our feedback topic.
 
 ### 4.2 Cognito email content in v1
 
@@ -297,7 +294,7 @@ Each SQS message carries a `clientToken` UUIDv7. The worker checks for an existi
 
 ### 6.1 Wiring
 
-- SES is configured to publish **Bounce**, **Complaint**, and **Delivery** notifications to SNS topic `numun-prod-email-feedback`.
+- SES publishes **Bounce**, **Complaint**, and **Delivery** events to SNS topic `numun-${env}-email-feedback` via the `numun-${env}-email` configuration set's event destination (`infra/api/template.yaml`). The worker names that configuration set on every send. Mail sent outside it (e.g. Cognito) does not produce feedback events.
 - A small Lambda (`/api/cmd/email-feedback/main.go`, third entry point in the same Go module) subscribes to the topic.
 
 ### 6.2 Handling
