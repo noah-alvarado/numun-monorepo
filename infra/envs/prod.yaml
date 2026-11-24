@@ -16,6 +16,7 @@ APEX_DOMAIN: numun.org
 AWS_REGION: us-east-2
 AWS_ACCOUNT_ID: "" # fill in once the prod AWS account is provisioned
 ALARM_EMAIL: "" # fill in before launch
+BILLING_THRESHOLD_USD: "10"
 SAM_ARTIFACTS_BUCKET: "" # numun-prod-sam-deploys-<accountId> once known
 
 # Account-level infrastructure (manually bootstrapped). Populate after

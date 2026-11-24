@@ -214,6 +214,32 @@ None of the deploy roles can read PII tables. None have wildcards on resources o
 
 **Break-glass admin.** One IAM user (`numun-break-glass`) with full administrator privileges for emergencies. MFA enforced. No long-lived access keys; access is via console + temporary STS credentials only. Documented in `/docs/runbooks/breakglass-access.md`.
 
+#### 3.2.1 Deploy-role trust boundary and the bootstrap stack (M14 item 7)
+
+Reviewed 2026-11-24 to answer: should `infra.yml` deploy `numun-${Env}-oidc-roles` (`infra/bootstrap/oidc-roles.yaml`) instead of break-glass?
+
+**What the bootstrap stack controls.** The GitHub OIDC provider, the trust policy and permissions of all five deploy roles, and the SAM artifacts bucket. Any principal that can update it can grant itself arbitrary IAM permissions, so "can deploy bootstrap" is equivalent to account admin.
+
+**The actual gate today.** Every deploy role trusts `token.actions.githubusercontent.com:sub = repo:<org>/<repo>:environment:<GitHubEnvironment>`. Who can assume a role is therefore decided by who can run a job in that GitHub Environment, not by branch protection on `main`. As of this review the `test` environment has **no deployment branch policy and no required reviewers**, so a workflow on any pushed branch that declares `environment: test` can assume any deploy role. (Plan risk #6 intended a `ref:refs/heads/main` constraint; the M2.7 switch to environment-scoped subjects dropped it.)
+
+**Existing escalation path.** `numun-${Env}-deploy-api` holds `iam:CreateRole`, `iam:PutRolePolicy`, and `iam:AttachRolePolicy` on `role/numun-${Env}-api-*` with no `iam:PermissionsBoundary` condition. A job with that role can create `numun-${Env}-api-x` with its own trust policy and `AdministratorAccess` attached, then assume it. deploy-api is already admin-equivalent; moving bootstrap into CI would not widen the blast radius beyond today's, but both should be closed together.
+
+**Who can reach it.** Today the repo has one collaborator (the owner, admin), so exposure is latent. It becomes real the moment a CMS editor is onboarded per `docs/cms-editor-onboarding.md` (Write permission → can push a branch with a workflow), or if an editor's Decap `repo`-scoped token is stolen from `cms.<apex>` (§4.6). Both paths would yield AWS admin.
+
+**Options for item 7.**
+
+| Option | Mechanism | Effect |
+|---|---|---|
+| A. Keep break-glass | Status quo | No new principal can reach admin. Bootstrap changes are rare (a few per year) and already MFA-gated. |
+| B. Grant deploy-infra IAM on deploy roles | Extend `infra-deploy` policy | deploy-infra becomes admin-equivalent behind the same unprotected `test` environment. Rejected. |
+| C. Dedicated `deploy-bootstrap` role | Trusts a separate GitHub Environment (e.g. `test-bootstrap`) with a required reviewer and a `main`-only branch policy; `workflow_dispatch` only | Admin-equivalent, but every run needs a human approval on a `main` commit. Viable once the prerequisites below are in place. |
+
+**Recommendation.** Keep break-glass (A) for bootstrap. Revisit C only if bootstrap changes become frequent or Identity Center replaces break-glass (§10). Regardless of item 7, close the escalation path before onboarding any CMS editor:
+
+1. Set a deployment branch policy on every deploy environment (`test`, future `prod`) restricting it to `main`. *(`test` done 2026-11-24.)*
+2. Add a permissions boundary for Lambda execution roles: a managed policy `numun-${Env}-lambda-boundary` defined in the bootstrap stack (outside anything deploy-api can modify), set as `PermissionsBoundary` on every role in `infra/api/template.yaml`, and required via an `iam:PermissionsBoundary` condition on deploy-api's `CreateRole` / `PutRolePolicy` / `AttachRolePolicy`.
+3. Separate content-editing access from code-push access so CMS editors cannot run workflows (e.g. editors commit only through a Decap-owned path enforced by a ruleset, or content moves to its own repo).
+
 ### 3.3 Secrets
 
 | Where | Stored as |

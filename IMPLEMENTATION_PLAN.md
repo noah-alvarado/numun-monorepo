@@ -265,13 +265,13 @@ The four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) stay 
 2. ✅ **Workflow loader** — `scripts/load-env.sh` reads the env YAML and writes `KEY=value` to `$GITHUB_ENV`. All four deploy workflows (`api.yml`, `portal.yml`, `site.yml`, `cms.yml`) plus `infra.yml` now invoke it.
 3. ✅ **Stack-output lookup** — `scripts/load-stack-outputs.sh` runs `aws cloudformation describe-stacks --query Outputs` and writes each output to `$GITHUB_ENV` (optional prefix arg). Workflows pull `numun-${env}-base-data` (Cognito IDs, bucket ARNs, table name) and `numun-${env}-base-cdn` (distribution IDs). Deploy-role ARNs are derived from `arn:aws:iam::${AWS_ACCOUNT_ID}:role/numun-${ENV_NAME}-deploy-<stack>` (naming convention in `infra/bootstrap/oidc-roles.yaml`) so the chicken-and-egg of "need credentials to read outputs that include role ARN" is sidestepped.
 4. ✅ **Sentry-DSN migration (API)** — `SentryDsn` SAM parameter dropped; `SENTRY_DSN` env-var threading removed from all 4 Lambda functions in `infra/api/template.yaml`. `observability.InitFromEnv` now resolves DSN from `SENTRY_DSN` env var first, then falls back to SSM at `/numun/${ENV}/sentry/dsn` (1-second timeout, best-effort — any failure means Sentry-disabled, never a process crash). Lambda IAM wildcard `ssm:GetParameter` on `/numun/${env}/*` already covers this.
-4a. ⏸ **Sentry-DSN migration (portal)** — portal workflow has the `aws ssm get-parameter` step, but the portal-deploy IAM role needs `ssm:GetParameter` on `/numun/${env}/sentry/*` added to `oidc-roles.yaml` and the bootstrap stack re-deployed (break-glass step). Until then, the step gracefully returns "" and Vite tree-shakes Sentry out of the bundle.
-5. ⏸ **Decommission GitHub Environment variables** — pending verification that the new workflows succeed end-to-end. Once green on `test`, `gh variable delete` each migrated entry.
-6. ⏸ **Update runbooks**:
+4a. ✅ **Sentry-DSN migration (portal)** — portal workflow reads the DSN via `aws ssm get-parameter`; the portal-deploy role's `ssm:GetParameter` on `/numun/${env}/sentry/*` is in `oidc-roles.yaml` and deployed to `numun-test-oidc-roles` (verified 2026-11-24).
+5. ✅ **Decommission GitHub Environment variables** — `gh variable list --env test` is empty and all four deploy workflows are green on `test`. `BILLING_THRESHOLD_USD` moved from `vars.` into the env YAMLs.
+6. ✅ **Update runbooks**:
    - `fresh-environment-deploy.md`: "set GitHub env variables" → "author `infra/envs/<env>.yaml`".
    - `sentry-setup.md`: "create env-scoped GitHub secret" → "create `/numun/${env}/sentry/dsn` SSM SecureString".
    - `operational-launch-checklist.md` §5: Sentry verification updated.
-7. ⏸ **Bring `infra/bootstrap/oidc-roles.yaml` into the `infra.yml` workflow** — currently the only stack still requiring break-glass deploys. Resolution involves granting the `deploy-infra` role the IAM-self-modify perms needed to re-apply oidc-roles.yaml; doing so safely needs review since deploy-infra would then be able to grant itself any permission. Defer to a follow-up sub-task with explicit threat-model write-up.
+7. ⏸ **Bring `infra/bootstrap/oidc-roles.yaml` into the `infra.yml` workflow** — threat model written in SECURITY.md §3.2.1. Recommendation: keep break-glass for bootstrap. The review surfaced a more urgent gap (unprotected `test` environment + deploy-api can mint an admin role) whose three fixes must land before any CMS editor is onboarded.
 
 #### Constraints + risks
 

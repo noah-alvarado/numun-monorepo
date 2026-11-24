@@ -179,7 +179,7 @@ This is **last** — it removes the OIDC deploy roles. Until R3 below
 re-creates them, no CI workflow can deploy anything.
 
 ```bash
-aws cloudformation delete-stack --stack-name "numun-${OLD_ENV}-bootstrap" \
+aws cloudformation delete-stack --stack-name "numun-${OLD_ENV}-oidc-roles" \
   --profile "$AWS_PROFILE" --region "$AWS_REGION"
 ```
 
@@ -225,7 +225,7 @@ bucket. **One-time, runs from the break-glass IAM user.**
 ```bash
 aws cloudformation deploy \
   --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-  --stack-name "numun-${ENV}-bootstrap" \
+  --stack-name "numun-${ENV}-oidc-roles" \
   --template-file infra/bootstrap/oidc-roles.yaml \
   --capabilities CAPABILITY_NAMED_IAM \
   --parameter-overrides \
@@ -237,7 +237,7 @@ aws cloudformation deploy \
 # Capture outputs
 aws cloudformation describe-stacks \
   --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-  --stack-name "numun-${ENV}-bootstrap" \
+  --stack-name "numun-${ENV}-oidc-roles" \
   --query "Stacks[0].Outputs"
 ```
 

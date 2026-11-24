@@ -135,8 +135,6 @@ jobs:
           aws-region: ${{ env.BILLING_ALARM_REGION }}
       - name: deploy
         working-directory: infra/billing-alarm
-        env:
-          THRESHOLD_USD: ${{ vars.BILLING_THRESHOLD_USD || '10' }}
         run: |
           aws cloudformation deploy \
             --stack-name "$STACK_NAME" \
@@ -146,4 +144,4 @@ jobs:
             --parameter-overrides \
               "Env=$ENV" \
               "AlarmEmail=$ALARM_EMAIL" \
-              "ThresholdUsd=$THRESHOLD_USD"
+              "ThresholdUsd=$BILLING_THRESHOLD_USD"
