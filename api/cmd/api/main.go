@@ -134,7 +134,7 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 		logger.Error("init validation interceptor", "err", err)
 		os.Exit(1)
 	}
-	opts := connect.WithInterceptors(validate)
+	opts := connect.WithInterceptors(observability.ConnectInterceptor(), validate)
 	scoper := auth.NewScoper(st)
 
 	healthPath, healthHandler := numunv1connect.NewHealthServiceHandler(&healthServer{}, opts)
