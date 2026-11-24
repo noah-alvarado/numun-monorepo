@@ -1,7 +1,7 @@
 .DEFAULT_GOAL := help
 SHELL := /bin/bash
 
-DEV_CONTAINER_NAMES := numun-ddb-local numun-ddb-init numun-localstack numun-mailhog
+DEV_CONTAINER_NAMES := numun-ddb-local numun-ddb-init numun-localstack numun-mailpit
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
@@ -15,7 +15,7 @@ dev-preflight: ## Remove stale local dev containers that can cause name conflict
 	  docker rm -f $$name >/dev/null 2>&1 || true; \
 	done
 
-dev: ## Bring up the local prod-mirror containers (DDB Local, LocalStack, MailHog) + init.
+dev: ## Bring up the local prod-mirror containers (DDB Local, LocalStack, Mailpit) + init.
 	@$(MAKE) reset
 	@echo ""
 	@echo "Local infra is up. In separate terminals run:"
@@ -23,7 +23,7 @@ dev: ## Bring up the local prod-mirror containers (DDB Local, LocalStack, MailHo
 	@echo "    make dev-portal   # Vite dev server at :5173"
 	@echo "    make dev-site     # Astro dev server at :4321"
 	@echo ""
-	@echo "MailHog web UI:        http://localhost:8025"
+	@echo "Mailpit web UI:        http://localhost:8025"
 	@echo "DynamoDB Local:        http://localhost:8000"
 	@echo "LocalStack:            http://localhost:4566"
 

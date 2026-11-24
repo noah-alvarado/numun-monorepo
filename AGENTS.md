@@ -22,7 +22,7 @@ All routine work goes through the root `Makefile`. From the repo root:
 
 | Task                                                        | Command                                             |
 | ----------------------------------------------------------- | --------------------------------------------------- |
-| Bring up local prod-mirror (DDB Local, LocalStack, MailHog) | `make dev`                                          |
+| Bring up local prod-mirror (DDB Local, LocalStack, Mailpit) | `make dev`                                          |
 | Tear it down                                                | `make dev-down`                                     |
 | Run SAM Local API GW + Go Lambdalith on `:3000`             | `make dev-api`                                      |
 | Run Vite (portal) on `:5173`                                | `make dev-portal`                                   |
