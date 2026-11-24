@@ -228,6 +228,8 @@ func TestPropose_DeterminismSameSeed(t *testing.T) {
 	in := buildLargeCase(t, "conf-det", 12, 8, 2)
 	opts := defaultOpts()
 	opts.Seed = 12345
+	// Phase C is only seed-deterministic when its iteration cap, not the wall-clock budget, ends the search.
+	opts.LocalSearchBudget = time.Minute
 
 	p1, err := Propose(context.Background(), in, opts)
 	if err != nil {
