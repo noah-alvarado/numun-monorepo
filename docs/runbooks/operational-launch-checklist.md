@@ -180,7 +180,7 @@ Notes (anything unexpected during restore): \***\*\*\*\*\***\_\_\_\_\***\*\*\*\*
 
 ## 5. Sentry verification (post-DSN bootstrap)
 
-After completing [`sentry-setup.md`](./sentry-setup.md) — which now stores the DSN in SSM at `/numun/${ENV}/sentry/dsn` rather than in a GitHub Environment secret — confirm both sides are sending events.
+After completing [`sentry-setup.md`](./sentry-setup.md) — which now stores the DSNs in SSM at `/numun/${ENV}/sentry/dsn` (API) and `/numun/${ENV}/sentry/dsn_portal` (portal) rather than in a GitHub Environment secret — confirm both sides are sending events.
 
 ```bash
 # Sanity-check that the SSM parameter exists.

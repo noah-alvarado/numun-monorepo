@@ -71,12 +71,13 @@ jobs:
           scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-data"
           scripts/load-stack-outputs.sh "numun-${ENV_NAME}-base-cdn"
       - name: load Sentry DSN from SSM
-        # Sentry DSN is stored as a SecureString at /numun/${ENV}/sentry/dsn.
+        # Sentry project numun-frontend; DSN is a SecureString at
+        # /numun/${ENV}/sentry/dsn_portal (the API uses .../sentry/dsn).
         # When unset, the export is empty and Vite tree-shakes Sentry out
         # of the portal bundle (portal/src/lib/sentry.ts no-ops).
         run: |
           DSN=$(aws ssm get-parameter \
-            --name "/numun/$ENV_NAME/sentry/dsn" \
+            --name "/numun/$ENV_NAME/sentry/dsn_portal" \
             --with-decryption \
             --query 'Parameter.Value' \
             --output text 2>/dev/null || echo "")
