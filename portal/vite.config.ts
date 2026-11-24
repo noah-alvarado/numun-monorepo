@@ -8,6 +8,10 @@ import { fileURLToPath, URL } from "node:url";
 
 export default defineConfig({
   plugins: [solid(), tailwindcss()],
+  // amazon-cognito-identity-js pulls in buffer@4, which reads Node's `global` at module init.
+  define: {
+    global: "globalThis",
+  },
   resolve: {
     alias: {
       "@": fileURLToPath(new URL("./src", import.meta.url)),
