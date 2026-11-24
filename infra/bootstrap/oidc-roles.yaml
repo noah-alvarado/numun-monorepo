@@ -64,6 +64,91 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # ── Lambda execution-role permissions boundary ─────────────────────────────────
+  # Caps every role deploy-api can create, so it cannot mint an admin role.
+  # Lives here (not in the api stack) so deploy-api cannot edit it. See
+  # SECURITY.md §3.2.1.
+  LambdaExecutionBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "numun-${Env}-lambda-boundary"
+      Description: Permissions boundary for Lambda execution roles created by the api stack.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:BatchGetItem
+              - dynamodb:BatchWriteItem
+              - dynamodb:ConditionCheckItem
+            Resource:
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}"
+              - !Sub "arn:aws:dynamodb:${AWS::Region}:${AWS::AccountId}:table/numun-${Env}/index/*"
+          - Effect: Allow
+            Action:
+              - ssm:GetParameter
+              - ssm:GetParameters
+              - ssm:GetParametersByPath
+            Resource:
+              - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/*"
+          - Effect: Allow
+            Action: kms:Decrypt
+            Resource: "*"
+            Condition:
+              StringEquals:
+                kms:ViaService: !Sub "ssm.${AWS::Region}.amazonaws.com"
+          - Effect: Allow
+            Action:
+              - cognito-idp:InitiateAuth
+              - cognito-idp:RevokeToken
+              - cognito-idp:AdminCreateUser
+              - cognito-idp:AdminGetUser
+              - cognito-idp:AdminUpdateUserAttributes
+            Resource:
+              - !Sub "arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*"
+          - Effect: Allow
+            Action:
+              - s3:PutObject
+              - s3:GetObject
+            Resource:
+              - !Sub "arn:aws:s3:::numun-${Env}-uploads/*"
+          - Effect: Allow
+            Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Resource: "*"
+          - Effect: Allow
+            Action:
+              - sqs:SendMessage
+              - sqs:ReceiveMessage
+              - sqs:DeleteMessage
+              - sqs:ChangeMessageVisibility
+              - sqs:GetQueueAttributes
+            Resource:
+              - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:numun-${Env}-email-send"
+              - !Sub "arn:aws:sqs:${AWS::Region}:${AWS::AccountId}:numun-${Env}-email-send-dlq"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogGroup
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource:
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-*"
+              - !Sub "arn:aws:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-*:*"
+          - Effect: Allow
+            Action:
+              - xray:PutTraceSegments
+              - xray:PutTelemetryRecords
+              - xray:GetSamplingRules
+              - xray:GetSamplingTargets
+            Resource: "*"
+
   # ── Trust policy fragment (re-used by every deploy role) ────────────────────
   # Constrains the OIDC subject to <org>/<repo> on the named branch only — a
   # fork's workflow cannot assume these roles even if it knows the role ARN.
@@ -169,6 +254,14 @@ Resources:
                   - iam:UntagRole
                 Resource:
                   - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
+              # Only the lambda boundary may be attached (SECURITY.md §3.2.1).
+              - Effect: Allow
+                Action: iam:PutRolePermissionsBoundary
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-api-*"
+                Condition:
+                  StringEquals:
+                    iam:PermissionsBoundary: !Ref LambdaExecutionBoundary
               # API Gateway HTTP API + custom domain.
               - Effect: Allow
                 Action:
@@ -628,6 +721,9 @@ Outputs:
   SamArtifactsBucketName:
     Description: SAM artifacts bucket — pass to `sam deploy --s3-bucket`.
     Value: !Ref SamArtifactsBucket
+  LambdaExecutionBoundaryArn:
+    Description: Permissions boundary required on api-stack Lambda roles.
+    Value: !Ref LambdaExecutionBoundary
   DeployRoleApiArn:
     Description: ARN to set as role-to-assume in .github/workflows/api.yml.
     Value: !GetAtt DeployRoleApi.Arn

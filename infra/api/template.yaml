@@ -83,6 +83,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "numun-${Env}-api-execution"
+      PermissionsBoundary: !Sub "arn:aws:iam::${AWS::AccountId}:policy/numun-${Env}-lambda-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -307,6 +308,7 @@ Resources:
       # Name must match the numun-${Env}-api-* pattern that the deploy-api OIDC
       # role is allowed to manage via iam:CreateRole / iam:PassRole.
       RoleName: !Sub "numun-${Env}-api-cognito-post-confirmation-execution"
+      PermissionsBoundary: !Sub "arn:aws:iam::${AWS::AccountId}:policy/numun-${Env}-lambda-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -407,6 +409,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "numun-${Env}-api-email-worker-execution"
+      PermissionsBoundary: !Sub "arn:aws:iam::${AWS::AccountId}:policy/numun-${Env}-lambda-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
@@ -498,6 +501,7 @@ Resources:
     Type: AWS::IAM::Role
     Properties:
       RoleName: !Sub "numun-${Env}-api-email-feedback-execution"
+      PermissionsBoundary: !Sub "arn:aws:iam::${AWS::AccountId}:policy/numun-${Env}-lambda-boundary"
       AssumeRolePolicyDocument:
         Version: "2012-10-17"
         Statement:
