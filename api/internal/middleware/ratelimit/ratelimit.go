@@ -104,7 +104,7 @@ func PerUser(limits Limits) func(http.Handler) http.Handler {
 // apply the tight or loose per-IP cap, not whether auth runs.
 func isAnonymousPath(p string) bool {
 	switch p {
-	case "/v1/health", "/v1/email/unsubscribe":
+	case "/v1/health", "/v1/email/unsubscribe", "/v1/diag":
 		return true
 	}
 	if strings.HasPrefix(p, "/numun.v1.PublicService/") {

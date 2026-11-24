@@ -45,6 +45,7 @@ func TestPublicPathBypassesAuth(t *testing.T) {
 
 	for _, path := range []string{
 		"/v1/health",
+		"/v1/diag",
 		"/numun.v1.HealthService/Check",
 		"/numun.v1.AuthService/Exchange",
 		"/numun.v1.AuthService/RecordPasswordResetCompleted",

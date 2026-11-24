@@ -55,7 +55,7 @@ func InitFromEnv(component string, logger *slog.Logger) bool {
 	}
 	dsn := os.Getenv("SENTRY_DSN")
 	if dsn == "" {
-		dsn = fetchDSNFromSSM(logger)
+		dsn = fetchSSMParam(logger, "sentry/dsn")
 	}
 	if dsn == "" {
 		return false
@@ -189,7 +189,7 @@ func isSensitive(k string) bool {
 	return ok
 }
 
-// fetchDSNFromSSM reads /numun/${ENV}/sentry/dsn as a SecureString.
+// fetchSSMParam reads /numun/${ENV}/<name> as a SecureString.
 // Returns "" on any failure — missing param, no IAM perm, no AWS
 // credentials (local dev), network issue. The intent is "Sentry is
 // optional; never break the process for it."
@@ -197,7 +197,7 @@ func isSensitive(k string) bool {
 // Uses a 1-second timeout so a slow/unreachable SSM endpoint doesn't
 // hold up Lambda cold-start. Real connectivity issues will surface
 // elsewhere (the Lambda's other SSM-loaded configs will fail similarly).
-func fetchDSNFromSSM(logger *slog.Logger) string {
+func fetchSSMParam(logger *slog.Logger, name string) string {
 	envName := firstNonEmpty(os.Getenv("ENV"), os.Getenv("ENV_NAME"))
 	if envName == "" {
 		return ""
@@ -210,7 +210,7 @@ func fetchDSNFromSSM(logger *slog.Logger) string {
 		return ""
 	}
 	out, err := ssm.NewFromConfig(cfg).GetParameter(ctx, &ssm.GetParameterInput{
-		Name:           aws.String("/numun/" + envName + "/sentry/dsn"),
+		Name:           aws.String("/numun/" + envName + "/" + name),
 		WithDecryption: aws.Bool(true),
 	})
 	if err != nil {

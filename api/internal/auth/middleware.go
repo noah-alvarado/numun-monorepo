@@ -44,7 +44,8 @@ func isPublic(p string) bool {
 		return true
 	}
 	switch p {
-	case "/v1/health", "/", "/v1/email/unsubscribe":
+	// /v1/diag is the portal's Sentry tunnel (observability.TunnelPath).
+	case "/v1/health", "/", "/v1/email/unsubscribe", "/v1/diag":
 		return true
 	}
 	if strings.HasPrefix(p, "/cms-oauth/") {

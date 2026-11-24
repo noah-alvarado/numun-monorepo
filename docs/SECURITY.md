@@ -136,7 +136,7 @@ JSON and Protobuf binary deserialization are handled by the Connect framework �
 | Cognito sign-in | 5 failed attempts/min/user, plus per-IP global limits | Built-in |
 | Per-user (all authenticated RPCs) | 300 req/min | In-memory `golang.org/x/time/rate` bucket per Lambda env, keyed by `userId` |
 | Per-IP (authenticated RPCs, defense-in-depth) | 600 req/min | In-memory bucket per Lambda env, keyed by `X-Forwarded-For` client IP |
-| Per-IP (anonymous surfaces: `PublicService.*`, `AuthService.Exchange`, `/cms-oauth/*`) | 60 req/min | In-memory bucket per Lambda env, keyed by client IP |
+| Per-IP (anonymous surfaces: `PublicService.*`, `AuthService.Exchange`, `/cms-oauth/*`, `/v1/diag` Sentry tunnel) | 60 req/min | In-memory bucket per Lambda env, keyed by client IP |
 | Bulk import | 10 previews + 10 commits per hour per advisor (BULK_IMPORT.md §8.2) | DDB conditional counter at `USER#<id>#BULK_IMPORT_HOUR#<floor(unix/3600)>` with 1h TTL — one write per attempt |
 | Per-route ceiling | API Gateway HTTP API account-level throttle (default 10k burst / 5k sustained) | AWS-managed; acts as the wallet shield against runaway traffic |
 
