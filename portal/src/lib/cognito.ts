@@ -117,6 +117,8 @@ export async function signIn(
     };
   }
   const user = new CognitoUser({ Username: email, Pool: pool });
+  // The app client only allows USER_PASSWORD_AUTH (AUTH.md §4.2); the library defaults to SRP.
+  user.setAuthenticationFlowType("USER_PASSWORD_AUTH");
   return new Promise<SignInResult>((resolve, reject) => {
     user.authenticateUser(
       new AuthenticationDetails({ Username: email, Password: password }),
