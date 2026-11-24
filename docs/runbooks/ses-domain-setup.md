@@ -2,6 +2,8 @@
 
 One-time procedure. Verifies `mail.numun.org` as a sending domain, creates three purpose-scoped sender identities, publishes SPF/DKIM/DMARC, and submits the SES sandbox-exit request. Region: `us-east-2`.
 
+**Per environment.** The sending domain is `mail.<apex>`: `mail.numun.org` for prod, `mail.test.numun.org` for `test` (derived from `EnvSubdomain` in `infra/api/template.yaml`). Run this procedure once per AWS account, substituting that env's mail domain below and publishing records in that env's hosted zone.
+
 References: [EMAIL.md](../subsystems/EMAIL.md) §2 and §13, [SECURITY.md](../SECURITY.md) §3.7.
 
 ## Prerequisites

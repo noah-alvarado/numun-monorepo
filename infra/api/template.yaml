@@ -155,8 +155,16 @@ Resources:
                 Condition:
                   StringEquals:
                     ses:FromAddress:
-                      - !Sub "noreply@mail.${RootDomain}"
-                      - !Sub "announcements@mail.${RootDomain}"
+                      - !If [
+                          HasSubdomain,
+                          !Sub "noreply@mail.${EnvSubdomain}.${RootDomain}",
+                          !Sub "noreply@mail.${RootDomain}",
+                        ]
+                      - !If [
+                          HasSubdomain,
+                          !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
+                          !Sub "announcements@mail.${RootDomain}",
+                        ]
               - Effect: Allow
                 Action:
                   - sqs:SendMessage
@@ -187,9 +195,24 @@ Resources:
           SENTRY_ENVIRONMENT: !Ref Env
           SENTRY_RELEASE: !Ref CommitSha
           # M9 email pipeline. EMAIL.md §5.
-          EMAIL_SENDER_TRANSACTIONAL: !Sub "noreply@mail.${RootDomain}"
-          EMAIL_SENDER_ANNOUNCEMENTS: !Sub "announcements@mail.${RootDomain}"
-          EMAIL_SENDER_COGNITO: !Sub "cognito@mail.${RootDomain}"
+          EMAIL_SENDER_TRANSACTIONAL:
+            !If [
+              HasSubdomain,
+              !Sub "noreply@mail.${EnvSubdomain}.${RootDomain}",
+              !Sub "noreply@mail.${RootDomain}",
+            ]
+          EMAIL_SENDER_ANNOUNCEMENTS:
+            !If [
+              HasSubdomain,
+              !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
+              !Sub "announcements@mail.${RootDomain}",
+            ]
+          EMAIL_SENDER_COGNITO:
+            !If [
+              HasSubdomain,
+              !Sub "cognito@mail.${EnvSubdomain}.${RootDomain}",
+              !Sub "cognito@mail.${RootDomain}",
+            ]
           EMAIL_UNSUBSCRIBE_BASE_URL: !If
             - HasSubdomain
             - !Sub "https://api.${EnvSubdomain}.${RootDomain}/v1/email/unsubscribe"
@@ -450,8 +473,16 @@ Resources:
                 Condition:
                   StringEquals:
                     ses:FromAddress:
-                      - !Sub "noreply@mail.${RootDomain}"
-                      - !Sub "announcements@mail.${RootDomain}"
+                      - !If [
+                          HasSubdomain,
+                          !Sub "noreply@mail.${EnvSubdomain}.${RootDomain}",
+                          !Sub "noreply@mail.${RootDomain}",
+                        ]
+                      - !If [
+                          HasSubdomain,
+                          !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
+                          !Sub "announcements@mail.${RootDomain}",
+                        ]
 
   EmailWorkerFunction:
     Type: AWS::Serverless::Function
@@ -467,8 +498,18 @@ Resources:
       Environment:
         Variables:
           DDB_TABLE_NAME: !Sub "numun-${Env}"
-          EMAIL_SENDER_TRANSACTIONAL: !Sub "noreply@mail.${RootDomain}"
-          EMAIL_SENDER_ANNOUNCEMENTS: !Sub "announcements@mail.${RootDomain}"
+          EMAIL_SENDER_TRANSACTIONAL:
+            !If [
+              HasSubdomain,
+              !Sub "noreply@mail.${EnvSubdomain}.${RootDomain}",
+              !Sub "noreply@mail.${RootDomain}",
+            ]
+          EMAIL_SENDER_ANNOUNCEMENTS:
+            !If [
+              HasSubdomain,
+              !Sub "announcements@mail.${EnvSubdomain}.${RootDomain}",
+              !Sub "announcements@mail.${RootDomain}",
+            ]
           EMAIL_QUEUE_URL: !Ref EmailSendQueue
           EMAIL_CONFIGURATION_SET: !Ref EmailConfigurationSet
           PORTAL_BASE_URL: !If
@@ -620,9 +661,9 @@ Outputs:
   EmailFeedbackTopicArn:
     Description: >
       SNS topic to subscribe SES bounce + complaint notifications to. Wire via:
-        aws ses put-identity-notification-topic --identity mail.${RootDomain} \
+        aws ses put-identity-notification-topic --identity mail.<apex> \
           --notification-type Bounce --sns-topic <arn>
-        aws ses put-identity-notification-topic --identity mail.${RootDomain} \
+        aws ses put-identity-notification-topic --identity mail.<apex> \
           --notification-type Complaint --sns-topic <arn>
     Value: !Ref EmailFeedbackTopic
   EmailConfigurationSetName:
