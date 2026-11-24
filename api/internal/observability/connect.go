@@ -28,6 +28,8 @@ func ConnectInterceptor() connect.UnaryInterceptorFunc {
 			}
 			hub.WithScope(func(scope *sentry.Scope) {
 				scope.SetTag("rpc.procedure", req.Spec().Procedure)
+				// Every capture shares the interceptor's stack, so split issues per RPC.
+				scope.SetFingerprint([]string{"{{ default }}", req.Spec().Procedure})
 				hub.CaptureException(err)
 			})
 			// Lambda freezes after the response, so send before returning.

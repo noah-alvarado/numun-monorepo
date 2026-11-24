@@ -55,15 +55,18 @@ No code or IAM change.
 
 After the next deploy:
 
-1. **API** — `curl https://api.<apex>/v1/health` (should still 200). To
-   trigger a real error, run any RPC that intentionally fails (e.g., POST
-   `/numun.v1.DelegationService/GetDelegation` with a malformed body). The
-   error should appear in Sentry within a minute, tagged
-   `component=api`, `environment=<env>`, with the deploy's commit SHA as
-   the `release`.
-2. **Portal** — open `https://portal.<apex>` with browser devtools. In the
-   console, run `throw new Error("sentry-smoketest")`. Reload — the error
-   should land in Sentry tagged `environment=<env>`.
+1. **API** — only RPCs failing with `internal` / `unknown` / `data_loss`
+   (and panics) are reported, via `observability.ConnectInterceptor`;
+   client errors such as a malformed body (`invalid_argument`) are not.
+   No RPC fails that way on demand, so verification needs a temporary
+   trigger: see #22 (admin-only `GetUser` with `user_id:
+"sentry-test-error"`), reverted in #23. Expect an issue in
+   `numun-backend` tagged `environment=<env>` and `rpc.procedure`, with
+   the commit SHA as `release`.
+2. **Portal** — open `https://portal.<apex>` with devtools and run
+   `setTimeout(() => { throw new Error("Sentry test error " + Date.now()) })`.
+   A bare `throw` typed into the console is not an app error and isn't
+   reported. Expect an issue in `numun-frontend` tagged `environment=<env>`.
 
 If errors don't show up, check:
 
@@ -72,6 +75,22 @@ If errors don't show up, check:
 - The `dist/assets/index-*.js` bundle for the literal DSN string. If
   absent, Vite tree-shook Sentry out because the env var was empty at
   build time.
+- The browser's Network tab for the request to `ingest.us.sentry.io`. Ad
+  blockers and Firefox tracking protection block it; retry in a private
+  window with protection off.
+
+### Grouping and in-app frames (`numun-backend`)
+
+API events all share the interceptor's stack, so the interceptor adds the
+RPC procedure to the fingerprint (`{{ default }}` + procedure) to keep one
+issue per RPC. The project's stack-trace rules (Settings → Projects →
+`numun-backend` → Issue Grouping) mark our packages in-app:
+
+```
+stack.module:github.com/numun/numun/** +app
+stack.module:main +app
+stack.module:github.com/numun/numun/api/internal/gen/** -app
+```
 
 ## 4. What the BeforeSend hook scrubs
 
