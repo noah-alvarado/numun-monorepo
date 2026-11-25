@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"connectrpc.com/connect"
+	"google.golang.org/protobuf/proto"
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
@@ -208,4 +209,28 @@ func TestAdvisorsAddCoAdvisorsByEmail(t *testing.T) {
 	}
 	_, err = svc.AddAdvisor(leadCtx, connect.NewRequest(&v1.AddAdvisorRequest{DelegationId: del.ID, Email: third.Email}))
 	wantCode(t, err, connect.CodeAlreadyExists)
+}
+
+func TestRejectedDelegationIsReadOnlyForAdvisors(t *testing.T) {
+	st := testStore(t)
+	ctx := context.Background()
+	delegations := &handlers.DelegationService{Store: st, Scoper: auth.NewScoper(st)}
+	delegates := &handlers.DelegateService{Store: st, Scoper: auth.NewScoper(st)}
+	advisor := seedUser(t, st, domain.RoleAdvisor, "")
+	del := seedDelegation(t, st, newUUID(t), advisor.ID)
+	rejected, err := st.SetDelegationStatus(ctx, del.ConferenceID, del.ID, del.Version, domain.DelegationStatusRejected, "admin")
+	if err != nil {
+		t.Fatalf("reject: %v", err)
+	}
+
+	advCtx := as(advisor.ID, domain.RoleAdvisor)
+	_, err = delegations.UpdateDelegation(advCtx, connect.NewRequest(&v1.UpdateDelegationRequest{DelegationId: del.ID, School: proto.String("Renamed"), ExpectedVersion: int32(rejected.Version)}))
+	wantCode(t, err, connect.CodeFailedPrecondition)
+	_, err = delegates.CreateDelegate(advCtx, connect.NewRequest(&v1.CreateDelegateRequest{DelegationId: del.ID, Input: &v1.DelegateInput{FirstName: "Ada", LastName: "Lovelace"}}))
+	wantCode(t, err, connect.CodeFailedPrecondition)
+
+	// Staff can still correct a rejected registration.
+	if _, err := delegates.CreateDelegate(as("admin", domain.RoleStaffAdmin), connect.NewRequest(&v1.CreateDelegateRequest{DelegationId: del.ID, Input: &v1.DelegateInput{FirstName: "Ada", LastName: "Lovelace"}})); err != nil {
+		t.Fatalf("admin create on rejected delegation: %v", err)
+	}
 }

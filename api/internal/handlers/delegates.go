@@ -126,6 +126,9 @@ func (s *DelegateService) CreateDelegate(ctx context.Context, req *connect.Reque
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
 	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
+	}
 	parent, err := s.Store.FindDelegationByID(ctx, delID)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -188,6 +191,9 @@ func (s *DelegateService) UpdateDelegate(ctx context.Context, req *connect.Reque
 		s.log().Error("UpdateDelegate: load", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
+	if err := advisorMayEdit(ctx, s.Store, existing.DelegationID); err != nil {
+		return nil, err
+	}
 	patch := store.UpdateDelegatePatch{}
 	if v := req.Msg.FirstName; v != nil {
 		val := strings.TrimSpace(*v)
@@ -247,6 +253,9 @@ func (s *DelegateService) DeleteDelegate(ctx context.Context, req *connect.Reque
 		}
 		s.log().Error("DeleteDelegate: load", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	if err := advisorMayEdit(ctx, s.Store, existing.DelegationID); err != nil {
+		return nil, err
 	}
 	if err := s.Store.SoftDeleteDelegate(ctx, existing.DelegationID, id, int(req.Msg.GetExpectedVersion()), caller.UserID); err != nil {
 		switch {

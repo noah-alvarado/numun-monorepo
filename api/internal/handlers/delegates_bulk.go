@@ -40,6 +40,9 @@ func (s *DelegateService) PreviewUpsertDelegatesBulk(ctx context.Context, req *c
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
 	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
+	}
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLPreview); err != nil {
 		if errors.Is(err, store.ErrBulkImportRateLimitExceeded) {
@@ -211,6 +214,9 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 	}
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
+	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
 	}
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLCommit); err != nil {

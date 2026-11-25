@@ -236,6 +236,9 @@ func (s *DelegationService) UpdateDelegation(ctx context.Context, req *connect.R
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, id); err != nil {
 		return nil, mapScopeErr(err)
 	}
+	if err := advisorMayEdit(ctx, s.Store, id); err != nil {
+		return nil, err
+	}
 	d, err := s.Store.FindDelegationByID(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -413,6 +416,9 @@ func (s *DelegationService) AddAdvisor(ctx context.Context, req *connect.Request
 	}
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
+	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
 	}
 	role, _ := domainAdvisorRole(req.Msg.GetRole())
 	if role == "" {
