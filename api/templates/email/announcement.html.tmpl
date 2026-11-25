@@ -1,6 +1,7 @@
 {{define "subject"}}{{index .Vars "subject"}}{{end}}
 {{define "body"}}
 <p>Hi{{with .RecipientName}} {{.}}{{end}},</p>
-{{/* bodyHTML is staff-authored and sanitized before send. */}}
-{{index .Vars "bodyHTML"}}
+{{/* Announcements are plain text (SECURITY.md §2.2): escaped here, with
+     line breaks kept by pre-wrap. */}}
+<div style="white-space:pre-wrap;">{{index .Vars "bodyText"}}</div>
 {{end}}

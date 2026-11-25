@@ -1,7 +1,8 @@
 // Announcements — staff-admin emails the advisors of a conference's
 // delegations. Preview shows who would receive it (advisors who opted in and
 // whose email isn't suppressed) before anything is sent. The body is plain
-// text; paragraphs and line breaks carry over to the HTML version.
+// text (SECURITY.md §2.2); the server escapes it into the HTML email and
+// keeps its line breaks.
 
 import { createResource, createSignal, For, Show } from "solid-js";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
@@ -29,23 +30,6 @@ const audienceLabel = (raw: string) => {
     return "Advisors";
   }
 };
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// Blank lines separate paragraphs; single newlines become <br>.
-function textToHtml(text: string): string {
-  return text
-    .trim()
-    .split(/\n\s*\n/)
-    .map((p) => `<p>${escapeHtml(p.trim()).replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-}
 
 export default function AdminAnnouncements() {
   const [user] = userSignal;
@@ -98,7 +82,9 @@ export default function AdminAnnouncements() {
       const resp = await announcementClient.send({
         subject: subject().trim(),
         bodyText: body().trim(),
-        bodyHtml: textToHtml(body()),
+        // Required by the API but unused for rendering: announcements are
+        // plain text.
+        bodyHtml: body().trim(),
         audience: filter(),
       });
       const n = resp.announcement?.recipientCount ?? preview()?.count ?? 0;
@@ -165,7 +151,7 @@ export default function AdminAnnouncements() {
             </label>
             <label class="block">
               <span class="text-xs text-nu-purple-700">
-                Message (blank lines start new paragraphs)
+                Message (plain text; line breaks are kept)
               </span>
               <textarea
                 required
