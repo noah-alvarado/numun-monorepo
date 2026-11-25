@@ -32,11 +32,6 @@ import (
 	"github.com/numun/numun/api/internal/store"
 )
 
-// assignmentBatchSize is the per-TransactWriteItems cap when persisting
-// proposals. DDB hard limit is 100; 25 leaves plenty of room and keeps each
-// batch quick. See BULK_IMPORT.md §6.4 for the precedent.
-const assignmentBatchSize = 25
-
 // algorithmSoftCap is the budget the handler grants Propose under the API
 // Gateway 29s ceiling. See ASSIGNMENT_ALGORITHM.md §9.
 const algorithmSoftCap = 20 * time.Second
@@ -233,25 +228,16 @@ func (s *AssignmentService) Propose(ctx context.Context, req *connect.Request[v1
 		return connect.NewResponse(&v1.ProposeResponse{Run: assignmentRunToProto(updated)}), nil
 	}
 
-	// Persist the proposal: delete prior proposed-status rows + write the new ones.
-	if err := s.Store.DeleteAllProposedAssignmentsForConference(ctx, conferenceID); err != nil {
-		s.log().Error("Propose: delete prior proposed", "err", err)
-		_, _ = s.Store.UpdateAssignmentRunStatus(ctx, persistedRun.ID, domain.AssignmentRunStatusFailed, 0, 0, "delete prior proposed: "+err.Error(), time.Now().UTC())
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("persistence failed"))
-	}
-
+	// Swap the prior proposed rows for this run's; the store rolls back on failure.
 	created := buildAssignmentRows(prop, in.PinnedAssignments, conferenceID, persistedRun.ID, caller.UserID)
-	for i := 0; i < len(created); i += assignmentBatchSize {
-		end := i + assignmentBatchSize
-		if end > len(created) {
-			end = len(created)
+	if err := s.Store.ReplaceProposedAssignments(ctx, conferenceID, persistedRun.ID, created); err != nil {
+		s.log().Error("Propose: persist proposal", "err", err)
+		finalizeCtx := context.WithoutCancel(ctx)
+		_, _ = s.Store.UpdateAssignmentRunStatus(finalizeCtx, persistedRun.ID, domain.AssignmentRunStatusFailed, prop.Objective, 0, "persist proposal: "+err.Error(), time.Now().UTC())
+		if errors.Is(err, store.ErrProposalRollbackIncomplete) {
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("run failed and previous proposals could not be fully restored; re-run to repair"))
 		}
-		if err := s.Store.WriteAssignmentBatch(ctx, persistedRun.ID, created[i:end], nil); err != nil {
-			s.log().Error("Propose: write batch", "err", err, "batchStart", i)
-			diag := fmt.Sprintf("write batch starting at %d: %s", i, err.Error())
-			_, _ = s.Store.UpdateAssignmentRunStatus(ctx, persistedRun.ID, domain.AssignmentRunStatusFailed, prop.Objective, i, diag, time.Now().UTC())
-			return nil, connect.NewError(connect.CodeUnavailable, errors.New("partial proposal persisted; run failed"))
-		}
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("run failed; previous proposals kept"))
 	}
 
 	updated, err := s.Store.UpdateAssignmentRunStatus(ctx, persistedRun.ID, domain.AssignmentRunStatusDone, prop.Objective, len(created), "", time.Now().UTC())

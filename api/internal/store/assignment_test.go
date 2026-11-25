@@ -3,7 +3,12 @@ package store_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
+
+	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/aws/smithy-go/middleware"
 
 	"github.com/numun/numun/api/internal/domain"
 	"github.com/numun/numun/api/internal/store"
@@ -159,16 +164,171 @@ func TestWriteAssignmentBatchAndDeleteProposed(t *testing.T) {
 	if len(proposed) != 2 {
 		t.Fatalf("expected 2 proposed, got %d", len(proposed))
 	}
+}
 
-	// Delete all proposed clears the batch.
-	if err := c.DeleteAllProposedAssignmentsForConference(ctx, conferenceID); err != nil {
-		t.Fatalf("delete proposed: %v", err)
-	}
-	remaining, err := c.ListAllAssignmentsByConference(ctx, conferenceID, "", "", "")
+// proposalFixture is a conference with one committee and two positions.
+type proposalFixture struct {
+	conferenceID, committeeID, pos1, pos2 string
+}
+
+func newProposalFixture(t *testing.T, c *store.Client) proposalFixture {
+	t.Helper()
+	ctx := context.Background()
+	f := proposalFixture{conferenceID: newID(t)}
+	committee, err := c.CreateCommittee(ctx, domain.Committee{
+		ConferenceID: f.conferenceID,
+		Name:         "ReplaceTest",
+		Type:         domain.CommitteeTypeNonCrisis,
+		Size:         domain.CommitteeSizeMedium,
+	})
 	if err != nil {
-		t.Fatalf("list after delete: %v", err)
+		t.Fatalf("create committee: %v", err)
 	}
-	if len(remaining) != 0 {
-		t.Fatalf("expected 0 remaining, got %d", len(remaining))
+	f.committeeID = committee.ID
+	for _, dst := range []*string{&f.pos1, &f.pos2} {
+		p, err := c.CreatePosition(ctx, domain.Position{ConferenceID: f.conferenceID, CommitteeID: committee.ID, Name: newID(t)})
+		if err != nil {
+			t.Fatalf("create position: %v", err)
+		}
+		*dst = p.ID
+	}
+	return f
+}
+
+func (f proposalFixture) row(positionID, delegateID string) domain.Assignment {
+	return domain.Assignment{
+		ConferenceID: f.conferenceID,
+		CommitteeID:  f.committeeID,
+		PositionID:   positionID,
+		DelegateID:   delegateID,
+		DelegationID: "delegation-" + delegateID,
+	}
+}
+
+// proposedByKey lists the conference's proposed rows keyed by position|delegate.
+func proposedByKey(t *testing.T, c *store.Client, conferenceID string) map[string]domain.Assignment {
+	t.Helper()
+	rows, err := c.ListAllAssignmentsByConference(context.Background(), conferenceID, "", "", domain.AssignmentStatusProposed)
+	if err != nil {
+		t.Fatalf("list proposed: %v", err)
+	}
+	out := make(map[string]domain.Assignment, len(rows))
+	for _, a := range rows {
+		out[a.PositionID+"|"+a.DelegateID] = a
+	}
+	return out
+}
+
+// failNthTransact returns a copy of c whose nth TransactWriteItems call fails
+// before reaching DynamoDB.
+func failNthTransact(c *store.Client, n int32) *store.Client {
+	var calls atomic.Int32
+	ddb := dynamodb.New(c.DDB.Options(), func(o *dynamodb.Options) {
+		o.APIOptions = append(o.APIOptions, func(s *middleware.Stack) error {
+			return s.Initialize.Add(middleware.InitializeMiddlewareFunc("failNthTransact",
+				func(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (middleware.InitializeOutput, middleware.Metadata, error) {
+					if awsmiddleware.GetOperationName(ctx) == "TransactWriteItems" && calls.Add(1) == n {
+						return middleware.InitializeOutput{}, middleware.Metadata{}, errors.New("injected failure")
+					}
+					return next.HandleInitialize(ctx, in)
+				}), middleware.After)
+		})
+	})
+	return &store.Client{DDB: ddb, Table: c.Table}
+}
+
+func TestReplaceProposedAssignments(t *testing.T) {
+	ctx := context.Background()
+	c := testClient(t)
+	f := newProposalFixture(t, c)
+	kept, stale, approved, tombstoned, fresh := newID(t), newID(t), newID(t), newID(t), newID(t)
+
+	if err := c.WriteAssignmentBatch(ctx, "run-1", []domain.Assignment{
+		f.row(f.pos1, kept), f.row(f.pos1, stale), f.row(f.pos2, approved), f.row(f.pos2, tombstoned),
+	}, nil); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	if _, err := c.ApproveAssignment(ctx, f.pos2, approved, 1, "actor"); err != nil {
+		t.Fatalf("approve: %v", err)
+	}
+	if err := c.SoftDeleteAssignment(ctx, f.pos2, tombstoned, 1, "actor"); err != nil {
+		t.Fatalf("soft delete: %v", err)
+	}
+
+	err := c.ReplaceProposedAssignments(ctx, f.conferenceID, "run-2", []domain.Assignment{
+		f.row(f.pos1, kept), f.row(f.pos2, tombstoned), f.row(f.pos1, fresh),
+	})
+	if err != nil {
+		t.Fatalf("replace: %v", err)
+	}
+
+	got := proposedByKey(t, c, f.conferenceID)
+	for _, key := range []string{f.pos1 + "|" + kept, f.pos2 + "|" + tombstoned, f.pos1 + "|" + fresh} {
+		if got[key].RunID != "run-2" {
+			t.Errorf("%s: want run-2 proposal, got %+v", key, got[key])
+		}
+	}
+	if len(got) != 3 {
+		t.Errorf("want 3 proposed rows, got %d: %+v", len(got), got)
+	}
+	if a, err := c.GetAssignment(ctx, f.pos2, approved); err != nil || a.Status != domain.AssignmentStatusApproved {
+		t.Errorf("approved row disturbed: %+v, %v", a, err)
+	}
+
+	// A new row may never overwrite an approved one.
+	err = c.ReplaceProposedAssignments(ctx, f.conferenceID, "run-3", []domain.Assignment{f.row(f.pos2, approved)})
+	if err == nil {
+		t.Fatal("replace over an approved row: want error")
+	}
+	if after := proposedByKey(t, c, f.conferenceID); len(after) != 3 || after[f.pos1+"|"+kept].RunID != "run-2" {
+		t.Errorf("run-2 proposals not kept after rejected run: %+v", after)
+	}
+}
+
+func TestReplaceProposedAssignmentsRollsBack(t *testing.T) {
+	cases := []struct {
+		name     string
+		newRows  int   // 30 rows → two put transactions, then one delete transaction
+		failCall int32 // which TransactWriteItems call fails
+	}{
+		{name: "second write chunk fails", newRows: 30, failCall: 2},
+		{name: "discarding stale rows fails", newRows: 3, failCall: 2},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.Background()
+			c := testClient(t)
+			f := newProposalFixture(t, c)
+			overwritten, stale := newID(t), newID(t)
+
+			if err := c.WriteAssignmentBatch(ctx, "run-1", []domain.Assignment{
+				f.row(f.pos1, overwritten), f.row(f.pos1, stale),
+			}, nil); err != nil {
+				t.Fatalf("seed: %v", err)
+			}
+			before := proposedByKey(t, c, f.conferenceID)
+
+			rows := []domain.Assignment{f.row(f.pos1, overwritten)}
+			for len(rows) < tc.newRows {
+				rows = append(rows, f.row(f.pos2, newID(t)))
+			}
+			err := failNthTransact(c, tc.failCall).ReplaceProposedAssignments(ctx, f.conferenceID, "run-2", rows)
+			if err == nil {
+				t.Fatal("want error from injected failure")
+			}
+			if errors.Is(err, store.ErrProposalRollbackIncomplete) {
+				t.Fatalf("rollback should have completed: %v", err)
+			}
+
+			after := proposedByKey(t, c, f.conferenceID)
+			if len(after) != len(before) {
+				t.Fatalf("want the %d prior proposals back, got %d: %+v", len(before), len(after), after)
+			}
+			for key, prev := range before {
+				if after[key].ID != prev.ID || after[key].RunID != "run-1" {
+					t.Errorf("%s: want prior row %+v, got %+v", key, prev, after[key])
+				}
+			}
+		})
 	}
 }
