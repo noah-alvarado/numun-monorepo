@@ -101,30 +101,47 @@ jobs:
               "EnvSubdomain=$ENV_SUBDOMAIN" \
               "CommitSha=${{ github.sha }}" \
               "ReleaseVersion=${{ steps.version.outputs.version }}" \
-              "ApiCertificateArn=$API_CERTIFICATE_ARN" \
+              "CloudFrontCertificateArn=$CDN_CERTIFICATE_ARN" \
+              "OriginVerifySecret=/numun/$ENV/api/origin_verify_secret" \
               "HostedZoneId=$HOSTED_ZONE_ID" \
               "CognitoUserPoolId=$CognitoUserPoolId" \
               "CognitoUserPoolArn=$CognitoUserPoolArn" \
               "CognitoClientId=$CognitoClientId"
-      - name: get HTTP API endpoint
+      - name: get API endpoints
         id: api
         run: |
-          ENDPOINT=$(aws cloudformation describe-stacks \
-            --stack-name "$STACK_NAME" \
-            --query "Stacks[0].Outputs[?OutputKey=='HttpApiEndpoint'].OutputValue | [0]" \
-            --output text)
-          echo "endpoint=$ENDPOINT" >> "$GITHUB_OUTPUT"
-          echo "API endpoint: $ENDPOINT"
+          output() {
+            aws cloudformation describe-stacks \
+              --stack-name "$STACK_NAME" \
+              --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" \
+              --output text
+          }
+          BASE_URL=$(output ApiBaseUrl)
+          ORIGIN_URL=$(output HttpApiEndpoint)
+          echo "base_url=$BASE_URL" >> "$GITHUB_OUTPUT"
+          echo "origin_url=$ORIGIN_URL" >> "$GITHUB_OUTPUT"
+          echo "origin_verify_enforced=$(output OriginVerifyEnforced)" >> "$GITHUB_OUTPUT"
+          echo "API base URL: $BASE_URL (origin: $ORIGIN_URL)"
       - name: smoke check
         run: |
-          for i in $(seq 1 30); do
-            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.api.outputs.endpoint }}/v1/health" || true)
+          # Up to 2 min: allows for alias-record TTL when DNS has just moved.
+          for i in $(seq 1 60); do
+            code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.api.outputs.base_url }}/v1/health" || true)
             echo "attempt $i → $code"
-            [ "$code" = "200" ] && exit 0
+            [ "$code" = "200" ] && break
             sleep 2
           done
-          echo "smoke check failed"
-          exit 1
+          [ "$code" = "200" ] || { echo "smoke check failed"; exit 1; }
+          # Once enforced, the raw execute-api URL must reject requests that
+          # bypass CloudFront. In report-only mode it still serves them.
+          code=$(curl -s -o /dev/null -w '%{http_code}' "${{ steps.api.outputs.origin_url }}/v1/health" || true)
+          echo "direct origin → $code (enforced=${{ steps.api.outputs.origin_verify_enforced }})"
+          if [ "$code" != "403" ]; then
+            if [ "${{ steps.api.outputs.origin_verify_enforced }}" = "true" ]; then
+              echo "origin is reachable without X-Origin-Verify"; exit 1
+            fi
+            echo "::warning::origin verify is report-only; execute-api is reachable directly"
+          fi
       - name: tag release
         env:
           TAG: ${{ steps.version.outputs.tag }}

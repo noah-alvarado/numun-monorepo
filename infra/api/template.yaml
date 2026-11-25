@@ -4,11 +4,14 @@ Description: >
   NUMUN — api stack (fast-changing).
 
   HTTP API + Lambdalith at api.${Apex}, where Apex is composed from
-  EnvSubdomain + RootDomain. Code lives in /api/cmd/api; SAM build
-  cross-compiles a linux/arm64 `bootstrap` binary via /api/Makefile.
+  EnvSubdomain + RootDomain. A CloudFront distribution (HTTP/2 + HTTP/3)
+  owns the api.${Apex} hostname and forwards uncached to the HTTP API's
+  execute-api endpoint; the Lambdalith rejects requests that bypass it.
+  Code lives in /api/cmd/api; SAM build cross-compiles a linux/arm64
+  `bootstrap` binary via /api/Makefile.
 
   Region: us-east-2.
-  References: APPLICATION.md §4, API.md, SECURITY.md §3.2.
+  References: APPLICATION.md §4, API.md, SECURITY.md §3.2, §3.6.
 
 Parameters:
   Env:
@@ -35,10 +38,30 @@ Parameters:
     Type: String
     Default: 0.0.0
     Description: Release version stamped into the binary via ldflags.
-  ApiCertificateArn:
+  CloudFrontCertificateArn:
     Type: String
-    Description: ACM cert ARN in us-east-2 for the api subdomain.
-    AllowedPattern: "^arn:aws:acm:us-east-2:[0-9]{12}:certificate/.+$"
+    Description: >
+      ACM cert ARN in us-east-1 covering *.apex (the same cert base-cdn
+      uses); attached to the api CloudFront distribution.
+    AllowedPattern: "^arn:aws:acm:us-east-1:[0-9]{12}:certificate/.+$"
+  OriginVerifySecret:
+    Type: AWS::SSM::Parameter::Value<String>
+    NoEcho: true
+    Description: >
+      Name of the SSM String parameter (e.g. /numun/test/api/origin_verify_secret)
+      holding the shared secret CloudFront sends to the origin as
+      X-Origin-Verify. Must be String, not SecureString — CloudFormation
+      can't resolve SecureString into CloudFront config. See SECURITY.md §3.6.
+  EnforceOriginVerify:
+    Type: String
+    Default: "false"
+    AllowedValues: ["true", "false"]
+    Description: >
+      "true" → the Lambdalith 403s requests lacking a valid X-Origin-Verify
+      (i.e. that bypassed CloudFront). "false" → report-only: log
+      "origin verify failed" and serve. Ships "false" for the DNS cutover
+      from the API Gateway custom domain; flip the default to "true" once
+      logs show no misses. Also an emergency off-switch.
   HostedZoneId:
     Type: String
     Description: Route 53 zone id for RootDomain.
@@ -231,6 +254,10 @@ Resources:
             - !Sub ".${EnvSubdomain}.${RootDomain}"
             - !Sub ".${RootDomain}"
           COOKIE_SECURE: "true"
+          # Checked by edge.VerifyOrigin; must match the X-Origin-Verify
+          # origin custom header on ApiDistribution.
+          ORIGIN_VERIFY_SECRET: !Ref OriginVerifySecret
+          ORIGIN_VERIFY_ENFORCE: !Ref EnforceOriginVerify
           # Used by /cms-oauth/* to build the GitHub redirect_uri and the
           # postMessage target origin. See CMS_CONTENT_MODEL.md §8.3.
           ROOT_DOMAIN: !Ref RootDomain
@@ -304,16 +331,89 @@ Resources:
           - Connect-Timeout-Ms
         AllowCredentials: true
         MaxAge: 600
-      Domain:
-        DomainName: !If
-          - HasSubdomain
-          - !Sub "api.${EnvSubdomain}.${RootDomain}"
-          - !Sub "api.${RootDomain}"
-        CertificateArn: !Ref ApiCertificateArn
-        EndpointConfiguration: REGIONAL
-        SecurityPolicy: TLS_1_2
-        Route53:
-          HostedZoneId: !Ref HostedZoneId
+
+  # ── CloudFront in front of the HTTP API ─────────────────────────────────────
+  # Gives api.${Apex} HTTP/3 and the same edge layer as the static surfaces.
+  # No caching; every viewer header except Host is forwarded so cookies,
+  # Origin (CORS), Connect-*, Idempotency-Key, and X-CSRF-Token reach the
+  # Lambdalith. API Gateway still answers CORS via CorsConfiguration above.
+  #
+  # The viewer-request function stamps X-Numun-Viewer-Ip with the viewer's IP,
+  # overwriting any client-supplied value, so the API can trust it for rate
+  # limiting and audit IPs (edge.ClientIP). It's also the place to add an
+  # emergency IP blocklist (runbooks/ddos-or-api-abuse.md Stage B).
+  ApiViewerRequestFunction:
+    Type: AWS::CloudFront::Function
+    Properties:
+      Name: !Sub "numun-${Env}-api-viewer-request"
+      AutoPublish: true
+      FunctionConfig:
+        Comment: !Sub "Stamp trusted viewer IP on ${Env} api requests."
+        Runtime: cloudfront-js-2.0
+      FunctionCode: |
+        function handler(event) {
+          var request = event.request;
+          request.headers['x-numun-viewer-ip'] = { value: event.viewer.ip };
+          return request;
+        }
+
+  ApiDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Comment: !Sub "API for ${Env}"
+        Aliases:
+          - !If
+            - HasSubdomain
+            - !Sub "api.${EnvSubdomain}.${RootDomain}"
+            - !Sub "api.${RootDomain}"
+        HttpVersion: http2and3
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          AcmCertificateArn: !Ref CloudFrontCertificateArn
+          MinimumProtocolVersion: TLSv1.2_2021
+          SslSupportMethod: sni-only
+        Origins:
+          - Id: http-api
+            DomainName: !Sub "${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols: [TLSv1.2]
+              # Matches API Gateway's 30s integration ceiling.
+              OriginReadTimeout: 30
+            OriginCustomHeaders:
+              - HeaderName: X-Origin-Verify
+                HeaderValue: !Ref OriginVerifySecret
+        DefaultCacheBehavior:
+          TargetOriginId: http-api
+          ViewerProtocolPolicy: https-only
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          CachePolicyId: 4135ea2d-6df8-44a3-9df3-4b5a84be39ad # Managed-CachingDisabled
+          OriginRequestPolicyId: b689b0a8-53d0-40ab-baf2-68738e2966ac # Managed-AllViewerExceptHostHeader
+          FunctionAssociations:
+            - EventType: viewer-request
+              FunctionARN: !GetAtt ApiViewerRequestFunction.FunctionMetadata.FunctionARN
+
+  # api.${Apex} → ApiDistribution. The logical ID is deliberately the one SAM
+  # generated for the old HttpApi `Domain.Route53` block in the test account,
+  # so CloudFormation repoints the existing alias in place instead of creating
+  # a duplicate record (which Route 53 rejects). Don't rename it.
+  RecordSetGroupd79915f0de:
+    Type: AWS::Route53::RecordSetGroup
+    Properties:
+      HostedZoneId: !Ref HostedZoneId
+      RecordSets:
+        - Name: !If
+            - HasSubdomain
+            - !Sub "api.${EnvSubdomain}.${RootDomain}"
+            - !Sub "api.${RootDomain}"
+          Type: A
+          AliasTarget:
+            HostedZoneId: Z2FDTNDATAQYW2 # CloudFront's fixed alias zone
+            DNSName: !GetAtt ApiDistribution.DomainName
+            EvaluateTargetHealth: false
 
   # ── Cognito post-confirmation Lambda ───────────────────────────────────────
   # Triggered by Cognito after a user confirms their sign-up email. Writes the
@@ -657,8 +757,21 @@ Outputs:
   HttpApiId:
     Value: !Ref HttpApi
   HttpApiEndpoint:
-    Description: Internal HTTP API invoke URL — use the api.${Apex} custom domain in practice.
+    Description: >
+      Raw execute-api URL. Rejected (403) when OriginVerifyEnforced is "true"
+      because requests here lack X-Origin-Verify; use ApiBaseUrl.
     Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com"
+  OriginVerifyEnforced:
+    Description: Read by the deploy smoke check to decide whether HttpApiEndpoint must 403.
+    Value: !Ref EnforceOriginVerify
+  ApiBaseUrl:
+    Description: Public API base URL (CloudFront).
+    Value: !If
+      - HasSubdomain
+      - !Sub "https://api.${EnvSubdomain}.${RootDomain}"
+      - !Sub "https://api.${RootDomain}"
+  ApiDistributionId:
+    Value: !Ref ApiDistribution
   CognitoPostConfirmationFunctionArn:
     Description: Attached to the user pool by base-data (PostConfirmationTrigger=enabled).
     Value: !GetAtt CognitoPostConfirmationFunction.Arn

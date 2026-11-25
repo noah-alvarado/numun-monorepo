@@ -262,7 +262,8 @@ Resources:
                 Condition:
                   StringEquals:
                     iam:PermissionsBoundary: !Ref LambdaExecutionBoundary
-              # API Gateway HTTP API + custom domain.
+              # API Gateway HTTP API (no custom domain — CloudFront owns
+              # api.${Apex}).
               - Effect: Allow
                 Action:
                   - apigateway:*
@@ -309,8 +310,7 @@ Resources:
                   - ssm:GetParameters
                 Resource:
                   - !Sub "arn:aws:ssm:${AWS::Region}:${AWS::AccountId}:parameter/numun/${Env}/*"
-              # Route53 alias record for the api custom domain
-              # (SAM Domain block with Route53 config).
+              # Route53 alias record api.${Apex} → the api CloudFront distribution.
               - Effect: Allow
                 Action:
                   - route53:GetHostedZone
@@ -320,6 +320,34 @@ Resources:
                 Resource:
                   - "arn:aws:route53:::hostedzone/*"
                   - "arn:aws:route53:::change/*"
+              # CloudFront distribution + viewer-request function in front of
+              # the HTTP API (HTTP/3 edge; SECURITY.md §3.6). Distribution IDs
+              # are random, so distributions can't be name-scoped.
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateDistribution
+                  - cloudfront:UpdateDistribution
+                  - cloudfront:DeleteDistribution
+                  - cloudfront:GetDistribution
+                  - cloudfront:GetDistributionConfig
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:cloudfront::${AWS::AccountId}:distribution/*"
+              - Effect: Allow
+                Action:
+                  - cloudfront:CreateFunction
+                  - cloudfront:UpdateFunction
+                  - cloudfront:DeleteFunction
+                  - cloudfront:DescribeFunction
+                  - cloudfront:GetFunction
+                  - cloudfront:PublishFunction
+                Resource:
+                  - !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/numun-${Env}-api-*"
+              - Effect: Allow
+                Action: cloudfront:ListDistributions
+                Resource: "*"
               # SQS for the email-send queue + DLQ (M9 email pipeline).
               - Effect: Allow
                 Action:

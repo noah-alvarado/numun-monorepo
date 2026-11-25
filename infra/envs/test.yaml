@@ -34,10 +34,9 @@ SAM_ARTIFACTS_BUCKET: numun-test-sam-deploys-034083889387
 # rather than looked up because SAM doesn't manage them and there's no
 # stack to query.
 HOSTED_ZONE_ID: Z00949061U0JI0JIYVUUF
-# `api.test.numun.org` cert, must be in us-east-2 for API Gateway.
-API_CERTIFICATE_ARN: arn:aws:acm:us-east-2:034083889387:certificate/ba2da586-da18-4208-9352-59b16d14d437
 # CloudFront cert (covers `test.numun.org`, `*.test.numun.org`), must be
-# in us-east-1 per the CloudFront requirement.
+# in us-east-1 per the CloudFront requirement. Also fronts `api.` (the api
+# stack's CloudFront distribution).
 CDN_CERTIFICATE_ARN: arn:aws:acm:us-east-1:034083889387:certificate/3c72a813-d7e9-4b2b-9f84-5f0e786533df
 # PR preview cert (`*.preview.test.numun.org`, us-east-1). Empty disables previews.
 PREVIEW_CERTIFICATE_ARN: arn:aws:acm:us-east-1:034083889387:certificate/58980df4-3b25-4c2a-a38a-b2c7c91d925b
