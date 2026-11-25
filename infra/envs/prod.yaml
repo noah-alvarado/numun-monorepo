@@ -20,6 +20,10 @@ BILLING_THRESHOLD_USD: "10"
 # Flip to `ses` once SES production access is granted (ses-domain-setup.md §4a).
 COGNITO_EMAIL_SENDER: cognito
 SAM_ARTIFACTS_BUCKET: "" # numun-prod-sam-deploys-<accountId> once known
+# 403 API requests that bypass CloudFront (SECURITY.md §3.6). Passed
+# explicitly on every api deploy because `sam deploy` reuses a stack's
+# previous parameter value when one is omitted. "false" = report-only.
+ENFORCE_ORIGIN_VERIFY: "true"
 
 # Account-level infrastructure (manually bootstrapped). Populate after
 # the prod hosted zone + ACM certs are created.

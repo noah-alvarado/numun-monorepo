@@ -27,6 +27,10 @@ BILLING_THRESHOLD_USD: "10"
 # (accounts@mail.<apex>; needs SES production access, granted 2026-11-24).
 COGNITO_EMAIL_SENDER: ses
 SAM_ARTIFACTS_BUCKET: numun-test-sam-deploys-034083889387
+# 403 API requests that bypass CloudFront (SECURITY.md §3.6). Passed
+# explicitly on every api deploy because `sam deploy` reuses a stack's
+# previous parameter value when one is omitted. "false" = report-only.
+ENFORCE_ORIGIN_VERIFY: "true"
 
 # Account-level infrastructure not owned by any SAM/CFN stack — created
 # once at environment-bootstrap time (Route 53 hosted zone via the AWS
