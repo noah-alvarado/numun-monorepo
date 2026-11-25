@@ -44,3 +44,9 @@ samconfig.toml
 # Coverage / test artifacts
 coverage/
 *.lcov
+
+# Playwright e2e (see /e2e)
+dist-e2e/
+/e2e/playwright-report/
+/e2e/test-results/
+/e2e/blob-report/

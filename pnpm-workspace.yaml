@@ -1,6 +1,7 @@
 packages:
   - "site"
   - "portal"
+  - "e2e"
   - "cms"
   - "packages/*"
 

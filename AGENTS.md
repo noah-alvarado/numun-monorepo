@@ -10,6 +10,7 @@ Monorepo holding four deployable surfaces plus shared infra and content:
 - `/cms` — Decap CMS static bundle (`cms.numun.org`) committing into `/content`
 - `/content` — CMS-managed Markdown / JSON / images consumed by `/site`
 - `/docs` — design docs (`PROJECT`, `INFRASTRUCTURE`, `APPLICATION`, `DATA_MODEL`, `API`, `AUTH`, `SECURITY`) plus `runbooks/` and `subsystems/`
+- `/e2e` — Playwright suite driving the built portal against the local stack (see `DEVELOPERS.md` §5.3)
 - `/infra` — five SAM template groups: `bootstrap` (OIDC roles), `base-data` (DDB + Cognito), `base-cdn` (S3 + CloudFront + DNS), `api` (Lambda + API GW), `billing-alarm`
 - `/portal` — SolidJS + Vite SPA (`portal.numun.org`); calls the API via generated Connect clients
 - `/site` — Astro + Tailwind static site (`numun.org`)
@@ -20,23 +21,24 @@ Monorepo holding four deployable surfaces plus shared infra and content:
 
 All routine work goes through the root `Makefile`. From the repo root:
 
-| Task                                                        | Command                                             |
-| ----------------------------------------------------------- | --------------------------------------------------- |
-| Bring up local prod-mirror (DDB Local, LocalStack, Mailpit) | `make dev`                                          |
-| Tear it down                                                | `make dev-down`                                     |
-| Run SAM Local API GW + Go Lambdalith on `:3000`             | `make dev-api`                                      |
-| Run Vite (portal) on `:5173`                                | `make dev-portal`                                   |
-| Run Astro (site) on `:4321`                                 | `make dev-site`                                     |
-| Restart SAM after editing `/api` (no auto-reload)           | `make api-restart`                                  |
-| Seed DDB Local                                              | `make seed`                                         |
-| Reset DDB Local + LocalStack volumes                        | `make reset`                                        |
-| Codegen Go + TS from protos                                 | `make proto`                                        |
-| Lint everything                                             | `make lint` (or `lint-go`, `lint-js`, `lint-proto`) |
-| Typecheck everything                                        | `make typecheck`                                    |
-| Unit tests across workspaces                                | `make test`                                         |
-| Integration tests (requires `make dev`)                     | `make integration-tests`                            |
-| Validate all SAM templates                                  | `make sam-validate`                                 |
-| Verify tool versions                                        | `make doctor`                                       |
+| Task                                                        | Command                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| Bring up local prod-mirror (DDB Local, LocalStack, Mailpit) | `make dev`                                               |
+| Tear it down                                                | `make dev-down`                                          |
+| Run SAM Local API GW + Go Lambdalith on `:3000`             | `make dev-api`                                           |
+| Run Vite (portal) on `:5173`                                | `make dev-portal`                                        |
+| Run Astro (site) on `:4321`                                 | `make dev-site`                                          |
+| Restart SAM after editing `/api` (no auto-reload)           | `make api-restart`                                       |
+| Seed DDB Local                                              | `make seed`                                              |
+| Reset DDB Local + LocalStack volumes                        | `make reset`                                             |
+| Codegen Go + TS from protos                                 | `make proto`                                             |
+| Lint everything                                             | `make lint` (or `lint-go`, `lint-js`, `lint-proto`)      |
+| Typecheck everything                                        | `make typecheck`                                         |
+| Unit tests across workspaces                                | `make test`                                              |
+| Integration tests (requires `make dev`)                     | `make integration-tests`                                 |
+| Playwright e2e (starts API + portal preview itself)         | `make e2e` (one spec: `make e2e ARGS="tests/x.spec.ts"`) |
+| Validate all SAM templates                                  | `make sam-validate`                                      |
+| Verify tool versions                                        | `make doctor`                                            |
 
 Targeted equivalents:
 
