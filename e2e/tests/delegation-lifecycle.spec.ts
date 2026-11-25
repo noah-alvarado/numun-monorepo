@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
 import { createDelegation, uniqueSchool } from "../support/api";
+import { e2eSchool } from "../support/seed";
 
 function statusBadge(page: Page) {
   return page.getByText(/^(Pending review|Approved|Rejected)$/);
@@ -74,7 +75,9 @@ test("advisor registers a delegation and an admin approves it", async ({
 
   await step("approval survives a reload", async () => {
     await page.reload();
-    await expect(page.getByText("NUMUN XXIV (Seed)")).toBeVisible();
+    await expect(page.getByText("Loading…")).toBeHidden();
+    // The seed advisor's pending delegation proves the list loaded.
+    await expect(pendingItem(page, e2eSchool)).toBeVisible();
     await expect(pendingItem(page, school)).toHaveCount(0);
   });
 
@@ -97,10 +100,22 @@ test("admin rejects a delegation", async ({
 
   await signInAs("admin");
 
-  await step("reject from pending list", async () => {
+  const item = pendingItem(page, school);
+  const dialog = page.getByRole("dialog", { name: `Reject ${school}?` });
+
+  await step("reject asks for confirmation", async () => {
     await page.goto("/admin/delegations");
-    const item = pendingItem(page, school);
     await item.getByRole("button", { name: "Reject" }).click();
+    await expect(dialog).toContainText("can't be undone");
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(item).toBeVisible();
+  });
+
+  await step("confirmed reject with a reason", async () => {
+    await item.getByRole("button", { name: "Reject" }).click();
+    await dialog.getByLabel(/Reason/).fill("Duplicate registration");
+    await dialog.getByRole("button", { name: "Reject" }).click();
     await expect(item).toHaveCount(0);
     await expect(page.locator("p.bg-red-50")).toBeHidden();
   });

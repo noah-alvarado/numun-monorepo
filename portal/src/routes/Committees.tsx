@@ -72,20 +72,22 @@ export default function Committees() {
           >
             Back
           </button>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-          >
-            Reload
-          </button>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            class="rounded bg-nu-purple px-3 py-1 text-white"
-          >
-            Create committee
-          </button>
+          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
+            >
+              Reload
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              class="rounded bg-nu-purple px-3 py-1 text-white"
+            >
+              Create committee
+            </button>
+          </Show>
         </div>
       </header>
 

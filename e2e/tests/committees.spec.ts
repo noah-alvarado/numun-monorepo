@@ -154,5 +154,8 @@ test("committees are admin-only", async ({ page, signInAs, step }) => {
     await page.goto(`/conferences/${seedConferenceId}/committees`);
     await expect(page.getByText("Admin only.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Expand" })).toHaveCount(0);
+    for (const name of ["Create committee", "Reload"]) {
+      await expect(page.getByRole("button", { name })).toHaveCount(0);
+    }
   });
 });

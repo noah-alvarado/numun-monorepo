@@ -270,7 +270,8 @@ export default function DelegateImportPreview() {
 
       <div class="mt-3 flex items-center justify-between text-sm">
         <div class="text-nu-purple-700">
-          Page {page() + 1} of {totalPages()} · {rows().length} rows
+          Page {page() + 1} of {totalPages()} · {rows().length}{" "}
+          {rows().length === 1 ? "row" : "rows"}
         </div>
         <div class="flex gap-2">
           <button
@@ -521,17 +522,35 @@ function DiffTable(props: {
         <For each={entries()}>
           {([k, v]) => (
             <tr>
-              <td class="py-0.5 pr-2 font-semibold">{k}</td>
+              <td class="py-0.5 pr-2 font-semibold">{fieldLabel(k)}</td>
               <td class="py-0.5 pr-2 text-nu-purple-700 line-through">
-                {v.old || "—"}
+                {diffValue(k, v.old)}
               </td>
-              <td class="py-0.5">{v.new || "—"}</td>
+              <td class="py-0.5">{diffValue(k, v.new)}</td>
             </tr>
           )}
         </For>
       </tbody>
     </table>
   );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  firstName: "First name",
+  lastName: "Last name",
+  email: "Email",
+  experienceLevel: "Experience",
+};
+
+function fieldLabel(field: string): string {
+  return FIELD_LABELS[field] ?? field;
+}
+
+function diffValue(field: string, v: string): string {
+  if (!v) return "—";
+  return field === "experienceLevel"
+    ? v.charAt(0).toUpperCase() + v.slice(1)
+    : v;
 }
 
 function CellInput(props: {

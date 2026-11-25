@@ -105,7 +105,7 @@ export default function Dashboard() {
                 <AwardsCard onClick={() => navigate("/awards")} />
                 <NavCard
                   title="Email Health"
-                  description="Review bounced or complaining recipients and un-suppress them."
+                  description="Review bounced or complaining recipients and unsuppress them."
                   onClick={() => navigate("/admin/email-health")}
                 />
               </section>

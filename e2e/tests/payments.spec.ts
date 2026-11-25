@@ -43,17 +43,18 @@ test("payments ledger drives balance and paid-in-full", async ({
   await step("open the payments tab", async () => {
     await page.goto(`/delegations/${delegation.id}?tab=payments`);
     await expect(page.getByText("No ledger entries yet.")).toBeVisible();
+    await expect(balance(page)).toContainText("Nothing due");
   });
 
+  const recordModal = page.locator("div.fixed.inset-0");
   await step("invalid amount is refused", async () => {
     await page.getByRole("button", { name: "Record payment" }).click();
-    const modal = page.locator("div.fixed.inset-0");
-    await modal.getByLabel("Amount").fill("12.345");
-    await modal.getByRole("button", { name: "Save" }).click();
-    await expect(modal.getByText(/non-negative amount/)).toBeVisible();
-    await modal.getByRole("button", { name: "Cancel" }).click();
-    await expect(modal).toBeHidden();
+    await recordModal.getByLabel("Amount").fill("12.345");
+    await recordModal.getByRole("button", { name: "Save" }).click();
+    await expect(recordModal.getByText(/non-negative amount/)).toBeVisible();
   });
+  await recordModal.getByRole("button", { name: "Cancel" }).click();
+  await expect(recordModal).toBeHidden();
 
   await step("record a $1,000 charge", async () => {
     await record(page, {

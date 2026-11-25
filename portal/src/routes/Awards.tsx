@@ -21,13 +21,7 @@ import {
 import { useNavigate } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
-import {
-  awardClient,
-  delegationClient,
-  delegateClient,
-  exportUrls,
-  userClient,
-} from "@/lib/api";
+import { awardClient, delegateClient, exportUrls, userClient } from "@/lib/api";
 import { activeConferenceSignal, userSignal } from "@/lib/session";
 import {
   AwardRecipientKind,
@@ -37,6 +31,7 @@ import {
 } from "@/gen/numun/v1/awards_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
+import { listScopedDelegations } from "@/lib/delegations";
 import { connectMessage } from "@/lib/errors";
 
 type RecipientFormRow = {
@@ -73,10 +68,7 @@ export default function Awards() {
     async (id) => {
       if (!id) return [] as Delegation[];
       try {
-        const resp = await delegationClient.listDelegations({
-          conferenceId: id,
-        });
-        return resp.items;
+        return await listScopedDelegations(id);
       } catch {
         return [] as Delegation[];
       }
@@ -134,6 +126,14 @@ export default function Awards() {
   const [editTarget, setEditTarget] = createSignal<Award | null>(null);
   const [deleteTarget, setDeleteTarget] = createSignal<Award | null>(null);
   const [cmsBanner, setCmsBanner] = createSignal<CmsSyncStatus | null>(null);
+  const [cmsVerb, setCmsVerb] = createSignal<"Saved" | "Deleted">("Saved");
+  const modalOpen = () => createOpen() || !!editTarget() || !!deleteTarget();
+  function closeModals() {
+    setCreateOpen(false);
+    setEditTarget(null);
+    setDeleteTarget(null);
+    setError(null);
+  }
 
   async function handleCreate(state: AwardFormState) {
     setError(null);
@@ -145,6 +145,7 @@ export default function Awards() {
         recipients: state.recipients.map(formRowToProto),
       });
       setCreateOpen(false);
+      setCmsVerb("Saved");
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
@@ -164,6 +165,7 @@ export default function Awards() {
         recipientsSet: true,
       });
       setEditTarget(null);
+      setCmsVerb("Saved");
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
@@ -179,6 +181,7 @@ export default function Awards() {
         expectedVersion: target.version,
       });
       setDeleteTarget(null);
+      setCmsVerb("Deleted");
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
@@ -218,6 +221,8 @@ export default function Awards() {
       return false;
     });
   }
+
+  const anyWritable = createMemo(() => (awards() ?? []).some(canWrite));
 
   return (
     <main class="mx-auto max-w-5xl px-6 py-8">
@@ -276,7 +281,7 @@ export default function Awards() {
         </div>
       </header>
 
-      <Show when={error()}>
+      <Show when={!modalOpen() && error()}>
         {(e) => (
           <p class="mt-4 rounded bg-red-50 p-3 text-sm text-red-900">{e()}</p>
         )}
@@ -288,13 +293,14 @@ export default function Awards() {
             when={s().ok}
             fallback={
               <p class="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">
-                Saved to database, but CMS sync failed after {s().attempts}{" "}
-                attempts: {s().finalError}. Retry by editing the award.
+                {cmsVerb()} in the database, but CMS sync failed after{" "}
+                {s().attempts} attempts: {s().finalError}. Retry by editing the
+                award.
               </p>
             }
           >
             <p class="mt-4 rounded bg-green-50 p-3 text-sm text-green-900">
-              Saved and synced to the public site.
+              {cmsVerb()} and synced to the public site.
               <Show when={s().commitSha}>
                 {" "}
                 <code class="text-xs">{s().commitSha.slice(0, 7)}</code>
@@ -355,7 +361,9 @@ export default function Awards() {
                   <th class="px-2 py-2">Name</th>
                   <th class="px-2 py-2">Category</th>
                   <th class="px-2 py-2">Recipients</th>
-                  <th class="w-40 px-2 py-2 text-right">Actions</th>
+                  <Show when={anyWritable()}>
+                    <th class="w-40 px-2 py-2 text-right">Actions</th>
+                  </Show>
                 </tr>
               </thead>
               <tbody>
@@ -376,24 +384,26 @@ export default function Awards() {
                       <td class="px-2 py-2">
                         <RecipientList recipients={a.recipients} />
                       </td>
-                      <td class="px-2 py-2 text-right">
-                        <Show when={canWrite(a)}>
-                          <button
-                            type="button"
-                            onClick={() => setEditTarget(a)}
-                            class="rounded border border-nu-purple-300 px-2 py-0.5 text-xs text-nu-purple-700"
-                          >
-                            Edit
-                          </button>{" "}
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(a)}
-                            class="rounded border border-red-300 px-2 py-0.5 text-xs text-red-700"
-                          >
-                            Delete
-                          </button>
-                        </Show>
-                      </td>
+                      <Show when={anyWritable()}>
+                        <td class="px-2 py-2 text-right">
+                          <Show when={canWrite(a)}>
+                            <button
+                              type="button"
+                              onClick={() => setEditTarget(a)}
+                              class="rounded border border-nu-purple-300 px-2 py-0.5 text-xs text-nu-purple-700"
+                            >
+                              Edit
+                            </button>{" "}
+                            <button
+                              type="button"
+                              onClick={() => setDeleteTarget(a)}
+                              class="rounded border border-red-300 px-2 py-0.5 text-xs text-red-700"
+                            >
+                              Delete
+                            </button>
+                          </Show>
+                        </td>
+                      </Show>
                     </tr>
                   )}
                 </For>
@@ -414,7 +424,8 @@ export default function Awards() {
             ],
           }}
           allowedKinds={kindsForCaller(user()?.role)}
-          onClose={() => setCreateOpen(false)}
+          error={error()}
+          onClose={closeModals}
           onSubmit={handleCreate}
         />
       </Show>
@@ -433,7 +444,8 @@ export default function Awards() {
               })),
             }}
             allowedKinds={kindsForCaller(user()?.role)}
-            onClose={() => setEditTarget(null)}
+            error={error()}
+            onClose={closeModals}
             onSubmit={(s) => handleUpdate(target(), s)}
           />
         )}
@@ -444,7 +456,8 @@ export default function Awards() {
           <ConfirmModal
             title="Delete award?"
             message={`This will delete "${target().name}" from both the database and the public site.`}
-            onCancel={() => setDeleteTarget(null)}
+            error={error()}
+            onCancel={closeModals}
             onConfirm={() => handleDelete(target())}
           />
         )}
@@ -474,6 +487,7 @@ function AwardModal(props: {
   title: string;
   initial: AwardFormState;
   allowedKinds: AwardRecipientKind[];
+  error: string | null;
   onClose: () => void;
   onSubmit: (s: AwardFormState) => Promise<void>;
 }) {
@@ -554,7 +568,7 @@ function AwardModal(props: {
           </legend>
           <For each={recipients()}>
             {(row, i) => (
-              <div class="mt-2 grid grid-cols-[8rem_1fr_1fr_auto] gap-2">
+              <div class="mt-2 grid grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
                 <select
                   value={String(row.kind)}
                   onChange={(e) =>
@@ -605,6 +619,8 @@ function AwardModal(props: {
           </button>
         </fieldset>
 
+        <ModalError message={props.error} />
+
         <div class="flex justify-end gap-2 pt-2">
           <button
             type="button"
@@ -629,6 +645,7 @@ function AwardModal(props: {
 function ConfirmModal(props: {
   title: string;
   message: string;
+  error: string | null;
   onCancel: () => void;
   onConfirm: () => Promise<void>;
 }) {
@@ -644,6 +661,7 @@ function ConfirmModal(props: {
   return (
     <ModalShell title={props.title} onClose={props.onCancel}>
       <p class="text-sm text-nu-purple-700">{props.message}</p>
+      <ModalError message={props.error} />
       <div class="mt-4 flex justify-end gap-2">
         <button
           type="button"
@@ -662,6 +680,16 @@ function ConfirmModal(props: {
         </button>
       </div>
     </ModalShell>
+  );
+}
+
+function ModalError(props: { message: string | null }) {
+  return (
+    <Show when={props.message}>
+      {(m) => (
+        <p class="mt-3 rounded bg-red-50 p-2 text-sm text-red-900">{m()}</p>
+      )}
+    </Show>
   );
 }
 

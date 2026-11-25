@@ -271,7 +271,7 @@ export default function DelegateImport() {
                       const list = e.currentTarget.files;
                       setFile(list && list[0] ? list[0] : null);
                     }}
-                    class="mt-1 block w-full text-sm"
+                    class="mt-1 block w-full text-sm text-nu-purple-700 file:mr-3 file:rounded file:border file:border-nu-purple-300 file:bg-white file:px-3 file:py-1 file:text-sm file:text-nu-purple-700 hover:file:bg-nu-purple-50"
                   />
                 </label>
                 <p class="mt-2 text-xs text-nu-purple-700">

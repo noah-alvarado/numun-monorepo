@@ -65,6 +65,9 @@ test("admin creates and deletes an award", async ({ page, signInAs, step }) => {
     await expect(modal).toBeVisible();
     await modal.getByRole("button", { name: "Delete", exact: true }).click();
     await expect(modal).toBeHidden();
+    await expect(
+      page.getByText("Deleted and synced to the public site."),
+    ).toBeVisible();
   });
 
   await step("award is gone", async () => {
@@ -143,6 +146,10 @@ test("advisor sees and dismisses a congratulations banner", async ({
       0,
     );
     await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+    // Advisors can't edit anything, so there's no Actions column.
+    await expect(
+      page.getByRole("columnheader", { name: "Actions" }),
+    ).toHaveCount(0);
   });
 
   await step("dismiss the banner", async () => {
@@ -217,7 +224,8 @@ test("staffer awards only within their delegations", async ({
     await modal.getByRole("combobox").selectOption({ label: "delegation" });
     await recipientRows.fill(other.id);
     await modal.getByRole("button", { name: "Save" }).click();
-    await expect(page.locator("p.bg-red-50")).toContainText(
+    // The error shows inside the dialog, not behind its overlay.
+    await expect(modal.locator("p.bg-red-50")).toContainText(
       "You don't have permission",
     );
   });

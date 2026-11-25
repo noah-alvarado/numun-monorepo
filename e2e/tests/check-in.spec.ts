@@ -60,6 +60,7 @@ test("staff check in a delegate by name", async ({
     await page.getByPlaceholder(/Search by first or last name/).fill("Z");
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page.getByText("Type at least 2 characters.")).toBeVisible();
+    await expect(page.getByRole("listitem")).toHaveCount(0);
   });
 });
 

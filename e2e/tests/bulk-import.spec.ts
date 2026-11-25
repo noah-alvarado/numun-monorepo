@@ -108,13 +108,21 @@ test("advisor imports a CSV roster", async ({
     await page.getByRole("button", { name: "Preview import" }).click();
     await expect(stat(page, "Update")).toContainText("1");
     await expect(stat(page, "Create")).toContainText("0");
+    await expect(page.getByText("Page 1 of 1 · 1 row")).toBeVisible();
     await page.getByRole("button", { name: /update — see diff/ }).click();
     await expect(page.getByText("Diff", { exact: true })).toBeVisible();
+    const diffRow = page
+      .getByRole("row")
+      .filter({ hasText: "Experience" })
+      .last();
+    await expect(diffRow).toContainText("Advanced");
+    await expect(diffRow).toContainText("Intermediate");
   });
 
   await step("cancel discards the preview", async () => {
     await page.getByRole("button", { name: "Cancel" }).first().click();
     await expect(page).toHaveURL(/\/delegation$/);
+    await expect(page.getByLabel("School name")).toHaveValue(delegation.school);
   });
 });
 
@@ -208,7 +216,7 @@ test("non-roster files are refused before upload", async ({
       .getByLabel("File")
       .setInputFiles(csv([["firstName", "lastName"]]));
     await page.getByRole("button", { name: "Preview import" }).click();
-    await expect(page.getByText(/no data rows/)).toBeVisible();
+    await expect(page.getByText("File has no data rows")).toBeVisible();
   });
 });
 
@@ -354,6 +362,8 @@ test("full sync soft-deletes delegates missing from the file", async ({
     await expect(
       page.getByText(/1 created · \d+ updated · 1 soft-deleted/),
     ).toBeVisible();
+    // Soft-deletes aren't counted as imported.
+    await expect(page.getByText(/^Imported \d+ delegates?$/)).toBeVisible();
   });
 });
 

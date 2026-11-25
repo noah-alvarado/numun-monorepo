@@ -81,6 +81,7 @@ test("advisor cannot use the admin pending list", async ({
     await page.goto("/admin/delegations");
     await expect(page.getByText("Admin only.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
   });
 });
 

@@ -13,6 +13,7 @@ test("email health is admin-only and loads", async ({
   await step("advisor is turned away", async () => {
     await page.goto("/admin/email-health");
     await expect(page.getByText("Admin only.")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
   });
 
   await signInAs("admin");

@@ -335,13 +335,15 @@ export default function AssignmentStudio() {
           <p class="mt-1 text-sm text-nu-purple-700">{conference()}</p>
         </div>
         <div class="flex items-center gap-3 text-sm">
-          <RunStatusBadge
-            run={currentRun() ?? runs()?.[0]}
-            onRefresh={() => {
-              refetchCurrentRun();
-              refetchRuns();
-            }}
-          />
+          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+            <RunStatusBadge
+              run={currentRun() ?? runs()?.[0]}
+              onRefresh={() => {
+                refetchCurrentRun();
+                refetchRuns();
+              }}
+            />
+          </Show>
           <button
             type="button"
             onClick={() => navigate("/dashboard")}
@@ -930,6 +932,10 @@ function EditAssignmentModal(props: {
         </label>
         <p class="text-xs text-nu-purple-700">
           Saving checks that the position has a free seat.
+          <Show when={props.assignment.status === AssignmentStatus.APPROVED}>
+            {" "}
+            This assignment is approved; moving it returns it to Proposed.
+          </Show>
         </p>
         <Show when={props.error}>
           {(e) => (

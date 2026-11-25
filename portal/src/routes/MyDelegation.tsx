@@ -225,6 +225,10 @@ export default function MyDelegation() {
         </p>
       </Show>
 
+      <Show when={!loaded()}>
+        <p class="mt-6 text-sm text-nu-purple-700">Loading…</p>
+      </Show>
+
       <Show when={loaded()}>
         <Show
           when={delegation()}

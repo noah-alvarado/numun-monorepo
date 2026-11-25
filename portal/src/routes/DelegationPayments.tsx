@@ -96,7 +96,11 @@ export default function DelegationPayments(props: {
                   : "ml-2 rounded bg-nu-purple-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-nu-purple-700"
               }
             >
-              {props.delegation.paidInFull ? "Paid in full" : "Outstanding"}
+              {props.delegation.paidInFull
+                ? "Paid in full"
+                : moneyToCents(props.delegation.balanceDue) === 0n
+                  ? "Nothing due"
+                  : "Outstanding"}
             </span>
           </div>
         </div>

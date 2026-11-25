@@ -40,6 +40,8 @@ export default function AdminCheckIn() {
     }
     if (q.length < 2) {
       setError("Type at least 2 characters.");
+      setHits([]);
+      setSearched(false);
       return;
     }
     setError(null);

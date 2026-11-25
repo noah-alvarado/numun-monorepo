@@ -50,6 +50,8 @@ test("import screens opened directly point back to the start", async ({
     await expect(
       page.getByText("No result to show. Start an import first."),
     ).toBeVisible();
+    await page.getByRole("button", { name: "Go to import" }).click();
+    await expect(page).toHaveURL(base);
   });
 });
 
