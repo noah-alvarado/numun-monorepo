@@ -82,10 +82,16 @@ export default defineConfig({
   webServer: [
     {
       name: "fakes",
-      command: "node fakes/server.ts",
+      // The fake Cognito runs the real post-confirmation trigger binary.
+      command:
+        "go build -C ../api -o ../e2e/.bin/cognito-post-confirmation ./cmd/cognito-post-confirmation && node fakes/server.ts",
+      env: {
+        ...apiEnv,
+        POST_CONFIRMATION_BIN: ".bin/cognito-post-confirmation",
+      },
       url: `${FAKES_URL}/__control/health`,
       reuseExistingServer: !isCI,
-      timeout: 30_000,
+      timeout: 180_000,
       stdout: "ignore",
       stderr: "pipe",
     },

@@ -98,6 +98,15 @@ test("an advisor signs up, verifies their email and signs in", async ({
     await expect(page.getByText("New Advisor")).toBeVisible();
     await expect(page.getByText("Advisor", { exact: true })).toBeVisible();
   });
+
+  // The post-confirmation trigger, not sign-in, creates the account; only it
+  // knows the phone number given at sign-up.
+  await step("the account has the sign-up details", async () => {
+    await page.getByRole("link", { name: "Edit profile" }).click();
+    await expect(page.getByLabel("Name")).toHaveValue("New Advisor");
+    await expect(page.getByLabel("Phone")).toHaveValue("+18472462882");
+    await expect(page.getByLabel(/Email me NUMUN announcements/)).toBeChecked();
+  });
 });
 
 test("signing up with a taken email looks the same as a new one", async ({

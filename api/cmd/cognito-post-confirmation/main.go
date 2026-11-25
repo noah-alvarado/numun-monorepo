@@ -12,6 +12,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"os"
@@ -43,7 +44,30 @@ func main() {
 		os.Exit(1)
 	}
 	h := &handler{store: st}
+	if len(os.Args) > 1 && os.Args[1] == "-local" {
+		os.Exit(runLocal(ctx, h))
+	}
 	lambda.Start(h.Handle)
+}
+
+// runLocal handles one trigger event read from stdin, so the e2e fake
+// Cognito can invoke the trigger the way Cognito does. Only allowed with
+// DEV_MODE=true.
+func runLocal(ctx context.Context, h *handler) int {
+	if os.Getenv("DEV_MODE") != "true" {
+		logger.Error("-local requires DEV_MODE=true")
+		return 2
+	}
+	var e events.CognitoEventUserPoolsPostConfirmation
+	if err := json.NewDecoder(os.Stdin).Decode(&e); err != nil {
+		logger.Error("decode event", "err", err)
+		return 1
+	}
+	if _, err := h.Handle(ctx, e); err != nil {
+		logger.Error("handle", "err", err)
+		return 1
+	}
+	return 0
 }
 
 type handler struct {
@@ -77,6 +101,8 @@ func (h *handler) Handle(ctx context.Context, e events.CognitoEventUserPoolsPost
 		Email: strings.ToLower(e.Request.UserAttributes["email"]),
 		Name:  e.Request.UserAttributes["name"],
 		Phone: e.Request.UserAttributes["phone_number"],
+		// DATA_MODEL.md: announcements are opt-out.
+		AnnouncementsOptIn: true,
 	}
 
 	if _, err := h.store.CreateUser(ctx, user); err != nil && !errors.Is(err, store.ErrAlreadyExists) {

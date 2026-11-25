@@ -12,6 +12,7 @@
 // Tokens are JWT-shaped but unsigned, with a "dev-" prefix the API's
 // dev-bypass Exchange accepts (it reads the claims without verifying).
 
+import { execFileSync } from "node:child_process";
 import { randomUUID } from "node:crypto";
 import {
   createServer,
@@ -28,6 +29,7 @@ type User = {
   sub: string;
   email: string;
   name: string;
+  phone: string;
   role: string;
   password: string;
   confirmed: boolean;
@@ -98,6 +100,36 @@ function attr(
   return attrs?.find((a) => a.Name === name)?.Value ?? "";
 }
 
+// Runs the real post-confirmation trigger (api/cmd/cognito-post-confirmation
+// -local), synchronously like Cognito, when POST_CONFIRMATION_BIN is set.
+function postConfirmation(triggerSource: string, u: User) {
+  const bin = process.env.POST_CONFIRMATION_BIN;
+  if (!bin) return;
+  const event = {
+    version: "1",
+    triggerSource,
+    region: "us-east-2",
+    userPoolId: "us-east-2_e2eFake",
+    userName: u.email,
+    callerContext: { awsSdkVersion: "fake", clientId: "e2efakeclient" },
+    request: {
+      userAttributes: {
+        sub: u.sub,
+        email: u.email,
+        email_verified: "true",
+        name: u.name,
+        phone_number: u.phone,
+        "custom:role": u.role,
+      },
+    },
+    response: {},
+  };
+  execFileSync(bin, ["-local"], {
+    input: JSON.stringify(event),
+    stdio: ["pipe", "ignore", "inherit"],
+  });
+}
+
 function userAttributes(u: User) {
   return [
     { Name: "sub", Value: u.sub },
@@ -141,6 +173,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
       sub: randomUUID(),
       email,
       name: attr(b.UserAttributes, "name"),
+      phone: attr(b.UserAttributes, "phone_number"),
       role: "advisor",
       password: b.Password,
       confirmed: false,
@@ -161,6 +194,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
     }
     u.confirmed = true;
     signUpCodes.delete(u.email);
+    postConfirmation("PostConfirmation_ConfirmSignUp", u);
     return {};
   },
 
@@ -258,8 +292,10 @@ const cognito: Record<string, (b: Body) => unknown> = {
       );
     }
     checkPassword(b.Password);
-    mustFind(email).password = b.Password;
+    const u = mustFind(email);
+    u.password = b.Password;
     resetCodes.delete(email);
+    postConfirmation("PostConfirmation_ConfirmForgotPassword", u);
     return {};
   },
 
@@ -275,6 +311,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
       sub: randomUUID(),
       email,
       name: attr(b.UserAttributes, "name"),
+      phone: "",
       role: attr(b.UserAttributes, "custom:role") || "advisor",
       password: `temp-${code()}-password`,
       confirmed: true,
@@ -360,6 +397,7 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
       sub: body.sub ?? users.get(email)?.sub ?? randomUUID(),
       email,
       name: body.name ?? "",
+      phone: "",
       role: body.role ?? "advisor",
       password: body.password,
       confirmed: body.confirmed ?? true,
