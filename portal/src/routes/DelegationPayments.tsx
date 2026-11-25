@@ -77,6 +77,17 @@ export default function DelegationPayments(props: {
     await Promise.all([refetch(), props.onLedgerChanged?.()]);
   }
 
+  // The entry changed under an open dialog: show the latest ledger instead
+  // of asking the admin to find a Reload button.
+  async function showConflict() {
+    setEditTarget(null);
+    setDeleteTarget(null);
+    await reload();
+    setBanner(
+      "Someone else changed that entry first. The ledger now shows their change; redo yours if it's still needed.",
+    );
+  }
+
   return (
     <section class="space-y-4">
       <header class="flex flex-wrap items-center justify-between gap-3 rounded border border-nu-purple-200 bg-white p-4">
@@ -252,6 +263,7 @@ export default function DelegationPayments(props: {
               await reload();
             }}
             onError={setBanner}
+            onConflict={showConflict}
           />
         )}
       </Show>
@@ -266,6 +278,7 @@ export default function DelegationPayments(props: {
               await reload();
             }}
             onError={setBanner}
+            onConflict={showConflict}
           />
         )}
       </Show>
@@ -304,7 +317,8 @@ function signedCents(p: PaymentRecord): bigint {
     case PaymentKind.PAYMENT:
       return abs >= 0n ? -abs : abs;
     case PaymentKind.ADJUSTMENT:
-      return abs;
+      // Stored with the ledger's sign: positive is a credit.
+      return -abs;
     default:
       return abs;
   }
@@ -433,6 +447,7 @@ function RecordModal(props: {
 }) {
   const [amount, setAmount] = createSignal("");
   const [kind, setKind] = createSignal<PaymentKind>(PaymentKind.PAYMENT);
+  const [raisesBalance, setRaisesBalance] = createSignal(false);
   const [method, setMethod] = createSignal<PaymentMethod>(PaymentMethod.CHECK);
   const [reference, setReference] = createSignal("");
   const [notes, setNotes] = createSignal("");
@@ -443,9 +458,14 @@ function RecordModal(props: {
     ev.preventDefault();
     setLocalErr(null);
     const money = parseAmountInput(amount());
-    if (!money) {
-      setLocalErr("Enter a non-negative amount with up to 2 decimals.");
+    if (!money || moneyToCents(money) === 0n) {
+      setLocalErr("Enter an amount greater than zero, with up to 2 decimals.");
       return;
+    }
+    // Adjustments carry their own sign; negative raises the balance due.
+    if (kind() === PaymentKind.ADJUSTMENT && raisesBalance()) {
+      money.units = -money.units;
+      money.cents = -money.cents;
     }
     setBusy(true);
     try {
@@ -520,6 +540,24 @@ function RecordModal(props: {
             />
           </div>
         </fieldset>
+
+        <Show when={kind() === PaymentKind.ADJUSTMENT}>
+          <label class="block">
+            <span class="block text-xs font-semibold text-nu-purple-700">
+              Effect
+            </span>
+            <select
+              value={raisesBalance() ? "raise" : "lower"}
+              onChange={(e) =>
+                setRaisesBalance(e.currentTarget.value === "raise")
+              }
+              class="mt-1 w-full rounded border border-nu-purple-300 px-2 py-1"
+            >
+              <option value="lower">Lowers the balance (credit)</option>
+              <option value="raise">Raises the balance</option>
+            </select>
+          </label>
+        </Show>
 
         <label class="block">
           <span class="block text-xs font-semibold text-nu-purple-700">
@@ -614,6 +652,7 @@ function EditModal(props: {
   onClose: () => void;
   onSaved: () => Promise<void>;
   onError: (msg: string | null) => void;
+  onConflict: () => Promise<void>;
 }) {
   const [reference, setReference] = createSignal(props.payment.reference);
   const [notes, setNotes] = createSignal(props.payment.notes);
@@ -635,9 +674,7 @@ function EditModal(props: {
       await props.onSaved();
     } catch (err) {
       if (err instanceof ConnectError && err.code === Code.Aborted) {
-        setLocalErr(
-          "Another change happened first. Close this dialog, reload the ledger, and retry.",
-        );
+        await props.onConflict();
       } else {
         setLocalErr(connectMessage(err) ?? "Failed to save changes.");
       }
@@ -706,6 +743,7 @@ function DeleteModal(props: {
   onClose: () => void;
   onConfirmed: () => Promise<void>;
   onError: (msg: string | null) => void;
+  onConflict: () => Promise<void>;
 }) {
   const [busy, setBusy] = createSignal(false);
   const [localErr, setLocalErr] = createSignal<string | null>(null);
@@ -722,9 +760,7 @@ function DeleteModal(props: {
       await props.onConfirmed();
     } catch (err) {
       if (err instanceof ConnectError && err.code === Code.Aborted) {
-        setLocalErr(
-          "Another change happened first. Close this dialog and reload the ledger.",
-        );
+        await props.onConflict();
       } else {
         setLocalErr(connectMessage(err) ?? "Failed to delete entry.");
       }

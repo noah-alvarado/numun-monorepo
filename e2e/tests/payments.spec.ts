@@ -1,7 +1,12 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
-import { createDelegation, uniqueSchool } from "../support/api";
+import {
+  createDelegation,
+  recordCharge,
+  rpc,
+  uniqueSchool,
+} from "../support/api";
 import { seedUsers } from "../support/seed";
 
 function balance(page: Page) {
@@ -51,7 +56,10 @@ test("payments ledger drives balance and paid-in-full", async ({
     await page.getByRole("button", { name: "Record payment" }).click();
     await recordModal.getByLabel("Amount").fill("12.345");
     await recordModal.getByRole("button", { name: "Save" }).click();
-    await expect(recordModal.getByText(/non-negative amount/)).toBeVisible();
+    await expect(recordModal.getByText(/greater than zero/)).toBeVisible();
+    await recordModal.getByLabel("Amount").fill("0");
+    await recordModal.getByRole("button", { name: "Save" }).click();
+    await expect(recordModal.getByText(/greater than zero/)).toBeVisible();
   });
   await recordModal.getByRole("button", { name: "Cancel" }).click();
   await expect(recordModal).toBeHidden();
@@ -142,5 +150,102 @@ test("payments ledger drives balance and paid-in-full", async ({
     await expect(ledgerRow(page, "INV-1")).not.toContainText(
       seedUsers.admin.id,
     );
+  });
+});
+
+test("adjustments move the balance either way", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("Adjustments"),
+  );
+  await recordCharge(delegation.id, 1000, "INV-ADJ");
+
+  await signInAs("admin");
+  await page.goto(`/delegations/${delegation.id}?tab=payments`);
+  await expect(balance(page)).toContainText("$1,000.00");
+
+  await step("a credit lowers the balance", async () => {
+    await page.getByRole("button", { name: "Record payment" }).click();
+    const modal = page.locator("div.fixed.inset-0");
+    await modal.getByLabel("Amount").fill("100");
+    await modal.getByLabel("Adjustment", { exact: true }).check();
+    await expect(modal.getByLabel("Effect")).toHaveValue("lower");
+    await modal.getByLabel("Reference").fill("SCHOLARSHIP");
+    await modal.getByRole("button", { name: "Save" }).click();
+    await expect(modal).toBeHidden();
+    await expect(ledgerRow(page, "SCHOLARSHIP")).toContainText("-$100.00");
+    await expect(ledgerRow(page, "SCHOLARSHIP")).toContainText("$900.00");
+    await expect(balance(page)).toContainText("$900.00");
+  });
+
+  await step("a debit raises it", async () => {
+    await page.getByRole("button", { name: "Record payment" }).click();
+    const modal = page.locator("div.fixed.inset-0");
+    await modal.getByLabel("Amount").fill("25.50");
+    await modal.getByLabel("Adjustment", { exact: true }).check();
+    await modal.getByLabel("Effect").selectOption("Raises the balance");
+    await modal.getByLabel("Reference").fill("LATE-FEE");
+    await modal.getByRole("button", { name: "Save" }).click();
+    await expect(modal).toBeHidden();
+    await expect(ledgerRow(page, "LATE-FEE")).toContainText("+$25.50");
+    await expect(ledgerRow(page, "LATE-FEE")).toContainText("$925.50");
+    await expect(balance(page)).toContainText("$925.50");
+  });
+});
+
+test("editing a payment someone else just changed", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("PayConflict"),
+  );
+  await recordCharge(delegation.id, 300, "INV-CONFLICT");
+
+  await signInAs("admin");
+  await page.goto(`/delegations/${delegation.id}?tab=payments`);
+  const modal = page.locator("div.fixed.inset-0");
+
+  await step("save over a change made meanwhile", async () => {
+    await ledgerRow(page, "INV-CONFLICT")
+      .getByRole("button", { name: "Edit" })
+      .click();
+    const { items } = await rpc<{ items: { id: string; version: number }[] }>(
+      seedUsers.admin.id,
+      "PaymentService/ListPayments",
+      { delegationId: delegation.id },
+    );
+    await rpc(seedUsers.admin.id, "PaymentService/UpdatePayment", {
+      paymentId: items[0].id,
+      notes: "Changed in another tab",
+      expectedVersion: items[0].version,
+    });
+    await modal.getByLabel("Notes").fill("My edit");
+    await modal.getByRole("button", { name: "Save" }).click();
+    await expect(modal).toBeHidden();
+    await expect(
+      page.getByText(/Someone else changed that entry/),
+    ).toBeVisible();
+    await expect(ledgerRow(page, "INV-CONFLICT")).toContainText(
+      "Changed in another tab",
+    );
+  });
+
+  await step("redo the edit on the latest version", async () => {
+    await ledgerRow(page, "INV-CONFLICT")
+      .getByRole("button", { name: "Edit" })
+      .click();
+    await modal.getByLabel("Notes").fill("My edit");
+    await modal.getByRole("button", { name: "Save" }).click();
+    await expect(modal).toBeHidden();
+    await expect(ledgerRow(page, "INV-CONFLICT")).toContainText("My edit");
   });
 });
