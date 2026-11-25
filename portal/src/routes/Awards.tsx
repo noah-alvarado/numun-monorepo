@@ -393,9 +393,11 @@ export default function Awards() {
       </Show>
 
       <Show
-        when={!awards.loading}
+        when={conferenceId() && !awards.loading}
         fallback={
-          <p class="mt-6 text-sm text-nu-purple-700">Loading awards…</p>
+          <Show when={conferenceId()}>
+            <p class="mt-6 text-sm text-nu-purple-700">Loading awards…</p>
+          </Show>
         }
       >
         <Show

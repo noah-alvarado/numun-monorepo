@@ -114,22 +114,29 @@ export default function AdminCheckIn() {
           </p>
         }
       >
-        <form onSubmit={search} class="mt-6 flex items-center gap-2">
-          <input
-            type="search"
-            autofocus
-            value={query()}
-            onInput={(e) => setQuery(e.currentTarget.value)}
-            placeholder="Search by first or last name…"
-            class="flex-1 rounded border border-nu-purple-300 px-3 py-2 text-sm"
-          />
-          <button
-            type="submit"
-            class="rounded bg-nu-purple px-3 py-2 text-sm text-white"
-          >
-            Search
-          </button>
-        </form>
+        <Show when={!conference()}>
+          <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
+            No active conference.
+          </p>
+        </Show>
+        <Show when={conference()}>
+          <form onSubmit={search} class="mt-6 flex items-center gap-2">
+            <input
+              type="search"
+              autofocus
+              value={query()}
+              onInput={(e) => setQuery(e.currentTarget.value)}
+              placeholder="Search by first or last name…"
+              class="flex-1 rounded border border-nu-purple-300 px-3 py-2 text-sm"
+            />
+            <button
+              type="submit"
+              class="rounded bg-nu-purple px-3 py-2 text-sm text-white"
+            >
+              Search
+            </button>
+          </form>
+        </Show>
 
         <Show when={error()}>
           {(e) => (
