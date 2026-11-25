@@ -193,6 +193,17 @@ Resources:
           FunctionAssociations:
             - EventType: viewer-request
               FunctionARN: !GetAtt WwwRedirectFunction.FunctionMetadata.FunctionARN
+        # Missing pages: S3 (via OAC) answers 403, not 404. Serve the site's own
+        # page instead of S3's XML error, with a real 404 status.
+        CustomErrorResponses:
+          - ErrorCode: 403
+            ResponseCode: 404
+            ResponsePagePath: /404.html
+            ErrorCachingMinTTL: 60
+          - ErrorCode: 404
+            ResponseCode: 404
+            ResponsePagePath: /404.html
+            ErrorCachingMinTTL: 60
 
   PortalDistribution:
     Type: AWS::CloudFront::Distribution
