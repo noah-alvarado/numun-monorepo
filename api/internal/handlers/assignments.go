@@ -747,7 +747,7 @@ func (s *AssignmentService) notifyRunCompleted(ctx context.Context, callerUserID
 		"conferenceName":  conferenceName,
 		"assignmentCount": count,
 		"objective":       fmt.Sprintf("%.4f", objective),
-		"runLink":         portalBase() + "/admin/assignments?run=" + runID,
+		"runLink":         portalBase() + "/conferences/" + conferenceID + "/assignments",
 	}
 	if err := s.Email.Send(ctx, email.SendRequest{
 		User: user,
