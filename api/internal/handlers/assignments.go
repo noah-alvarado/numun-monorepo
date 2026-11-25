@@ -46,8 +46,13 @@ type AssignmentService struct {
 	Logger *slog.Logger
 }
 
+// ListAssignments is scoped per API.md §9.2: admins see the whole conference;
+// staffers must filter to a delegation they oversee or a committee they are
+// assigned to; advisors must filter to their own delegation and only see
+// approved rows (proposals stay internal until staff approve them).
 func (s *AssignmentService) ListAssignments(ctx context.Context, req *connect.Request[v1.ListAssignmentsRequest]) (*connect.Response[v1.ListAssignmentsResponse], error) {
-	if _, ok := auth.FromContext(ctx); !ok {
+	caller, ok := auth.FromContext(ctx)
+	if !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
 	}
 	conferenceID := strings.TrimSpace(req.Msg.GetConferenceId())
@@ -63,9 +68,45 @@ func (s *AssignmentService) ListAssignments(ctx context.Context, req *connect.Re
 	if v, ok := domainAssignmentStatus(req.Msg.GetStatus()); ok {
 		status = v
 	}
+	empty := connect.NewResponse(&v1.ListAssignmentsResponse{Page: &v1.Page{}})
+	switch caller.Role {
+	case domain.RoleStaffAdmin:
+	case domain.RoleStaffStaffer:
+		if delegationID == "" && committeeID == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id or committee_id required"))
+		}
+		delErr := errScopeNotChecked
+		if delegationID != "" {
+			delErr = s.Scoper.MustHaveScopeOnDelegation(ctx, delegationID)
+		}
+		if delErr != nil {
+			if committeeID == "" {
+				return nil, mapScopeErr(delErr)
+			}
+			if err := s.Scoper.MustHaveScopeOnCommittee(ctx, committeeID); err != nil {
+				return nil, mapScopeErr(err)
+			}
+		}
+	default:
+		if delegationID == "" {
+			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id required"))
+		}
+		if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delegationID); err != nil {
+			return nil, mapScopeErr(err)
+		}
+		if status != "" && status != domain.AssignmentStatusApproved {
+			return empty, nil
+		}
+		status = domain.AssignmentStatusApproved
+	}
 	rows, err := s.Store.ListAllAssignmentsByConference(ctx, conferenceID, committeeID, delegationID, status)
 	if err != nil {
 		s.log().Error("ListAssignments: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	names, err := s.assignmentNames(ctx, conferenceID, rows)
+	if err != nil {
+		s.log().Error("ListAssignments: names", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
 	out := &v1.ListAssignmentsResponse{
@@ -73,9 +114,55 @@ func (s *AssignmentService) ListAssignments(ctx context.Context, req *connect.Re
 		Page:  &v1.Page{},
 	}
 	for _, a := range rows {
-		out.Items = append(out.Items, assignmentToProto(a))
+		out.Items = append(out.Items, names.apply(assignmentToProto(a)))
 	}
 	return connect.NewResponse(out), nil
+}
+
+// errScopeNotChecked marks a scope path that wasn't tried, so the fallback
+// path runs.
+var errScopeNotChecked = errors.New("scope not checked")
+
+type assignmentNameIndex struct {
+	committees map[string]string
+	positions  map[string]string
+}
+
+func (n assignmentNameIndex) apply(a *v1.Assignment) *v1.Assignment {
+	a.CommitteeName = n.committees[a.GetCommitteeId()]
+	a.PositionName = n.positions[a.GetPositionId()]
+	return a
+}
+
+// assignmentNames resolves committee and position names with one query per
+// committee present in rows, rather than a lookup per assignment.
+func (s *AssignmentService) assignmentNames(ctx context.Context, conferenceID string, rows []domain.Assignment) (assignmentNameIndex, error) {
+	idx := assignmentNameIndex{committees: map[string]string{}, positions: map[string]string{}}
+	if len(rows) == 0 {
+		return idx, nil
+	}
+	committees, err := s.Store.ListCommitteesByConference(ctx, conferenceID)
+	if err != nil {
+		return idx, err
+	}
+	for _, c := range committees {
+		idx.committees[c.ID] = c.Name
+	}
+	seen := map[string]bool{}
+	for _, a := range rows {
+		if a.CommitteeID == "" || seen[a.CommitteeID] {
+			continue
+		}
+		seen[a.CommitteeID] = true
+		positions, err := s.Store.ListPositionsByCommittee(ctx, a.CommitteeID)
+		if err != nil {
+			return idx, err
+		}
+		for _, p := range positions {
+			idx.positions[p.ID] = p.Name
+		}
+	}
+	return idx, nil
 }
 
 func (s *AssignmentService) GetAssignment(ctx context.Context, req *connect.Request[v1.GetAssignmentRequest]) (*connect.Response[v1.GetAssignmentResponse], error) {
@@ -97,7 +184,15 @@ func (s *AssignmentService) GetAssignment(ctx context.Context, req *connect.Requ
 		s.log().Error("GetAssignment: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-	return connect.NewResponse(&v1.GetAssignmentResponse{Assignment: assignmentToProto(a)}), nil
+	if caller, _ := auth.FromContext(ctx); caller.Role == domain.RoleAdvisor && a.Status != domain.AssignmentStatusApproved {
+		return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
+	}
+	names, err := s.assignmentNames(ctx, a.ConferenceID, []domain.Assignment{a})
+	if err != nil {
+		s.log().Error("GetAssignment: names", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	return connect.NewResponse(&v1.GetAssignmentResponse{Assignment: names.apply(assignmentToProto(a))}), nil
 }
 
 // Propose runs the assignment algorithm. Dry runs return the proposal without

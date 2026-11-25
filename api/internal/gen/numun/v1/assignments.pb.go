@@ -145,9 +145,13 @@ type Assignment struct {
 	RunId string `protobuf:"bytes,10,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`
 	// Per-assignment objective score at proposal time. See
 	// ASSIGNMENT_ALGORITHM.md §4.2.
-	Score         float64                `protobuf:"fixed64,11,opt,name=score,proto3" json:"score,omitempty"`
-	Reason        string                 `protobuf:"bytes,12,opt,name=reason,proto3" json:"reason,omitempty"`
-	ProposedAt    *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=proposed_at,json=proposedAt,proto3" json:"proposed_at,omitempty"`
+	Score      float64                `protobuf:"fixed64,11,opt,name=score,proto3" json:"score,omitempty"`
+	Reason     string                 `protobuf:"bytes,12,opt,name=reason,proto3" json:"reason,omitempty"`
+	ProposedAt *timestamppb.Timestamp `protobuf:"bytes,13,opt,name=proposed_at,json=proposedAt,proto3" json:"proposed_at,omitempty"`
+	// Display names resolved at read time (not stored on the row), so callers
+	// without committee/position read scope (advisors) can still show them.
+	CommitteeName string                 `protobuf:"bytes,14,opt,name=committee_name,json=committeeName,proto3" json:"committee_name,omitempty"`
+	PositionName  string                 `protobuf:"bytes,15,opt,name=position_name,json=positionName,proto3" json:"position_name,omitempty"`
 	Version       int32                  `protobuf:"varint,20,opt,name=version,proto3" json:"version,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,21,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,22,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
@@ -274,6 +278,20 @@ func (x *Assignment) GetProposedAt() *timestamppb.Timestamp {
 		return x.ProposedAt
 	}
 	return nil
+}
+
+func (x *Assignment) GetCommitteeName() string {
+	if x != nil {
+		return x.CommitteeName
+	}
+	return ""
+}
+
+func (x *Assignment) GetPositionName() string {
+	if x != nil {
+		return x.PositionName
+	}
+	return ""
 }
 
 func (x *Assignment) GetVersion() int32 {
@@ -1900,7 +1918,7 @@ var File_numun_v1_assignments_proto protoreflect.FileDescriptor
 
 const file_numun_v1_assignments_proto_rawDesc = "" +
 	"\n" +
-	"\x1anumun/v1/assignments.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15numun/v1/common.proto\"\xef\x04\n" +
+	"\x1anumun/v1/assignments.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15numun/v1/common.proto\"\xbb\x05\n" +
 	"\n" +
 	"Assignment\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
@@ -1921,7 +1939,9 @@ const file_numun_v1_assignments_proto_rawDesc = "" +
 	"\x05score\x18\v \x01(\x01R\x05score\x12\x16\n" +
 	"\x06reason\x18\f \x01(\tR\x06reason\x12;\n" +
 	"\vproposed_at\x18\r \x01(\v2\x1a.google.protobuf.TimestampR\n" +
-	"proposedAt\x12\x18\n" +
+	"proposedAt\x12%\n" +
+	"\x0ecommittee_name\x18\x0e \x01(\tR\rcommitteeName\x12#\n" +
+	"\rposition_name\x18\x0f \x01(\tR\fpositionName\x12\x18\n" +
 	"\aversion\x18\x14 \x01(\x05R\aversion\x129\n" +
 	"\n" +
 	"created_at\x18\x15 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
