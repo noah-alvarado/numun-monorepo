@@ -96,7 +96,9 @@ needed.
 
 `main` requires PRs and passing checks (rulesets `main: protections` and
 `main: code owner review`), which would reject the App's direct commits.
-Add the App as a bypass actor on both:
+Signed commits are not the blocker: the client commits through GraphQL
+`createCommitOnBranch`, which GitHub signs. Add the App as a bypass actor
+on both:
 
 ```bash
 API=repos/noah-alvarado/numun-monorepo/rulesets
