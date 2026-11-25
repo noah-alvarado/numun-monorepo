@@ -54,11 +54,17 @@ func isPublic(p string) bool {
 	return strings.HasPrefix(p, "/numun.v1.PublicService/")
 }
 
-// Mutating returns whether the path is treated as a write call for CSRF
-// purposes. Connect uses POST for everything, so we use a name-based heuristic:
-// anything whose RPC name starts with Get/List is read; everything else is a
-// write. Conservative: when in doubt, demand CSRF. Bypass paths skip this check.
-func isMutating(p string) bool {
+// Mutating returns whether the request is treated as a write call for CSRF
+// purposes. GET/HEAD are reads (the CSV export routes, API.md §12.1). Connect
+// uses POST for everything, so for POSTs we use a name-based heuristic:
+// anything whose RPC name starts with Get/List/Search is read; everything else
+// is a write. Conservative: when in doubt, demand CSRF. Bypass paths skip
+// this check.
+func isMutating(r *http.Request) bool {
+	if r.Method == http.MethodGet || r.Method == http.MethodHead {
+		return false
+	}
+	p := r.URL.Path
 	// Path shape: /numun.v1.ServiceName/MethodName
 	slash := strings.LastIndex(p, "/")
 	if slash < 0 || slash == len(p)-1 {
@@ -173,7 +179,7 @@ func New(cfg MiddlewareConfig) func(http.Handler) http.Handler {
 
 			// CSRF double-submit on mutating calls. Skipped for the dev-bypass
 			// branch which already returned.
-			if isMutating(path) {
+			if isMutating(r) {
 				csrfCookie, err := r.Cookie(CSRFCookieName)
 				header := r.Header.Get(CSRFHeader)
 				if err != nil || csrfCookie.Value == "" || header == "" || header != csrfCookie.Value || header != sess.CSRFToken {
