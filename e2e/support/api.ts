@@ -168,3 +168,26 @@ export async function createCommittee(
   }
   return committee.id;
 }
+
+export async function createDelegationAward(
+  name: string,
+  delegation: Delegation,
+): Promise<{ id: string }> {
+  const { award } = await rpc<{ award: { id: string } }>(
+    admin,
+    "AwardService/CreateAward",
+    {
+      conferenceId: seedConferenceId,
+      name,
+      category: "Delegation Awards",
+      recipients: [
+        {
+          kind: "AWARD_RECIPIENT_KIND_DELEGATION",
+          id: delegation.id,
+          displayName: delegation.school,
+        },
+      ],
+    },
+  );
+  return award;
+}
