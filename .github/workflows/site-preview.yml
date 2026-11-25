@@ -116,16 +116,16 @@ jobs:
       - name: upload preview
         run: aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" --delete --cache-control "no-cache"
       - name: mark preview ready
+        id: ready
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
             -f state=success -f context=deploy/preview \
             -f target_url="$PREVIEW_URL" -f description="Preview ready"
-      # The deploy/preview status already carries the link, so a comment that
-      # can't be posted is a warning, not a failed preview.
+      # Reviewers find the preview through this comment, so failing to post
+      # it (after retries) fails the check.
       - name: comment preview link
-        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -138,8 +138,10 @@ jobs:
           else
             scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
           fi
+      # Only when the preview itself didn't go up: if just the comment
+      # failed, the preview is live and Decap's link to it must keep working.
       - name: mark preview failed
-        if: failure()
+        if: failure() && steps.ready.outcome != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
