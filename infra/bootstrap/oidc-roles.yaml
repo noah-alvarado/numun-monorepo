@@ -343,6 +343,9 @@ Resources:
                   - cloudfront:DescribeFunction
                   - cloudfront:GetFunction
                   - cloudfront:PublishFunction
+                  - cloudfront:TagResource
+                  - cloudfront:UntagResource
+                  - cloudfront:ListTagsForResource
                 Resource:
                   - !Sub "arn:aws:cloudfront::${AWS::AccountId}:function/numun-${Env}-api-*"
               - Effect: Allow
