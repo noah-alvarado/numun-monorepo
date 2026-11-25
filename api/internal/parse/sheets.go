@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -23,22 +24,31 @@ func parseSheet(rawURL, tabName string, client *http.Client) (ParseResult, error
 		return ParseResult{}, err
 	}
 
-	if tabName == "" {
-		tabs, err := listSheetTabs(sheetID, client)
-		if err != nil {
-			return ParseResult{}, err
+	tabs, err := listSheetTabs(sheetID, client)
+	if err != nil {
+		return ParseResult{}, err
+	}
+	if tabName != "" {
+		tabGID, ok := tabGIDByName(tabs, tabName)
+		if !ok {
+			return ParseResult{}, fmt.Errorf("%w: the sheet has no tab named %q", ErrInvalidArgument, tabName)
 		}
-		if len(tabs) > 1 {
-			// If a gid is present in the URL we honour it as an implicit
-			// selection; otherwise force the caller to pick.
-			if gid == "" {
-				return ParseResult{AvailableTabs: tabs}, nil
-			}
+		gid = tabGID
+	} else if len(tabs) > 1 && gid == "" {
+		// A gid in the URL is an implicit selection; otherwise make the
+		// caller pick.
+		names := make([]string, len(tabs))
+		for i, t := range tabs {
+			names[i] = t.name
 		}
+		return ParseResult{AvailableTabs: names}, nil
 	}
 
 	if gid == "" {
 		gid = "0"
+		if len(tabs) == 1 {
+			gid = tabs[0].gid
+		}
 	}
 	exportURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=csv&gid=%s", sheetID, gid)
 	body, err := fetchSheet(exportURL, client)
@@ -105,16 +115,30 @@ func fetchSheet(exportURL string, client *http.Client) ([]byte, error) {
 	return body, nil
 }
 
-// sheetTitleRe matches <sheet ... name="My Tab" ...> elements emitted by the
-// Google Sheets HTML export. We intentionally don't pull in a full HTML
-// parser; the pattern is stable enough for the listing use case.
-var sheetTitleRe = regexp.MustCompile(`<sheet[^>]*\bname="([^"]+)"`)
+type sheetTab struct {
+	name string
+	gid  string
+}
 
-// listSheetTabs fetches the HTML export and extracts the sheet tab names. If
-// the request fails or no tabs are found, returns an empty slice with no
-// error so the caller can fall back to gid=0 behaviour.
-func listSheetTabs(sheetID string, client *http.Client) ([]string, error) {
-	htmlURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/export?format=html", sheetID)
+func tabGIDByName(tabs []sheetTab, name string) (string, bool) {
+	for _, t := range tabs {
+		if t.name == name {
+			return t.gid, true
+		}
+	}
+	return "", false
+}
+
+// sheetTabRe matches the per-tab entries in the /htmlview page's inline
+// script: items.push({name: "Roster", pageUrl: "...", gid: "123"...
+// The "export?format=html" endpoint can't be used: it returns 400.
+var sheetTabRe = regexp.MustCompile(`items\.push\(\{name: "((?:[^"\\]|\\.)*)", pageUrl: "(?:[^"\\]|\\.)*", gid: "(\d+)"`)
+
+// listSheetTabs reads the sheet's tab names and gids from /htmlview. If the
+// page can't be read or has no tabs, it returns no tabs and no error so the
+// caller falls back to the first tab (gid=0).
+func listSheetTabs(sheetID string, client *http.Client) ([]sheetTab, error) {
+	htmlURL := fmt.Sprintf("https://docs.google.com/spreadsheets/d/%s/htmlview", sheetID)
 	req, err := http.NewRequest(http.MethodGet, htmlURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("%w: build sheets html request: %v", ErrInvalidArgument, err)
@@ -134,16 +158,27 @@ func listSheetTabs(sheetID string, client *http.Client) ([]string, error) {
 	if err != nil {
 		return nil, nil
 	}
-	matches := sheetTitleRe.FindAllSubmatch(body, -1)
-	tabs := make([]string, 0, len(matches))
-	seen := map[string]struct{}{}
-	for _, m := range matches {
-		name := string(m[1])
-		if _, dup := seen[name]; dup {
+	var tabs []sheetTab
+	seen := map[string]bool{}
+	for _, m := range sheetTabRe.FindAllSubmatch(body, -1) {
+		name := unescapeJSString(string(m[1]))
+		if seen[name] {
 			continue
 		}
-		seen[name] = struct{}{}
-		tabs = append(tabs, name)
+		seen[name] = true
+		tabs = append(tabs, sheetTab{name: name, gid: string(m[2])})
 	}
 	return tabs, nil
+}
+
+// unescapeJSString decodes the escapes Google uses in inline script string
+// literals (\xNN, \uNNNN, \/, \", \\).
+func unescapeJSString(s string) string {
+	if !strings.Contains(s, `\`) {
+		return s
+	}
+	if out, err := strconv.Unquote(`"` + strings.ReplaceAll(s, `\/`, "/") + `"`); err == nil {
+		return out
+	}
+	return s
 }

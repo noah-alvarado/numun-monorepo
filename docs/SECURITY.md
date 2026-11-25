@@ -117,7 +117,7 @@ The only outbound HTTP call to a user-supplied URL is **Google Sheets fetch** in
 - Allowlists `docs.google.com` and `*.googleusercontent.com` only.
 - Resolves the hostname server-side, refuses if it resolves to any private IPv4 (`10.0.0.0/8`, `172.16.0.0/12`, `192.168.0.0/16`, `169.254.0.0/16`, `127.0.0.0/8`, `0.0.0.0/8`) or any private IPv6 (`::1`, `fc00::/7`, `fe80::/10`).
 - Sets a hard 5 s connect timeout and 10 s overall timeout.
-- Refuses redirects across origins.
+- Follows redirects only to the same host or to another allowlisted host over HTTPS (Google redirects every export to `*.googleusercontent.com`); every hop goes through the same allowlist and IP checks.
 
 These rules live in `/api/internal/httpclient/safe.go` as a hardened wrapper. No raw `net/http.Client` calls are permitted in handler code (lint-enforced).
 

@@ -2,6 +2,7 @@ package parse
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -51,21 +52,43 @@ func newSheetsClient(srv *httptest.Server) *http.Client {
 	return &http.Client{Transport: &sheetsRoundTripper{srv: srv}}
 }
 
-func TestParseSheet_SingleTabSuccess(t *testing.T) {
+// htmlview renders tabs the way Google's /htmlview page lists them; args
+// are name, gid pairs.
+func htmlview(nameGID ...string) string {
+	var b strings.Builder
+	b.WriteString("<html><script>var items = [];")
+	for i := 0; i+1 < len(nameGID); i += 2 {
+		fmt.Fprintf(&b, `items.push({name: "%s", pageUrl: "https:\/\/docs.google.com\/spreadsheets\/d\/abc\/htmlview\/sheet?headers\x3dtrue&gid=%s", gid: "%s",initialSheet: false});`, nameGID[i], nameGID[i+1], nameGID[i+1])
+	}
+	b.WriteString("</script></html>")
+	return b.String()
+}
+
+// fakeSheet serves /htmlview with the given tabs and records the gid of
+// each CSV export.
+func fakeSheet(t *testing.T, seenGID *string, nameGID ...string) *httptest.Server {
+	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query().Get("format")
-		switch q {
-		case "html":
-			// Single sheet — HTML export lists one <sheet name="...">
-			_, _ = w.Write([]byte(`<workbook><sheet name="Roster"/></workbook>`))
-		case "csv":
+		switch {
+		case strings.HasSuffix(r.URL.Path, "/htmlview"):
+			_, _ = w.Write([]byte(htmlview(nameGID...)))
+		case strings.HasSuffix(r.URL.Path, "/export") && r.URL.Query().Get("format") == "csv":
+			if seenGID != nil {
+				*seenGID = r.URL.Query().Get("gid")
+			}
 			w.Header().Set("Content-Type", "text/csv")
 			_, _ = w.Write([]byte("firstName,lastName\nJane,Doe\n"))
 		default:
 			http.NotFound(w, r)
 		}
 	}))
-	defer srv.Close()
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+func TestParseSheet_SingleTabSuccess(t *testing.T) {
+	var seenGID string
+	srv := fakeSheet(t, &seenGID, "Roster", "917")
 
 	res, err := Parse(ParseRequest{
 		SheetURL:   "https://docs.google.com/spreadsheets/d/abc/edit",
@@ -77,18 +100,13 @@ func TestParseSheet_SingleTabSuccess(t *testing.T) {
 	if len(res.Rows) != 1 || res.Rows[0].Input.GetFirstName() != "Jane" {
 		t.Errorf("unexpected rows: %+v", res.Rows)
 	}
+	if seenGID != "917" {
+		t.Errorf("a single-tab sheet should export that tab's gid, got %q", seenGID)
+	}
 }
 
 func TestParseSheet_MultiTabReturnsTabs(t *testing.T) {
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		q := r.URL.Query().Get("format")
-		if q == "html" {
-			_, _ = w.Write([]byte(`<workbook><sheet name="Roster"/><sheet name="Advisors"/></workbook>`))
-			return
-		}
-		http.NotFound(w, r)
-	}))
-	defer srv.Close()
+	srv := fakeSheet(t, nil, "Roster", "0", "Fall \\x26 Spring", "55")
 
 	res, err := Parse(ParseRequest{
 		SheetURL:   "https://docs.google.com/spreadsheets/d/abc/edit",
@@ -97,11 +115,37 @@ func TestParseSheet_MultiTabReturnsTabs(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(res.AvailableTabs) != 2 {
-		t.Errorf("want 2 tabs, got %v", res.AvailableTabs)
+	if len(res.AvailableTabs) != 2 || res.AvailableTabs[1] != "Fall & Spring" {
+		t.Errorf("want [Roster, Fall & Spring], got %v", res.AvailableTabs)
 	}
 	if len(res.Rows) != 0 {
 		t.Errorf("multi-tab without gid: rows should be empty, got %d", len(res.Rows))
+	}
+}
+
+func TestParseSheet_TabNameSelectsThatTab(t *testing.T) {
+	var seenGID string
+	srv := fakeSheet(t, &seenGID, "Roster", "0", "Advisors", "55")
+
+	res, err := Parse(ParseRequest{
+		SheetURL:   "https://docs.google.com/spreadsheets/d/abc/edit",
+		TabName:    "Advisors",
+		HTTPClient: newSheetsClient(srv),
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if seenGID != "55" || len(res.Rows) != 1 {
+		t.Errorf("want export of gid 55 with 1 row, got gid %q and %d rows", seenGID, len(res.Rows))
+	}
+
+	_, err = Parse(ParseRequest{
+		SheetURL:   "https://docs.google.com/spreadsheets/d/abc/edit",
+		TabName:    "Missing",
+		HTTPClient: newSheetsClient(srv),
+	})
+	if !errors.Is(err, ErrInvalidArgument) || !strings.Contains(err.Error(), `no tab named "Missing"`) {
+		t.Errorf("want a no-such-tab error, got %v", err)
 	}
 }
 
@@ -135,16 +179,7 @@ func TestParseSheet_RequiresClient(t *testing.T) {
 
 func TestParseSheet_GidFragmentInURL(t *testing.T) {
 	var seenGID string
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Query().Get("format") {
-		case "html":
-			_, _ = w.Write([]byte(`<workbook><sheet name="A"/><sheet name="B"/></workbook>`))
-		case "csv":
-			seenGID = r.URL.Query().Get("gid")
-			_, _ = w.Write([]byte("firstName,lastName\nJ,D\n"))
-		}
-	}))
-	defer srv.Close()
+	srv := fakeSheet(t, &seenGID, "A", "0", "B", "42")
 
 	// gid in URL fragment should pick that tab implicitly even though >1 tab exists.
 	_, err := Parse(ParseRequest{
