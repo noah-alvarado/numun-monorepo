@@ -72,14 +72,14 @@ export async function exchange(
  * result. Safe to call repeatedly; the cached signal is the source of truth
  * for advisor/admin screens needing to know "which conference are we in?".
  */
+// loadActiveConference caches the active conference. It marks the lookup
+// loaded only on success, so a failure (which it rethrows) isn't mistaken
+// for "no active conference".
 export async function loadActiveConference(): Promise<ActiveConferenceSummary | null> {
-  try {
-    const resp = await publicClient.getActiveConference({});
-    setActiveConference(resp.conference ?? null);
-    return resp.conference ?? null;
-  } finally {
-    setActiveConferenceLoaded(true);
-  }
+  const resp = await publicClient.getActiveConference({});
+  setActiveConference(resp.conference ?? null);
+  setActiveConferenceLoaded(true);
+  return resp.conference ?? null;
 }
 
 export async function logout(): Promise<void> {

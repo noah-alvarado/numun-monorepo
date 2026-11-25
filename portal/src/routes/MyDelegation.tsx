@@ -67,6 +67,9 @@ export default function MyDelegation() {
   const [delegation, setDelegation] = createSignal<Delegation | null>(null);
   const [loaded, setLoaded] = createSignal(false);
   const [banner, setBanner] = createSignal<string | null>(null);
+  // Set when loading failed, so we don't offer to register a delegation the
+  // advisor may already have.
+  const [loadFailed, setLoadFailed] = createSignal(false);
 
   const activeTab = createMemo<TabKey>(() => {
     const raw = Array.isArray(searchParams.tab)
@@ -103,6 +106,7 @@ export default function MyDelegation() {
 
   async function loadMyDelegation() {
     setBanner(null);
+    setLoadFailed(false);
     const conf = conference();
     if (!conf) {
       setLoaded(true);
@@ -115,6 +119,7 @@ export default function MyDelegation() {
       });
       setDelegation(resp.items[0] ?? null);
     } catch (err) {
+      setLoadFailed(true);
       setBanner(connectMessage(err) ?? "Failed to load delegation.");
     } finally {
       setLoading(false);
@@ -262,7 +267,7 @@ export default function MyDelegation() {
           >
             Back
           </button>
-          <Show when={delegation()}>
+          <Show when={delegation() || loadFailed()}>
             <button
               type="button"
               onClick={reload}
@@ -301,14 +306,16 @@ export default function MyDelegation() {
           when={delegation()}
           fallback={
             <>
-              <Show when={params.delegationId && banner()}>
+              <Show when={(params.delegationId || loadFailed()) && banner()}>
                 {(b) => (
                   <section class="mt-6">
                     <Banner message={b()} kind="error" />
                   </section>
                 )}
               </Show>
-              <Show when={!params.delegationId && conference()}>
+              <Show
+                when={!params.delegationId && !loadFailed() && conference()}
+              >
                 <section class="mt-6">
                   <CreateBlock
                     onSubmit={handleCreate}

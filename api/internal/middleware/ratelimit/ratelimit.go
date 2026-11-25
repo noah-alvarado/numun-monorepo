@@ -71,7 +71,7 @@ func PerIP(limits Limits) func(http.Handler) http.Handler {
 				store = anon
 			}
 			if !store.allow(ip) {
-				write429(w, "ip rate limit exceeded")
+				write429(w, tooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -92,7 +92,7 @@ func PerUser(limits Limits) func(http.Handler) http.Handler {
 				return
 			}
 			if !store.allow(caller.UserID) {
-				write429(w, "user rate limit exceeded")
+				write429(w, tooManyRequests)
 				return
 			}
 			next.ServeHTTP(w, r)
@@ -119,6 +119,9 @@ func isAnonymousPath(p string) bool {
 	}
 	return false
 }
+
+// tooManyRequests is shown to users as-is by the portal.
+const tooManyRequests = "Too many requests. Wait a minute and try again."
 
 func write429(w http.ResponseWriter, msg string) {
 	w.Header().Set("Content-Type", "application/json")

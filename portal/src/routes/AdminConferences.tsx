@@ -145,7 +145,8 @@ export default function AdminConferences() {
       setEditing(null);
       await load();
       // The status change may have opened or closed the active conference.
-      await loadActiveConference();
+      // The save already succeeded, so a failed refresh isn't an error here.
+      await loadActiveConference().catch(() => undefined);
     } catch (err) {
       setFormError(
         err instanceof ConnectError && err.code === Code.Aborted
