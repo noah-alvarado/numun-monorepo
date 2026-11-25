@@ -50,6 +50,55 @@ test("advisor signs in through the form and signs out", async ({
   });
 });
 
+test("remember me decides whether a browser restart signs you out", async ({
+  browser,
+  page,
+  step,
+}) => {
+  const advisor = seedUsers.advisor;
+
+  // A restarted browser keeps persistent cookies and drops session ones.
+  async function restartBrowser() {
+    const kept = (await page.context().cookies()).filter((c) => c.expires > 0);
+    const context = await browser.newContext({
+      baseURL: "http://localhost:4173",
+    });
+    await context.addCookies(kept);
+    return context.newPage();
+  }
+
+  async function signIn(remember: boolean) {
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(advisor.email);
+    await page.getByLabel("Password").fill(seedPassword);
+    await page.getByLabel("Remember me on this device").setChecked(remember);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText(advisor.name)).toBeVisible();
+  }
+
+  await step("without it, a restart signs you out", async () => {
+    await signIn(false);
+    const restarted = await restartBrowser();
+    await restarted.goto("/dashboard");
+    await expect(restarted).toHaveURL(/\/sign-in$/);
+    await restarted.context().close();
+  });
+
+  await step("with it, you stay signed in for 30 days", async () => {
+    await page.context().clearCookies();
+    await signIn(true);
+    const session = (await page.context().cookies()).find(
+      (c) => c.name === "numun_session",
+    )!;
+    const days = (session.expires - Date.now() / 1000) / 86_400;
+    expect(days).toBeGreaterThan(29.9);
+    const restarted = await restartBrowser();
+    await restarted.goto("/dashboard");
+    await expect(restarted.getByText(advisor.name)).toBeVisible();
+    await restarted.context().close();
+  });
+});
+
 test("sign-in rejects a wrong password and an unknown email alike", async ({
   page,
   step,

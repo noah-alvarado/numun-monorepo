@@ -366,6 +366,21 @@ test("admin filters, edits, swaps and approves all", async ({
     }
   });
 
+  await step("unapprove a selection", async () => {
+    for (const name of all.slice(0, 2)) {
+      await assignmentRow(page, name)
+        .getByRole("checkbox", { name: "Select assignment" })
+        .check();
+    }
+    await page
+      .getByRole("button", { name: "Unapprove selected", exact: true })
+      .click();
+    for (const name of all.slice(0, 2)) {
+      await expect(assignmentRow(page, name)).toContainText("Proposed");
+    }
+    await expect(assignmentRow(page, all[2])).toContainText("Approved");
+  });
+
   await step("run history lists the run", async () => {
     await page.getByRole("button", { name: /Run history/ }).click();
     const history = page.getByRole("row").filter({ hasText: "Done" });
