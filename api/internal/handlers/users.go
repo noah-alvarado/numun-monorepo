@@ -1,12 +1,15 @@
 package handlers
 
 import (
+	"cmp"
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
 	"strings"
 
 	"connectrpc.com/connect"
+	cognitotypes "github.com/aws/aws-sdk-go-v2/service/cognitoidentityprovider/types"
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
@@ -134,6 +137,10 @@ func (s *UserService) InviteStaff(ctx context.Context, req *connect.Request[user
 		Role:  string(role),
 	})
 	if err != nil {
+		var exists *cognitotypes.UsernameExistsException
+		if errors.As(err, &exists) {
+			return nil, connect.NewError(connect.CodeAlreadyExists, errors.New("an account with that email already exists"))
+		}
 		s.logger().Error("InviteStaff: cognito", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("cognito unavailable"))
 	}
@@ -169,6 +176,35 @@ func (s *UserService) InviteStaff(ctx context.Context, req *connect.Request[user
 	}
 
 	return connect.NewResponse(&usersv1.InviteStaffResponse{User: userToProto(u)}), nil
+}
+
+// ListStaff returns every staff account (admins and staffers), sorted by
+// name. Staff only — it backs staffer assignment and award recipient pickers.
+func (s *UserService) ListStaff(ctx context.Context, _ *connect.Request[usersv1.ListStaffRequest]) (*connect.Response[usersv1.ListStaffResponse], error) {
+	c, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	if c.Role != domain.RoleStaffAdmin && c.Role != domain.RoleStaffStaffer {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("staff only"))
+	}
+	var staff []domain.User
+	for _, role := range []domain.Role{domain.RoleStaffAdmin, domain.RoleStaffStaffer} {
+		users, err := s.Store.ListUsersByRole(ctx, role)
+		if err != nil {
+			s.logger().Error("ListStaff: store", "err", err)
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		staff = append(staff, users...)
+	}
+	slices.SortFunc(staff, func(a, b domain.User) int {
+		return cmp.Or(strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)), strings.Compare(a.Email, b.Email))
+	})
+	out := &usersv1.ListStaffResponse{Items: make([]*usersv1.User, 0, len(staff))}
+	for _, u := range staff {
+		out.Items = append(out.Items, userToProto(u))
+	}
+	return connect.NewResponse(out), nil
 }
 
 // DismissAward records a permanent dismissal of the given award from the

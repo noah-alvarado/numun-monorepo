@@ -407,20 +407,40 @@ func (s *DelegationService) AddAdvisor(ctx context.Context, req *connect.Request
 	}
 	delID := strings.TrimSpace(req.Msg.GetDelegationId())
 	userID := strings.TrimSpace(req.Msg.GetUserId())
-	if delID == "" || userID == "" {
-		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id and user_id required"))
+	email := strings.TrimSpace(req.Msg.GetEmail())
+	if delID == "" || (userID == "") == (email == "") {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id and exactly one of user_id or email required"))
 	}
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
 	}
-	// Only the lead-of-own-delegation or admin may add advisors.
+	role, _ := domainAdvisorRole(req.Msg.GetRole())
+	if role == "" {
+		role = domain.AdvisorRoleSecondary
+	}
+	// Any advisor on the delegation may add a secondary advisor; adding a
+	// lead takes a lead. Admins may do either.
 	if caller.Role == domain.RoleAdvisor {
 		me, err := s.Store.GetAdvisor(ctx, delID, caller.UserID)
-		if err != nil || me.Role != domain.AdvisorRoleLead {
-			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only a lead advisor may add advisors"))
+		if err != nil {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only this delegation's advisors may add advisors"))
+		}
+		if role == domain.AdvisorRoleLead && me.Role != domain.AdvisorRoleLead {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("only a lead advisor may add a lead"))
 		}
 	} else if caller.Role != domain.RoleStaffAdmin {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("not permitted"))
+	}
+	if email != "" {
+		u, err := s.Store.FindUserByEmail(ctx, email)
+		if err != nil && !errors.Is(err, store.ErrNotFound) {
+			s.log().Error("AddAdvisor: find user", "err", err)
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		if err != nil || u.Role != domain.RoleAdvisor {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("no advisor account uses that email; ask them to sign up first"))
+		}
+		userID = u.ID
 	}
 
 	d, err := s.Store.FindDelegationByID(ctx, delID)
@@ -430,10 +450,6 @@ func (s *DelegationService) AddAdvisor(ctx context.Context, req *connect.Request
 		}
 		s.log().Error("AddAdvisor: load delegation", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
-	}
-	role, _ := domainAdvisorRole(req.Msg.GetRole())
-	if role == "" {
-		role = domain.AdvisorRoleSecondary
 	}
 	out, err := s.Store.AddAdvisor(ctx, domain.DelegationAdvisor{
 		UserID:       userID,
@@ -459,7 +475,7 @@ func (s *DelegationService) AddAdvisor(ctx context.Context, req *connect.Request
 			"role":         string(role),
 		},
 	})
-	return connect.NewResponse(&v1.AddAdvisorResponse{Advisor: advisorToProto(out)}), nil
+	return connect.NewResponse(&v1.AddAdvisorResponse{Advisor: s.advisorWithUser(ctx, out)}), nil
 }
 
 // RemoveAdvisor — lead-of-own delegation or admin. Refuses if removing the
@@ -574,7 +590,7 @@ func (s *DelegationService) SetAdvisorRole(ctx context.Context, req *connect.Req
 		s.log().Error("SetAdvisorRole: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-	return connect.NewResponse(&v1.SetAdvisorRoleResponse{Advisor: advisorToProto(updated)}), nil
+	return connect.NewResponse(&v1.SetAdvisorRoleResponse{Advisor: s.advisorWithUser(ctx, updated)}), nil
 }
 
 // ListAdvisors — scope-gated; non-paginated under the hood (advisors per
@@ -598,7 +614,7 @@ func (s *DelegationService) ListAdvisors(ctx context.Context, req *connect.Reque
 		Page:  &v1.Page{NextCursor: "", PageSize: int32(len(advisors))},
 	}
 	for _, a := range advisors {
-		out.Items = append(out.Items, advisorToProto(a))
+		out.Items = append(out.Items, s.advisorWithUser(ctx, a))
 	}
 	return connect.NewResponse(out), nil
 }
@@ -619,7 +635,47 @@ func (s *DelegationService) ListAllAdvisors(ctx context.Context, req *connect.Re
 	}
 	out := &v1.ListAllAdvisorsResponse{Items: make([]*v1.DelegationAdvisor, 0, len(advisors))}
 	for _, a := range advisors {
-		out.Items = append(out.Items, advisorToProto(a))
+		out.Items = append(out.Items, s.advisorWithUser(ctx, a))
+	}
+	return connect.NewResponse(out), nil
+}
+
+// advisorWithUser maps an advisor link and fills in the advisor's name and
+// email, which co-advisors see on the delegation page. Best-effort: a failed
+// user lookup leaves them blank.
+func (s *DelegationService) advisorWithUser(ctx context.Context, a domain.DelegationAdvisor) *v1.DelegationAdvisor {
+	p := advisorToProto(a)
+	if u, err := s.Store.GetUser(ctx, a.UserID); err == nil {
+		p.Name, p.Email = u.Name, u.Email
+	}
+	return p
+}
+
+// ListStaffers — admin only. Returns the staffers overseeing a delegation.
+func (s *DelegationService) ListStaffers(ctx context.Context, req *connect.Request[v1.ListStaffersRequest]) (*connect.Response[v1.ListStaffersResponse], error) {
+	if err := auth.MustBeStaffAdmin(ctx); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
+	}
+	delID := strings.TrimSpace(req.Msg.GetDelegationId())
+	if delID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id required"))
+	}
+	ids, err := s.Store.ListStaffersByDelegation(ctx, delID)
+	if err != nil {
+		s.log().Error("ListStaffers: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	out := &v1.ListStaffersResponse{Items: make([]*v1.User, 0, len(ids))}
+	for _, id := range ids {
+		u, err := s.Store.GetUser(ctx, id)
+		if err != nil {
+			if errors.Is(err, store.ErrNotFound) {
+				continue
+			}
+			s.log().Error("ListStaffers: load user", "err", err)
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		out.Items = append(out.Items, userToProto(u))
 	}
 	return connect.NewResponse(out), nil
 }

@@ -99,10 +99,14 @@ func (c *Client) AddAdvisor(ctx context.Context, a domain.DelegationAdvisor) (do
 	if err != nil {
 		return domain.DelegationAdvisor{}, fmt.Errorf("marshal advisor: %w", err)
 	}
+	// A removed link leaves a soft-deleted row; re-adding overwrites it.
 	_, err = c.DDB.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName:           aws.String(c.Table),
 		Item:                av,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":true": &ddbtypes.AttributeValueMemberBOOL{Value: true},
+		},
 	})
 	if err != nil {
 		var ccf *ddbtypes.ConditionalCheckFailedException
@@ -342,10 +346,14 @@ func (c *Client) AssignStaffer(ctx context.Context, a domain.StaffDelegationAssi
 	if err != nil {
 		return fmt.Errorf("marshal staff-delegation: %w", err)
 	}
+	// A removed link leaves a soft-deleted row; re-adding overwrites it.
 	_, err = c.DDB.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName:           aws.String(c.Table),
 		Item:                av,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":true": &ddbtypes.AttributeValueMemberBOOL{Value: true},
+		},
 	})
 	if err != nil {
 		var ccf *ddbtypes.ConditionalCheckFailedException
@@ -355,6 +363,40 @@ func (c *Client) AssignStaffer(ctx context.Context, a domain.StaffDelegationAssi
 		return fmt.Errorf("put staff-delegation: %w", err)
 	}
 	return nil
+}
+
+// ListStaffersByDelegation returns the user ids of staffers with live
+// oversight of a delegation.
+func (c *Client) ListStaffersByDelegation(ctx context.Context, delegationID string) ([]string, error) {
+	var ids []string
+	var startKey map[string]ddbtypes.AttributeValue
+	for {
+		out, err := c.DDB.Query(ctx, &dynamodb.QueryInput{
+			TableName:              aws.String(c.Table),
+			KeyConditionExpression: aws.String("PK = :pk AND begins_with(SK, :prefix)"),
+			FilterExpression:       aws.String("isDeleted = :false"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":pk":     &ddbtypes.AttributeValueMemberS{Value: staffDelegationPK(delegationID)},
+				":prefix": &ddbtypes.AttributeValueMemberS{Value: "STAFF#"},
+				":false":  &ddbtypes.AttributeValueMemberBOOL{Value: false},
+			},
+			ExclusiveStartKey: startKey,
+		})
+		if err != nil {
+			return nil, fmt.Errorf("list staffers: %w", err)
+		}
+		for _, raw := range out.Items {
+			var it staffDelegationItem
+			if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
+				return nil, fmt.Errorf("unmarshal staff-delegation: %w", err)
+			}
+			ids = append(ids, it.UserID)
+		}
+		if len(out.LastEvaluatedKey) == 0 {
+			return ids, nil
+		}
+		startKey = out.LastEvaluatedKey
+	}
 }
 
 // UnassignStaffer soft-deletes a StaffDelegationAssignment.
@@ -519,10 +561,14 @@ func (c *Client) AssignStafferToCommittee(ctx context.Context, a domain.StaffCom
 	if err != nil {
 		return fmt.Errorf("marshal staff-committee: %w", err)
 	}
+	// A removed link leaves a soft-deleted row; re-adding overwrites it.
 	_, err = c.DDB.PutItem(ctx, &dynamodb.PutItemInput{
 		TableName:           aws.String(c.Table),
 		Item:                av,
-		ConditionExpression: aws.String("attribute_not_exists(PK)"),
+		ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":true": &ddbtypes.AttributeValueMemberBOOL{Value: true},
+		},
 	})
 	if err != nil {
 		var ccf *ddbtypes.ConditionalCheckFailedException

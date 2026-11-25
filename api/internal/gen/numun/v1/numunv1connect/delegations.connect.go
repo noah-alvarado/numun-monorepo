@@ -75,6 +75,9 @@ const (
 	// DelegationServiceUnassignStafferProcedure is the fully-qualified name of the DelegationService's
 	// UnassignStaffer RPC.
 	DelegationServiceUnassignStafferProcedure = "/numun.v1.DelegationService/UnassignStaffer"
+	// DelegationServiceListStaffersProcedure is the fully-qualified name of the DelegationService's
+	// ListStaffers RPC.
+	DelegationServiceListStaffersProcedure = "/numun.v1.DelegationService/ListStaffers"
 )
 
 // DelegationServiceClient is a client for the numun.v1.DelegationService service.
@@ -93,6 +96,8 @@ type DelegationServiceClient interface {
 	ListAllAdvisors(context.Context, *connect.Request[v1.ListAllAdvisorsRequest]) (*connect.Response[v1.ListAllAdvisorsResponse], error)
 	AssignStaffer(context.Context, *connect.Request[v1.AssignStafferRequest]) (*connect.Response[v1.AssignStafferResponse], error)
 	UnassignStaffer(context.Context, *connect.Request[v1.UnassignStafferRequest]) (*connect.Response[v1.UnassignStafferResponse], error)
+	// Staffers with direct oversight of a delegation. Staff-admin only.
+	ListStaffers(context.Context, *connect.Request[v1.ListStaffersRequest]) (*connect.Response[v1.ListStaffersResponse], error)
 }
 
 // NewDelegationServiceClient constructs a client for the numun.v1.DelegationService service. By
@@ -190,6 +195,12 @@ func NewDelegationServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(delegationServiceMethods.ByName("UnassignStaffer")),
 			connect.WithClientOptions(opts...),
 		),
+		listStaffers: connect.NewClient[v1.ListStaffersRequest, v1.ListStaffersResponse](
+			httpClient,
+			baseURL+DelegationServiceListStaffersProcedure,
+			connect.WithSchema(delegationServiceMethods.ByName("ListStaffers")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -209,6 +220,7 @@ type delegationServiceClient struct {
 	listAllAdvisors    *connect.Client[v1.ListAllAdvisorsRequest, v1.ListAllAdvisorsResponse]
 	assignStaffer      *connect.Client[v1.AssignStafferRequest, v1.AssignStafferResponse]
 	unassignStaffer    *connect.Client[v1.UnassignStafferRequest, v1.UnassignStafferResponse]
+	listStaffers       *connect.Client[v1.ListStaffersRequest, v1.ListStaffersResponse]
 }
 
 // ListDelegations calls numun.v1.DelegationService.ListDelegations.
@@ -281,6 +293,11 @@ func (c *delegationServiceClient) UnassignStaffer(ctx context.Context, req *conn
 	return c.unassignStaffer.CallUnary(ctx, req)
 }
 
+// ListStaffers calls numun.v1.DelegationService.ListStaffers.
+func (c *delegationServiceClient) ListStaffers(ctx context.Context, req *connect.Request[v1.ListStaffersRequest]) (*connect.Response[v1.ListStaffersResponse], error) {
+	return c.listStaffers.CallUnary(ctx, req)
+}
+
 // DelegationServiceHandler is an implementation of the numun.v1.DelegationService service.
 type DelegationServiceHandler interface {
 	ListDelegations(context.Context, *connect.Request[v1.ListDelegationsRequest]) (*connect.Response[v1.ListDelegationsResponse], error)
@@ -297,6 +314,8 @@ type DelegationServiceHandler interface {
 	ListAllAdvisors(context.Context, *connect.Request[v1.ListAllAdvisorsRequest]) (*connect.Response[v1.ListAllAdvisorsResponse], error)
 	AssignStaffer(context.Context, *connect.Request[v1.AssignStafferRequest]) (*connect.Response[v1.AssignStafferResponse], error)
 	UnassignStaffer(context.Context, *connect.Request[v1.UnassignStafferRequest]) (*connect.Response[v1.UnassignStafferResponse], error)
+	// Staffers with direct oversight of a delegation. Staff-admin only.
+	ListStaffers(context.Context, *connect.Request[v1.ListStaffersRequest]) (*connect.Response[v1.ListStaffersResponse], error)
 }
 
 // NewDelegationServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -390,6 +409,12 @@ func NewDelegationServiceHandler(svc DelegationServiceHandler, opts ...connect.H
 		connect.WithSchema(delegationServiceMethods.ByName("UnassignStaffer")),
 		connect.WithHandlerOptions(opts...),
 	)
+	delegationServiceListStaffersHandler := connect.NewUnaryHandler(
+		DelegationServiceListStaffersProcedure,
+		svc.ListStaffers,
+		connect.WithSchema(delegationServiceMethods.ByName("ListStaffers")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/numun.v1.DelegationService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DelegationServiceListDelegationsProcedure:
@@ -420,6 +445,8 @@ func NewDelegationServiceHandler(svc DelegationServiceHandler, opts ...connect.H
 			delegationServiceAssignStafferHandler.ServeHTTP(w, r)
 		case DelegationServiceUnassignStafferProcedure:
 			delegationServiceUnassignStafferHandler.ServeHTTP(w, r)
+		case DelegationServiceListStaffersProcedure:
+			delegationServiceListStaffersHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -483,4 +510,8 @@ func (UnimplementedDelegationServiceHandler) AssignStaffer(context.Context, *con
 
 func (UnimplementedDelegationServiceHandler) UnassignStaffer(context.Context, *connect.Request[v1.UnassignStafferRequest]) (*connect.Response[v1.UnassignStafferResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegationService.UnassignStaffer is not implemented"))
+}
+
+func (UnimplementedDelegationServiceHandler) ListStaffers(context.Context, *connect.Request[v1.ListStaffersRequest]) (*connect.Response[v1.ListStaffersResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegationService.ListStaffers is not implemented"))
 }

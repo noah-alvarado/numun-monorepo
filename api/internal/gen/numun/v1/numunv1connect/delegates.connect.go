@@ -53,6 +53,12 @@ const (
 	DelegateServiceDeleteDelegateProcedure = "/numun.v1.DelegateService/DeleteDelegate"
 	// DelegateServiceCheckInProcedure is the fully-qualified name of the DelegateService's CheckIn RPC.
 	DelegateServiceCheckInProcedure = "/numun.v1.DelegateService/CheckIn"
+	// DelegateServiceUndoCheckInProcedure is the fully-qualified name of the DelegateService's
+	// UndoCheckIn RPC.
+	DelegateServiceUndoCheckInProcedure = "/numun.v1.DelegateService/UndoCheckIn"
+	// DelegateServiceRestoreDelegateProcedure is the fully-qualified name of the DelegateService's
+	// RestoreDelegate RPC.
+	DelegateServiceRestoreDelegateProcedure = "/numun.v1.DelegateService/RestoreDelegate"
 	// DelegateServiceSearchDelegatesProcedure is the fully-qualified name of the DelegateService's
 	// SearchDelegates RPC.
 	DelegateServiceSearchDelegatesProcedure = "/numun.v1.DelegateService/SearchDelegates"
@@ -79,6 +85,11 @@ type DelegateServiceClient interface {
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
 	DeleteDelegate(context.Context, *connect.Request[v1.DeleteDelegateRequest]) (*connect.Response[v1.DeleteDelegateResponse], error)
 	CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error)
+	// Reverses a mistaken check-in. Staff only, same scope as CheckIn.
+	UndoCheckIn(context.Context, *connect.Request[v1.UndoCheckInRequest]) (*connect.Response[v1.UndoCheckInResponse], error)
+	// Undoes a soft delete (DeleteDelegate or a Full-sync import). Staff-admin
+	// only.
+	RestoreDelegate(context.Context, *connect.Request[v1.RestoreDelegateRequest]) (*connect.Response[v1.RestoreDelegateResponse], error)
 	// SearchDelegates returns delegates whose first/last name matches the query
 	// (case-insensitive substring), scoped to the conference. Backs the day-of
 	// check-in screen; results are filtered to the caller's scope.
@@ -145,6 +156,18 @@ func NewDelegateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(delegateServiceMethods.ByName("CheckIn")),
 			connect.WithClientOptions(opts...),
 		),
+		undoCheckIn: connect.NewClient[v1.UndoCheckInRequest, v1.UndoCheckInResponse](
+			httpClient,
+			baseURL+DelegateServiceUndoCheckInProcedure,
+			connect.WithSchema(delegateServiceMethods.ByName("UndoCheckIn")),
+			connect.WithClientOptions(opts...),
+		),
+		restoreDelegate: connect.NewClient[v1.RestoreDelegateRequest, v1.RestoreDelegateResponse](
+			httpClient,
+			baseURL+DelegateServiceRestoreDelegateProcedure,
+			connect.WithSchema(delegateServiceMethods.ByName("RestoreDelegate")),
+			connect.WithClientOptions(opts...),
+		),
 		searchDelegates: connect.NewClient[v1.SearchDelegatesRequest, v1.SearchDelegatesResponse](
 			httpClient,
 			baseURL+DelegateServiceSearchDelegatesProcedure,
@@ -187,6 +210,8 @@ type delegateServiceClient struct {
 	updateDelegate             *connect.Client[v1.UpdateDelegateRequest, v1.UpdateDelegateResponse]
 	deleteDelegate             *connect.Client[v1.DeleteDelegateRequest, v1.DeleteDelegateResponse]
 	checkIn                    *connect.Client[v1.CheckInRequest, v1.CheckInResponse]
+	undoCheckIn                *connect.Client[v1.UndoCheckInRequest, v1.UndoCheckInResponse]
+	restoreDelegate            *connect.Client[v1.RestoreDelegateRequest, v1.RestoreDelegateResponse]
 	searchDelegates            *connect.Client[v1.SearchDelegatesRequest, v1.SearchDelegatesResponse]
 	previewUpsertDelegatesBulk *connect.Client[v1.PreviewUpsertDelegatesBulkRequest, v1.PreviewUpsertDelegatesBulkResponse]
 	upsertDelegatesBulk        *connect.Client[v1.UpsertDelegatesBulkRequest, v1.UpsertDelegatesBulkResponse]
@@ -229,6 +254,16 @@ func (c *delegateServiceClient) CheckIn(ctx context.Context, req *connect.Reques
 	return c.checkIn.CallUnary(ctx, req)
 }
 
+// UndoCheckIn calls numun.v1.DelegateService.UndoCheckIn.
+func (c *delegateServiceClient) UndoCheckIn(ctx context.Context, req *connect.Request[v1.UndoCheckInRequest]) (*connect.Response[v1.UndoCheckInResponse], error) {
+	return c.undoCheckIn.CallUnary(ctx, req)
+}
+
+// RestoreDelegate calls numun.v1.DelegateService.RestoreDelegate.
+func (c *delegateServiceClient) RestoreDelegate(ctx context.Context, req *connect.Request[v1.RestoreDelegateRequest]) (*connect.Response[v1.RestoreDelegateResponse], error) {
+	return c.restoreDelegate.CallUnary(ctx, req)
+}
+
 // SearchDelegates calls numun.v1.DelegateService.SearchDelegates.
 func (c *delegateServiceClient) SearchDelegates(ctx context.Context, req *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error) {
 	return c.searchDelegates.CallUnary(ctx, req)
@@ -263,6 +298,11 @@ type DelegateServiceHandler interface {
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
 	DeleteDelegate(context.Context, *connect.Request[v1.DeleteDelegateRequest]) (*connect.Response[v1.DeleteDelegateResponse], error)
 	CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error)
+	// Reverses a mistaken check-in. Staff only, same scope as CheckIn.
+	UndoCheckIn(context.Context, *connect.Request[v1.UndoCheckInRequest]) (*connect.Response[v1.UndoCheckInResponse], error)
+	// Undoes a soft delete (DeleteDelegate or a Full-sync import). Staff-admin
+	// only.
+	RestoreDelegate(context.Context, *connect.Request[v1.RestoreDelegateRequest]) (*connect.Response[v1.RestoreDelegateResponse], error)
 	// SearchDelegates returns delegates whose first/last name matches the query
 	// (case-insensitive substring), scoped to the conference. Backs the day-of
 	// check-in screen; results are filtered to the caller's scope.
@@ -325,6 +365,18 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 		connect.WithSchema(delegateServiceMethods.ByName("CheckIn")),
 		connect.WithHandlerOptions(opts...),
 	)
+	delegateServiceUndoCheckInHandler := connect.NewUnaryHandler(
+		DelegateServiceUndoCheckInProcedure,
+		svc.UndoCheckIn,
+		connect.WithSchema(delegateServiceMethods.ByName("UndoCheckIn")),
+		connect.WithHandlerOptions(opts...),
+	)
+	delegateServiceRestoreDelegateHandler := connect.NewUnaryHandler(
+		DelegateServiceRestoreDelegateProcedure,
+		svc.RestoreDelegate,
+		connect.WithSchema(delegateServiceMethods.ByName("RestoreDelegate")),
+		connect.WithHandlerOptions(opts...),
+	)
 	delegateServiceSearchDelegatesHandler := connect.NewUnaryHandler(
 		DelegateServiceSearchDelegatesProcedure,
 		svc.SearchDelegates,
@@ -371,6 +423,10 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 			delegateServiceDeleteDelegateHandler.ServeHTTP(w, r)
 		case DelegateServiceCheckInProcedure:
 			delegateServiceCheckInHandler.ServeHTTP(w, r)
+		case DelegateServiceUndoCheckInProcedure:
+			delegateServiceUndoCheckInHandler.ServeHTTP(w, r)
+		case DelegateServiceRestoreDelegateProcedure:
+			delegateServiceRestoreDelegateHandler.ServeHTTP(w, r)
 		case DelegateServiceSearchDelegatesProcedure:
 			delegateServiceSearchDelegatesHandler.ServeHTTP(w, r)
 		case DelegateServicePreviewUpsertDelegatesBulkProcedure:
@@ -416,6 +472,14 @@ func (UnimplementedDelegateServiceHandler) DeleteDelegate(context.Context, *conn
 
 func (UnimplementedDelegateServiceHandler) CheckIn(context.Context, *connect.Request[v1.CheckInRequest]) (*connect.Response[v1.CheckInResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.CheckIn is not implemented"))
+}
+
+func (UnimplementedDelegateServiceHandler) UndoCheckIn(context.Context, *connect.Request[v1.UndoCheckInRequest]) (*connect.Response[v1.UndoCheckInResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.UndoCheckIn is not implemented"))
+}
+
+func (UnimplementedDelegateServiceHandler) RestoreDelegate(context.Context, *connect.Request[v1.RestoreDelegateRequest]) (*connect.Response[v1.RestoreDelegateResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.RestoreDelegate is not implemented"))
 }
 
 func (UnimplementedDelegateServiceHandler) SearchDelegates(context.Context, *connect.Request[v1.SearchDelegatesRequest]) (*connect.Response[v1.SearchDelegatesResponse], error) {

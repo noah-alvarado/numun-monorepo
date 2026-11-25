@@ -41,6 +41,8 @@ const (
 	UserServiceUpdateUserProcedure = "/numun.v1.UserService/UpdateUser"
 	// UserServiceInviteStaffProcedure is the fully-qualified name of the UserService's InviteStaff RPC.
 	UserServiceInviteStaffProcedure = "/numun.v1.UserService/InviteStaff"
+	// UserServiceListStaffProcedure is the fully-qualified name of the UserService's ListStaff RPC.
+	UserServiceListStaffProcedure = "/numun.v1.UserService/ListStaff"
 	// UserServiceDismissAwardProcedure is the fully-qualified name of the UserService's DismissAward
 	// RPC.
 	UserServiceDismissAwardProcedure = "/numun.v1.UserService/DismissAward"
@@ -58,6 +60,8 @@ type UserServiceClient interface {
 	// Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
 	// DDB written immediately). See AUTH.md §3.2.
 	InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error)
+	// Every staff-admin and staff-staffer account. Staff only.
+	ListStaff(context.Context, *connect.Request[v1.ListStaffRequest]) (*connect.Response[v1.ListStaffResponse], error)
 	// DismissAward records that the caller has dismissed the given award from
 	// their congratulatory hero. Idempotent. M11.
 	DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error)
@@ -98,6 +102,12 @@ func NewUserServiceClient(httpClient connect.HTTPClient, baseURL string, opts ..
 			connect.WithSchema(userServiceMethods.ByName("InviteStaff")),
 			connect.WithClientOptions(opts...),
 		),
+		listStaff: connect.NewClient[v1.ListStaffRequest, v1.ListStaffResponse](
+			httpClient,
+			baseURL+UserServiceListStaffProcedure,
+			connect.WithSchema(userServiceMethods.ByName("ListStaff")),
+			connect.WithClientOptions(opts...),
+		),
 		dismissAward: connect.NewClient[v1.DismissAwardRequest, v1.DismissAwardResponse](
 			httpClient,
 			baseURL+UserServiceDismissAwardProcedure,
@@ -113,6 +123,7 @@ type userServiceClient struct {
 	getUser      *connect.Client[v1.GetUserRequest, v1.GetUserResponse]
 	updateUser   *connect.Client[v1.UpdateUserRequest, v1.UpdateUserResponse]
 	inviteStaff  *connect.Client[v1.InviteStaffRequest, v1.InviteStaffResponse]
+	listStaff    *connect.Client[v1.ListStaffRequest, v1.ListStaffResponse]
 	dismissAward *connect.Client[v1.DismissAwardRequest, v1.DismissAwardResponse]
 }
 
@@ -136,6 +147,11 @@ func (c *userServiceClient) InviteStaff(ctx context.Context, req *connect.Reques
 	return c.inviteStaff.CallUnary(ctx, req)
 }
 
+// ListStaff calls numun.v1.UserService.ListStaff.
+func (c *userServiceClient) ListStaff(ctx context.Context, req *connect.Request[v1.ListStaffRequest]) (*connect.Response[v1.ListStaffResponse], error) {
+	return c.listStaff.CallUnary(ctx, req)
+}
+
 // DismissAward calls numun.v1.UserService.DismissAward.
 func (c *userServiceClient) DismissAward(ctx context.Context, req *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error) {
 	return c.dismissAward.CallUnary(ctx, req)
@@ -153,6 +169,8 @@ type UserServiceHandler interface {
 	// Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
 	// DDB written immediately). See AUTH.md §3.2.
 	InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error)
+	// Every staff-admin and staff-staffer account. Staff only.
+	ListStaff(context.Context, *connect.Request[v1.ListStaffRequest]) (*connect.Response[v1.ListStaffResponse], error)
 	// DismissAward records that the caller has dismissed the given award from
 	// their congratulatory hero. Idempotent. M11.
 	DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error)
@@ -189,6 +207,12 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 		connect.WithSchema(userServiceMethods.ByName("InviteStaff")),
 		connect.WithHandlerOptions(opts...),
 	)
+	userServiceListStaffHandler := connect.NewUnaryHandler(
+		UserServiceListStaffProcedure,
+		svc.ListStaff,
+		connect.WithSchema(userServiceMethods.ByName("ListStaff")),
+		connect.WithHandlerOptions(opts...),
+	)
 	userServiceDismissAwardHandler := connect.NewUnaryHandler(
 		UserServiceDismissAwardProcedure,
 		svc.DismissAward,
@@ -205,6 +229,8 @@ func NewUserServiceHandler(svc UserServiceHandler, opts ...connect.HandlerOption
 			userServiceUpdateUserHandler.ServeHTTP(w, r)
 		case UserServiceInviteStaffProcedure:
 			userServiceInviteStaffHandler.ServeHTTP(w, r)
+		case UserServiceListStaffProcedure:
+			userServiceListStaffHandler.ServeHTTP(w, r)
 		case UserServiceDismissAwardProcedure:
 			userServiceDismissAwardHandler.ServeHTTP(w, r)
 		default:
@@ -230,6 +256,10 @@ func (UnimplementedUserServiceHandler) UpdateUser(context.Context, *connect.Requ
 
 func (UnimplementedUserServiceHandler) InviteStaff(context.Context, *connect.Request[v1.InviteStaffRequest]) (*connect.Response[v1.InviteStaffResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.UserService.InviteStaff is not implemented"))
+}
+
+func (UnimplementedUserServiceHandler) ListStaff(context.Context, *connect.Request[v1.ListStaffRequest]) (*connect.Response[v1.ListStaffResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.UserService.ListStaff is not implemented"))
 }
 
 func (UnimplementedUserServiceHandler) DismissAward(context.Context, *connect.Request[v1.DismissAwardRequest]) (*connect.Response[v1.DismissAwardResponse], error) {

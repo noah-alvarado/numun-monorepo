@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, SearchDelegatesRequest, SearchDelegatesResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
+import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, RestoreDelegateRequest, RestoreDelegateResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, SearchDelegatesRequest, SearchDelegatesResponse, UndoCheckInRequest, UndoCheckInResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -75,6 +75,29 @@ export const DelegateService = {
       name: "CheckIn",
       I: CheckInRequest,
       O: CheckInResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Reverses a mistaken check-in. Staff only, same scope as CheckIn.
+     *
+     * @generated from rpc numun.v1.DelegateService.UndoCheckIn
+     */
+    undoCheckIn: {
+      name: "UndoCheckIn",
+      I: UndoCheckInRequest,
+      O: UndoCheckInResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Undoes a soft delete (DeleteDelegate or a Full-sync import). Staff-admin
+     * only.
+     *
+     * @generated from rpc numun.v1.DelegateService.RestoreDelegate
+     */
+    restoreDelegate: {
+      name: "RestoreDelegate",
+      I: RestoreDelegateRequest,
+      O: RestoreDelegateResponse,
       kind: MethodKind.Unary,
     },
     /**

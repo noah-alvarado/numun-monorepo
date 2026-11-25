@@ -60,6 +60,11 @@ func (s *DelegateService) ListAllDelegates(ctx context.Context, req *connect.Req
 	if _, ok := auth.FromContext(ctx); !ok {
 		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
 	}
+	if req.Msg.GetIncludeDeleted() {
+		if err := auth.MustBeStaffAdmin(ctx); err != nil {
+			return nil, connect.NewError(connect.CodePermissionDenied, errors.New("include_deleted is admin only"))
+		}
+	}
 	delID := strings.TrimSpace(req.Msg.GetDelegationId())
 	if delID == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id required"))
@@ -67,7 +72,11 @@ func (s *DelegateService) ListAllDelegates(ctx context.Context, req *connect.Req
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
 	}
-	rows, err := s.Store.ListAllDelegatesByDelegation(ctx, delID)
+	list := s.Store.ListAllDelegatesByDelegation
+	if req.Msg.GetIncludeDeleted() {
+		list = s.Store.ListAllDelegatesIncludingDeleted
+	}
+	rows, err := list(ctx, delID)
 	if err != nil {
 		s.log().Error("ListAllDelegates: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
@@ -266,6 +275,11 @@ func (s *DelegateService) CheckIn(ctx context.Context, req *connect.Request[v1.C
 	if id == "" {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegate_id required"))
 	}
+	// Check-in is a staff action; advisors have scope on their own delegates
+	// but must not check them in.
+	if caller.Role != domain.RoleStaffAdmin && caller.Role != domain.RoleStaffStaffer {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("staff only"))
+	}
 	if err := s.Scoper.MustHaveScopeOnDelegate(ctx, id); err != nil {
 		return nil, mapScopeErr(err)
 	}
@@ -292,6 +306,84 @@ func (s *DelegateService) CheckIn(ctx context.Context, req *connect.Request[v1.C
 		},
 	})
 	return connect.NewResponse(&v1.CheckInResponse{Delegate: delegateToProto(updated)}), nil
+}
+
+// UndoCheckIn clears a delegate's check-in. Same audience and scope as CheckIn.
+func (s *DelegateService) UndoCheckIn(ctx context.Context, req *connect.Request[v1.UndoCheckInRequest]) (*connect.Response[v1.UndoCheckInResponse], error) {
+	caller, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	id := strings.TrimSpace(req.Msg.GetDelegateId())
+	if id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegate_id required"))
+	}
+	if caller.Role != domain.RoleStaffAdmin && caller.Role != domain.RoleStaffStaffer {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("staff only"))
+	}
+	if err := s.Scoper.MustHaveScopeOnDelegate(ctx, id); err != nil {
+		return nil, mapScopeErr(err)
+	}
+	existing, err := s.Store.FindDelegateByID(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
+		}
+		s.log().Error("UndoCheckIn: load", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	updated, err := s.Store.UndoCheckInDelegate(ctx, existing.DelegationID, id, caller.UserID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, connect.NewError(connect.CodeNotFound, errors.New("not found"))
+		}
+		s.log().Error("UndoCheckIn: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	s.audit(ctx, domain.AuthAuditEvent{
+		UserID:      caller.UserID,
+		ActorUserID: caller.UserID,
+		Kind:        domain.AuthEventDelegateCheckInUndone,
+		Metadata: map[string]string{
+			"delegateId":   id,
+			"delegationId": existing.DelegationID,
+		},
+	})
+	return connect.NewResponse(&v1.UndoCheckInResponse{Delegate: delegateToProto(updated)}), nil
+}
+
+// RestoreDelegate undoes a soft delete. Staff-admin only.
+func (s *DelegateService) RestoreDelegate(ctx context.Context, req *connect.Request[v1.RestoreDelegateRequest]) (*connect.Response[v1.RestoreDelegateResponse], error) {
+	if err := auth.MustBeStaffAdmin(ctx); err != nil {
+		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
+	}
+	caller, _ := auth.FromContext(ctx)
+	delID := strings.TrimSpace(req.Msg.GetDelegationId())
+	id := strings.TrimSpace(req.Msg.GetDelegateId())
+	if delID == "" || id == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("delegation_id and delegate_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
+		return nil, mapScopeErr(err)
+	}
+	restored, err := s.Store.RestoreDelegate(ctx, delID, id, int(req.Msg.GetExpectedVersion()), caller.UserID)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			return nil, connect.NewError(connect.CodeAborted, errors.New("delegate is not deleted or changed since loading"))
+		}
+		s.log().Error("RestoreDelegate: store", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	s.audit(ctx, domain.AuthAuditEvent{
+		UserID:      caller.UserID,
+		ActorUserID: caller.UserID,
+		Kind:        domain.AuthEventDelegateRestored,
+		Metadata: map[string]string{
+			"delegateId":   id,
+			"delegationId": delID,
+		},
+	})
+	return connect.NewResponse(&v1.RestoreDelegateResponse{Delegate: delegateToProto(restored)}), nil
 }
 
 // SearchDelegates returns delegates whose first/last name (case-insensitive)
