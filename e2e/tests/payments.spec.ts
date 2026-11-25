@@ -2,6 +2,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
 import { createDelegation, uniqueSchool } from "../support/api";
+import { seedUsers } from "../support/seed";
 
 function balance(page: Page) {
   return page.getByText("Balance due:").locator("..");
@@ -62,6 +63,7 @@ test("payments ledger drives balance and paid-in-full", async ({
       reference: "INV-1",
     });
     await expect(ledgerRow(page, "INV-1")).toContainText("+$1,000.00");
+    await expect(ledgerRow(page, "INV-1")).toContainText(seedUsers.admin.name);
     await expect(balance(page)).toContainText("$1,000.00");
     await expect(balance(page)).toContainText("Outstanding");
   });
@@ -133,5 +135,11 @@ test("payments ledger drives balance and paid-in-full", async ({
     ).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Edit" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Delete" })).toHaveCount(0);
+    await expect(
+      page.getByRole("columnheader", { name: "Recorded by" }),
+    ).toHaveCount(0);
+    await expect(ledgerRow(page, "INV-1")).not.toContainText(
+      seedUsers.admin.id,
+    );
   });
 });

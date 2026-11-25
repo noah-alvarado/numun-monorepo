@@ -13,6 +13,7 @@ import {
   delegationClient,
   positionClient,
 } from "@/lib/api";
+import { conferenceLabel } from "@/lib/conference";
 import { userSignal } from "@/lib/session";
 import {
   AssignmentRunStatus,
@@ -36,6 +37,7 @@ export default function AssignmentStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const conferenceId = () => params.conferenceId;
+  const conference = conferenceLabel(conferenceId);
 
   // Reference data: committees, positions, delegates, delegations.
   const [committees, { refetch: refetchCommittees }] = createResource(
@@ -318,9 +320,7 @@ export default function AssignmentStudio() {
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">Assignment Studio</h1>
-          <p class="mt-1 text-sm text-nu-purple-700">
-            Conference {conferenceId()}
-          </p>
+          <p class="mt-1 text-sm text-nu-purple-700">{conference()}</p>
         </div>
         <div class="flex items-center gap-3 text-sm">
           <RunStatusBadge

@@ -11,6 +11,7 @@ import { useNavigate, useParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
 import { committeeClient, positionClient } from "@/lib/api";
+import { conferenceLabel } from "@/lib/conference";
 import { userSignal } from "@/lib/session";
 import {
   CommitteeSize,
@@ -39,6 +40,7 @@ export default function Committees() {
   const params = useParams<{ conferenceId: string }>();
   const [user] = userSignal;
   const navigate = useNavigate();
+  const conference = conferenceLabel(() => params.conferenceId);
 
   const [committees, { refetch }] = createResource(
     () => params.conferenceId,
@@ -59,9 +61,7 @@ export default function Committees() {
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">Committees</h1>
-          <p class="mt-1 text-sm text-nu-purple-700">
-            Conference {params.conferenceId}
-          </p>
+          <p class="mt-1 text-sm text-nu-purple-700">{conference()}</p>
         </div>
         <div class="flex gap-2 text-sm">
           <button

@@ -62,6 +62,14 @@ test("admin proposes, approves and re-runs assignments", async ({
   await step("open an empty studio", async () => {
     await page.goto(`/conferences/${conferenceId}/assignments`);
     await expect(emptyState(page)).toBeVisible();
+    // A draft conference isn't the session's active one, so this exercises
+    // the GetConference lookup.
+    await expect(page.locator("header").first()).toContainText(
+      /E2E Assignments \w{8} \(\d{4}\)/,
+    );
+    await expect(page.locator("header").first()).not.toContainText(
+      conferenceId,
+    );
   });
 
   await step("dry run proposes without saving", async () => {

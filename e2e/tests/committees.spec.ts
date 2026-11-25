@@ -2,7 +2,11 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
 import { rpc } from "../support/api";
-import { seedConferenceId, seedUsers } from "../support/seed";
+import {
+  seedConferenceId,
+  seedConferenceName,
+  seedUsers,
+} from "../support/seed";
 
 function modal(page: Page) {
   return page.locator("div.fixed.inset-0");
@@ -33,6 +37,8 @@ test("admin manages committees and positions", async ({
     await page.getByRole("button", { name: /Committees/ }).click();
     await expect(page).toHaveURL(`/conferences/${seedConferenceId}/committees`);
     await expect(page.getByText("Loading committees…")).toBeHidden();
+    await expect(page.locator("header")).toContainText(seedConferenceName);
+    await expect(page.locator("header")).not.toContainText(seedConferenceId);
   });
 
   await step("create a crisis committee", async () => {
