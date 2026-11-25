@@ -230,14 +230,30 @@ export default function AdminAnnouncements() {
       <Show when={preview()}>
         {(p) => (
           <Modal
-            title={`Send to ${p().count} advisor${p().count === 1 ? "" : "s"}?`}
+            title={
+              p().count === 0
+                ? "No one to send to"
+                : `Send to ${p().count} advisor${p().count === 1 ? "" : "s"}?`
+            }
             onClose={() => setPreview(null)}
           >
-            <p class="mt-2 text-sm text-nu-purple-700">
-              "{subject().trim()}" goes to{" "}
-              {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()} in{" "}
-              {conference()?.name}.
-            </p>
+            <Show
+              when={p().count > 0}
+              fallback={
+                <p class="mt-2 text-sm text-nu-purple-700">
+                  None of the{" "}
+                  {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()}{" "}
+                  in {conference()?.name} can get announcements: there are none
+                  yet, or they've opted out or their email bounced.
+                </p>
+              }
+            >
+              <p class="mt-2 text-sm text-nu-purple-700">
+                "{subject().trim()}" goes to{" "}
+                {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()}{" "}
+                in {conference()?.name}.
+              </p>
+            </Show>
             <Show when={p().sample.length > 0}>
               <p class="mt-2 text-xs text-nu-purple-700">
                 Including {p().sample.join(", ")}
@@ -250,16 +266,18 @@ export default function AdminAnnouncements() {
                 onClick={() => setPreview(null)}
                 class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
               >
-                Cancel
+                {p().count === 0 ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                disabled={busy() || p().count === 0}
-                onClick={send}
-                class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
-              >
-                {busy() ? "Sending…" : "Send"}
-              </button>
+              <Show when={p().count > 0}>
+                <button
+                  type="button"
+                  disabled={busy()}
+                  onClick={send}
+                  class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
+                >
+                  {busy() ? "Sending…" : "Send"}
+                </button>
+              </Show>
             </div>
           </Modal>
         )}

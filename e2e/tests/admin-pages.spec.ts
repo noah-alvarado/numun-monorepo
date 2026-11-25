@@ -230,3 +230,33 @@ test("an admin sends an announcement and an advisor unsubscribes", async ({
     ).not.toBeChecked();
   });
 });
+
+test("an announcement with no one to receive it can't be sent", async ({
+  page,
+  signInAs,
+  step,
+}) => {
+  // The shared table always has advisors to send to, so stand in for an
+  // audience that resolves to nobody (e.g. before any delegation is
+  // approved).
+  await page.route("**/numun.v1.AnnouncementService/PreviewSendAudience", (r) =>
+    r.fulfill({ contentType: "application/json", body: "{}" }),
+  );
+  await signInAs("admin");
+
+  await step("the review explains why", async () => {
+    await page.goto("/admin/announcements");
+    const form = page.getByRole("form", { name: "New announcement" });
+    await form.getByLabel("Subject").fill("Nobody home");
+    await form.getByLabel(/Message/).fill("Hello?");
+    await form.getByRole("button", { name: "Review and send" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("No one to send to");
+    await expect(dialog).toContainText(
+      "None of the advisors of approved delegations",
+    );
+    await expect(dialog.getByRole("button", { name: "Send" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(dialog).toBeHidden();
+  });
+});
