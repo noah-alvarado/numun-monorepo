@@ -1,5 +1,6 @@
 // Day-of Check-In — staff (admin or staffer) searches delegates by name and
-// taps Check In. Backed by DelegateService.SearchDelegates and CheckIn.
+// taps Check In (or Undo for a mistaken one). Backed by
+// DelegateService.SearchDelegates, CheckIn and UndoCheckIn.
 //
 // Scope: any signed-in user with scope on the active conference. The server
 // filters results to the caller's scope; advisors get a near-empty result set
@@ -59,13 +60,15 @@ export default function AdminCheckIn() {
     }
   }
 
-  async function checkIn(d: Delegate) {
+  async function toggle(d: Delegate, undo: boolean) {
     setBusy(d.id);
     setError(null);
     try {
-      const resp = await delegateClient.checkIn({ delegateId: d.id });
+      const resp = undo
+        ? await delegateClient.undoCheckIn({ delegateId: d.id })
+        : await delegateClient.checkIn({ delegateId: d.id });
       // Replace the hit's delegate with the server-returned version so the
-      // checked_in_at timestamp renders without a re-search.
+      // checked_in_at change renders without a re-search.
       setHits(
         hits().map((h) =>
           h.delegate?.id === d.id && resp.delegate
@@ -74,7 +77,9 @@ export default function AdminCheckIn() {
         ),
       );
     } catch (err) {
-      setError(connectMessage(err) ?? "Check-in failed.");
+      setError(
+        connectMessage(err) ?? (undo ? "Undo failed." : "Check-in failed."),
+      );
     } finally {
       setBusy(null);
     }
@@ -155,18 +160,32 @@ export default function AdminCheckIn() {
                           {checkedIn ? " · checked in" : ""}
                         </div>
                       </div>
-                      <button
-                        type="button"
-                        disabled={busy() === d.id || checkedIn}
-                        onClick={() => checkIn(d)}
-                        class="rounded bg-nu-purple px-3 py-1 text-sm text-white disabled:opacity-50"
+                      <Show
+                        when={checkedIn}
+                        fallback={
+                          <button
+                            type="button"
+                            disabled={busy() === d.id}
+                            onClick={() => toggle(d, false)}
+                            class="rounded bg-nu-purple px-3 py-1 text-sm text-white disabled:opacity-50"
+                          >
+                            {busy() === d.id ? "…" : "Check in"}
+                          </button>
+                        }
                       >
-                        {checkedIn
-                          ? "✓ Checked in"
-                          : busy() === d.id
-                            ? "…"
-                            : "Check in"}
-                      </button>
+                        <div class="flex items-center gap-2 text-sm">
+                          <span class="text-green-800">✓ Checked in</span>
+                          <button
+                            type="button"
+                            disabled={busy() === d.id}
+                            onClick={() => toggle(d, true)}
+                            aria-label={`Undo check-in for ${d.firstName} ${d.lastName}`}
+                            class="rounded border border-nu-purple-300 px-2 py-1 text-nu-purple-700 disabled:opacity-50"
+                          >
+                            {busy() === d.id ? "…" : "Undo"}
+                          </button>
+                        </div>
+                      </Show>
                     </li>
                   );
                 }}
