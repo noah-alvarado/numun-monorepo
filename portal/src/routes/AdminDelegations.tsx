@@ -15,7 +15,7 @@ import {
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import { listScopedDelegations } from "@/lib/delegations";
 import RejectDelegationDialog from "@/components/RejectDelegationDialog";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 
 export default function AdminDelegations() {
   const [user] = userSignal;
@@ -60,7 +60,7 @@ export default function AdminDelegations() {
       });
       setItems(items().filter((it) => it.id !== d.id));
     } catch (err) {
-      handleMutationError(err);
+      await handleMutationError(err);
     } finally {
       setBusy(null);
     }
@@ -80,18 +80,17 @@ export default function AdminDelegations() {
       });
       setItems(items().filter((it) => it.id !== d.id));
     } catch (err) {
-      handleMutationError(err);
+      await handleMutationError(err);
     } finally {
       setBusy(null);
       setRejectTarget(null);
     }
   }
 
-  function handleMutationError(err: unknown) {
-    if (err instanceof ConnectError && err.code === Code.Aborted) {
-      setError(
-        "Another change happened first. Reload to fetch the latest state.",
-      );
+  async function handleMutationError(err: unknown) {
+    if (isConflict(err)) {
+      await load();
+      setError(conflictMessage("this delegation"));
       return;
     }
     if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {

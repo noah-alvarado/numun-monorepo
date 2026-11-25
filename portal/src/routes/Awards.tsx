@@ -41,7 +41,7 @@ import type { Delegation } from "@/gen/numun/v1/delegations_pb";
 import type { Committee } from "@/gen/numun/v1/committees_pb";
 import type { SearchDelegatesResponse_Hit } from "@/gen/numun/v1/delegates_pb";
 import { listScopedDelegations } from "@/lib/delegations";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 
 type RecipientFormRow = {
   kind: AwardRecipientKind;
@@ -221,6 +221,12 @@ export default function Awards() {
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
+      if (isConflict(err)) {
+        setEditTarget(null);
+        await refetchAwards();
+        setError(conflictMessage("this award"));
+        return;
+      }
       setError(handleMutationError(err));
     }
   }
@@ -237,6 +243,12 @@ export default function Awards() {
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
+      if (isConflict(err)) {
+        setDeleteTarget(null);
+        await refetchAwards();
+        setError(conflictMessage("this award"));
+        return;
+      }
       setError(handleMutationError(err));
     }
   }
@@ -944,9 +956,6 @@ function formRowToProto(r: RecipientFormRow): AwardRecipient {
 }
 
 function handleMutationError(err: unknown): string {
-  if (err instanceof ConnectError && err.code === Code.Aborted) {
-    return "Another change happened first. Reload to fetch the latest state.";
-  }
   if (err instanceof ConnectError && err.code === Code.PermissionDenied) {
     return "You don't have permission to write that award.";
   }

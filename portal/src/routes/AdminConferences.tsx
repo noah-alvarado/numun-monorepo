@@ -4,11 +4,10 @@
 // API refuses a second and names the one to close.
 
 import { createSignal, For, onMount, Show } from "solid-js";
-import { Code, ConnectError } from "@connectrpc/connect";
 import { timestampDate, timestampFromDate } from "@bufbuild/protobuf/wkt";
 
 import { conferenceClient } from "@/lib/api";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 import { loadActiveConference, userSignal } from "@/lib/session";
 import PageHeader from "@/components/PageHeader";
 import Modal from "@/components/Modal";
@@ -148,11 +147,13 @@ export default function AdminConferences() {
       // The save already succeeded, so a failed refresh isn't an error here.
       await loadActiveConference().catch(() => undefined);
     } catch (err) {
-      setFormError(
-        err instanceof ConnectError && err.code === Code.Aborted
-          ? "Someone else changed this conference meanwhile. Close and reopen it to see their changes."
-          : (connectMessage(err) ?? "Failed to save the conference."),
-      );
+      if (isConflict(err)) {
+        setEditing(null);
+        await load();
+        setError(conflictMessage("this conference"));
+        return;
+      }
+      setFormError(connectMessage(err) ?? "Failed to save the conference.");
     } finally {
       setBusy(false);
     }

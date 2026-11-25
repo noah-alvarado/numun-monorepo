@@ -3,12 +3,11 @@
 // delegates (from Remove or a Full-sync import) and restore them.
 
 import { createMemo, createSignal, For, onMount, Show } from "solid-js";
-import { Code, ConnectError } from "@connectrpc/connect";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
 
 import { assignmentClient, delegateClient } from "@/lib/api";
 import { userSignal } from "@/lib/session";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 import Modal from "@/components/Modal";
 import { ExperienceLevel, type Delegate } from "@/gen/numun/v1/delegates_pb";
 import {
@@ -107,12 +106,6 @@ export default function DelegateRoster(props: {
   const active = () => delegates().filter((d) => !d.isDeleted);
 
   function mutationError(err: unknown, fallback: string) {
-    if (err instanceof ConnectError && err.code === Code.Aborted) {
-      setError(
-        "Someone else changed this roster meanwhile. Reload and try again.",
-      );
-      return;
-    }
     setError(connectMessage(err) ?? fallback);
   }
 
@@ -124,6 +117,12 @@ export default function DelegateRoster(props: {
       await fn();
       await load();
     } catch (err) {
+      if (isConflict(err)) {
+        setEditingId(null);
+        await load();
+        setError(conflictMessage("this roster"));
+        return;
+      }
       mutationError(err, fallback);
     } finally {
       setBusy(false);

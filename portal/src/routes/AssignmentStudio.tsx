@@ -37,7 +37,7 @@ import { User_Role } from "@/gen/numun/v1/users_pb";
 import AssignmentStudioRunControls, {
   countLabel,
 } from "./AssignmentStudioRunControls";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 
 type StatusFilter = "all" | "proposed" | "approved";
 
@@ -214,6 +214,11 @@ export default function AssignmentStudio() {
       });
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("this assignment"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -230,6 +235,11 @@ export default function AssignmentStudio() {
       });
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("this assignment"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -268,6 +278,11 @@ export default function AssignmentStudio() {
       setApproveAllOpen(false);
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("these assignments"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -295,6 +310,11 @@ export default function AssignmentStudio() {
       clearSelection();
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("these assignments"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -322,6 +342,11 @@ export default function AssignmentStudio() {
       clearSelection();
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("these assignments"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -342,6 +367,11 @@ export default function AssignmentStudio() {
       clearSelection();
       await refetchAssignments();
     } catch (err) {
+      if (isConflict(err)) {
+        await refetchAssignments();
+        setError(conflictMessage("these assignments"));
+        return;
+      }
       setError(handleMutationError(err));
     } finally {
       setBusyAction(null);
@@ -706,6 +736,12 @@ export default function AssignmentStudio() {
                 setEditTarget(null);
                 await refetchAssignments();
               } catch (err) {
+                if (isConflict(err)) {
+                  setEditTarget(null);
+                  await refetchAssignments();
+                  setError(conflictMessage("this assignment"));
+                  return;
+                }
                 setEditError(handleMutationError(err));
               }
             }}
@@ -1057,9 +1093,6 @@ function formatTs(ts: { seconds: bigint; nanos: number } | undefined): string {
 }
 
 function handleMutationError(err: unknown): string {
-  if (err instanceof ConnectError && err.code === Code.Aborted) {
-    return "Another change happened first. Reload to fetch the latest state.";
-  }
   if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
     return err.rawMessage;
   }

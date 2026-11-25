@@ -3,10 +3,9 @@
 // not editable here.
 
 import { createSignal, Show } from "solid-js";
-import { Code, ConnectError } from "@connectrpc/connect";
 
 import { userClient } from "@/lib/api";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 import { normalizePhone } from "@/lib/phone";
 import { userSignal } from "@/lib/session";
 import PageHeader from "@/components/PageHeader";
@@ -20,6 +19,15 @@ export default function Profile() {
   const [error, setError] = createSignal<string | null>(null);
   const [saved, setSaved] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
+
+  async function showLatest() {
+    const latest = (await userClient.getMe({}).catch(() => null))?.user;
+    if (!latest) return;
+    setUser(latest);
+    setName(latest.name);
+    setPhone(latest.phone);
+    setOptIn(latest.announcementsOptIn);
+  }
 
   async function save(e: SubmitEvent) {
     e.preventDefault();
@@ -52,11 +60,12 @@ export default function Profile() {
       }
       setSaved(true);
     } catch (err) {
-      setError(
-        err instanceof ConnectError && err.code === Code.Aborted
-          ? "Your profile changed in another tab. Reload the page and try again."
-          : (connectMessage(err) ?? "Failed to save your profile."),
-      );
+      if (isConflict(err)) {
+        await showLatest();
+        setError(conflictMessage("your profile"));
+        return;
+      }
+      setError(connectMessage(err) ?? "Failed to save your profile.");
     } finally {
       setBusy(false);
     }
