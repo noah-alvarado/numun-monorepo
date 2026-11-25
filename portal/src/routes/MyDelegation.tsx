@@ -16,7 +16,7 @@
 //   4. Edits go through UpdateDelegation with expected_version. A 409
 //      (Connect Aborted) prompts the user to re-fetch.
 
-import { onMount, Show, createSignal, createMemo } from "solid-js";
+import { For, onMount, Show, createSignal, createMemo } from "solid-js";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
@@ -65,6 +65,9 @@ export default function MyDelegation() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [delegation, setDelegation] = createSignal<Delegation | null>(null);
+  // The advisor's delegations in the active conference. Usually one; more
+  // when they also co-advise another school.
+  const [mine, setMine] = createSignal<Delegation[]>([]);
   const [loaded, setLoaded] = createSignal(false);
   const [banner, setBanner] = createSignal<string | null>(null);
   // Set when loading failed, so we don't offer to register a delegation the
@@ -117,7 +120,13 @@ export default function MyDelegation() {
       const resp = await delegationClient.listAllDelegations({
         conferenceId: conf.conferenceId,
       });
-      setDelegation(resp.items[0] ?? null);
+      setMine(resp.items);
+      const chosen = Array.isArray(searchParams.delegation)
+        ? searchParams.delegation[0]
+        : searchParams.delegation;
+      setDelegation(
+        resp.items.find((d) => d.id === chosen) ?? resp.items[0] ?? null,
+      );
     } catch (err) {
       setLoadFailed(true);
       setBanner(connectMessage(err) ?? "Failed to load delegation.");
@@ -295,6 +304,26 @@ export default function MyDelegation() {
         <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
           No active conference. Contact NUMUN leadership.
         </p>
+      </Show>
+
+      <Show when={!params.delegationId && mine().length > 1}>
+        <label class="mt-4 flex items-center gap-2 text-sm text-nu-purple-700">
+          You advise {mine().length} delegations:
+          <select
+            aria-label="Delegation"
+            value={delegation()?.id ?? ""}
+            onChange={(e) => {
+              const id = e.currentTarget.value;
+              setDelegation(mine().find((d) => d.id === id) ?? null);
+              setSearchParams({ delegation: id, tab: undefined });
+            }}
+            class="rounded border border-nu-purple-300 px-2 py-1"
+          >
+            <For each={mine()}>
+              {(d) => <option value={d.id}>{d.school}</option>}
+            </For>
+          </select>
+        </label>
       </Show>
 
       <Show when={!loaded()}>

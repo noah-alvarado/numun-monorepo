@@ -39,6 +39,12 @@ export default function DelegationAdvisors(props: {
   const canManage = () =>
     !props.readOnly &&
     (isAdmin() || me()?.role === DelegationAdvisor_Role.LEAD);
+  // Every delegation needs a lead; the API refuses to demote or remove the
+  // last one, so don't offer it.
+  const isOnlyLead = (a: DelegationAdvisor) =>
+    a.role === DelegationAdvisor_Role.LEAD &&
+    advisors().filter((x) => x.role === DelegationAdvisor_Role.LEAD).length ===
+      1;
 
   async function load() {
     try {
@@ -152,7 +158,23 @@ export default function DelegationAdvisors(props: {
                   <td class="py-2 pr-2">{a.email || "—"}</td>
                   <td class="py-2 pr-2">{roleLabel(a.role)}</td>
                   <td class="py-2 text-right">
-                    <Show when={canManage() && a.userId !== user()?.id}>
+                    <Show
+                      when={
+                        canManage() && a.userId !== user()?.id && isOnlyLead(a)
+                      }
+                    >
+                      <span
+                        class="text-xs text-nu-purple-700"
+                        title="Make another advisor lead before changing or removing this one."
+                      >
+                        Only lead
+                      </span>
+                    </Show>
+                    <Show
+                      when={
+                        canManage() && a.userId !== user()?.id && !isOnlyLead(a)
+                      }
+                    >
                       <div class="flex justify-end gap-1">
                         <button
                           type="button"
