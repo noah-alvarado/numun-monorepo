@@ -42,9 +42,9 @@ Run [`dns-cutover.md`](dns-cutover.md). Capture the hosted-zone id; you'll set i
 
 ### 2. ACM certificates (manual; two regions)
 
-CloudFront requires a cert in `us-east-1`; the API Gateway custom domain requires a cert in `us-east-2`. Both are DNS-validated against the Route 53 zone created in step 1.
+CloudFront requires a cert in `us-east-1`. One wildcard cert covers every hostname, including `api.numun.org` (a CloudFront distribution in the api stack; there is no API Gateway custom domain). It is DNS-validated against the Route 53 zone created in step 1.
 
-**us-east-1 wildcard cert** (used by all four CloudFront distributions):
+**us-east-1 wildcard cert** (used by all five CloudFront distributions):
 
 ```bash
 aws acm request-certificate \
@@ -55,17 +55,7 @@ aws acm request-certificate \
   --idempotency-token numun-cf-cert
 ```
 
-**us-east-2 cert for the API custom domain**:
-
-```bash
-aws acm request-certificate \
-  --region us-east-2 \
-  --domain-name api.numun.org \
-  --validation-method DNS \
-  --idempotency-token numun-api-cert
-```
-
-For each, fetch the DNS-validation records and create them as Route 53 CNAMEs:
+Fetch the DNS-validation records and create them as Route 53 CNAMEs:
 
 ```bash
 aws acm describe-certificate \
@@ -74,7 +64,7 @@ aws acm describe-certificate \
   --query "Certificate.DomainValidationOptions[].ResourceRecord"
 ```
 
-ACM flips to `ISSUED` once the validation CNAMEs propagate (5–30 minutes). Capture both cert ARNs for step 5.
+ACM flips to `ISSUED` once the validation CNAMEs propagate (5–30 minutes). Capture the cert ARN for step 5.
 
 ### 3. OIDC bootstrap stack
 
@@ -134,7 +124,6 @@ aws cloudformation deploy \
   --parameter-overrides \
     HostedZoneId=<id-from-step-1> \
     CloudFrontCertificateArn=<us-east-1-cert-arn-from-step-2> \
-    ApiCertificateArn=<us-east-2-cert-arn-from-step-2> \
     AlarmEmail=<your-ops-email>
 ```
 
@@ -164,10 +153,12 @@ Run [`ses-domain-setup.md`](ses-domain-setup.md). The sandbox-exit request can s
 
 Now that the deploy role and variables exist, the api workflow can take it from here.
 
+- Create the CloudFront → origin shared secret first (plain `String`; see SECURITY.md §3.6):
+  `aws ssm put-parameter --region us-east-2 --name /numun/prod/api/origin_verify_secret --type String --value "$(openssl rand -hex 32)"`
 - Push to `main` (any change touching `/api/**` or `/infra/api/**`).
 - Or manually trigger: GitHub → Actions → "deploy api" → Run workflow.
 
-The workflow `sam build`s the Go binary, `sam deploy`s the api stack, then smoke-checks `https://api.numun.org/v1/health` until it returns 200.
+The workflow `sam build`s the Go binary, `sam deploy`s the api stack (including the `api.numun.org` CloudFront distribution), then smoke-checks `https://api.numun.org/v1/health` until it returns 200. When origin verification is enforced, it also checks that the raw `execute-api` URL returns 403.
 
 ### 9. Final smoke check
 

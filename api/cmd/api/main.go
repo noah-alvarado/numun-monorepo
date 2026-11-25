@@ -1,7 +1,8 @@
 // Command api is the NUMUN portal Lambdalith.
 //
-// In production it runs as a single AWS Lambda function fronted by API Gateway
-// HTTP API. Locally it is invoked by `sam local start-api` or — when the
+// In production it runs as a single AWS Lambda function behind API Gateway
+// HTTP API, which in turn sits behind a CloudFront distribution at
+// api.${Apex}. Locally it is invoked by `sam local start-api` or — when the
 // LOCAL_HTTP env var is set — runs as a plain net/http server on port 3000
 // for quick iteration outside of Docker.
 //
@@ -29,6 +30,7 @@ import (
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 	"github.com/numun/numun/api/internal/handlers"
 	numunlog "github.com/numun/numun/api/internal/log"
+	"github.com/numun/numun/api/internal/middleware/edge"
 	"github.com/numun/numun/api/internal/middleware/idempotency"
 	"github.com/numun/numun/api/internal/middleware/ratelimit"
 	"github.com/numun/numun/api/internal/observability"
@@ -232,7 +234,20 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 		DevBypass: os.Getenv("DEV_BYPASS_AUTH") == "true",
 	})
 
+	// Shared secret CloudFront adds to every origin request (SECURITY.md
+	// §3.6). Fail closed outside DEV_MODE so a misconfigured deploy can't
+	// leave the raw execute-api URL open. ORIGIN_VERIFY_ENFORCE=false is
+	// report-only (log mismatches, don't block).
+	originSecret := os.Getenv("ORIGIN_VERIFY_SECRET")
+	if originSecret == "" && os.Getenv("DEV_MODE") != "true" {
+		logger.Error("ORIGIN_VERIFY_SECRET is required unless DEV_MODE=true")
+		os.Exit(1)
+	}
+	originEnforce := os.Getenv("ORIGIN_VERIFY_ENFORCE") != "false"
+
 	// Middleware chain (outermost first):
+	//   Origin verify (rejects requests that bypassed CloudFront; strips the
+	//   secret before Sentry can capture it) →
 	//   Sentry HTTP (panic recovery + request scope) →
 	//   PerIP rate limit (SECURITY.md §2.10) → auth → PerUser rate limit →
 	//   Idempotency-Key lock (API.md §8) → mux.
@@ -242,7 +257,7 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	limits := ratelimit.DefaultLimits()
 	idem := idempotency.New(st, logger)
 	chain := ratelimit.PerIP(limits)(mw(ratelimit.PerUser(limits)(idem(mux))))
-	return observability.HTTPMiddleware(corsPreflight(chain))
+	return edge.VerifyOrigin(originSecret, originEnforce, logger)(observability.HTTPMiddleware(corsPreflight(chain)))
 }
 
 // corsPreflight answers browser preflights with 204. The ANY /{proxy+} route forwards OPTIONS

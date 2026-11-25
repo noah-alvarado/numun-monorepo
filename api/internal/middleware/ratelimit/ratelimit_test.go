@@ -7,6 +7,7 @@ import (
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
+	"github.com/numun/numun/api/internal/middleware/edge"
 )
 
 func TestPerIPSeparatesAnonymousFromAuthenticated(t *testing.T) {
@@ -54,7 +55,7 @@ func TestPerIPDifferentIPsIndependent(t *testing.T) {
 }
 
 func TestPerIPNoXFFPasses(t *testing.T) {
-	// API Gateway always sets X-Forwarded-For; absence means local dev call
+	// CloudFront always stamps the viewer IP; absence means local dev call
 	// and we don't rate limit.
 	limits := Limits{PerIPAuthedPerMin: 1, PerIPAnonymousPerMin: 1}
 	h := PerIP(limits)(okHandler())
@@ -131,7 +132,7 @@ func okHandler() http.Handler {
 
 func callIP(h http.Handler, path, ip string) *httptest.ResponseRecorder {
 	req := httptest.NewRequest(http.MethodPost, path, nil)
-	req.Header.Set("X-Forwarded-For", ip)
+	req.Header.Set(edge.ViewerIPHeader, ip)
 	rr := httptest.NewRecorder()
 	h.ServeHTTP(rr, req)
 	return rr

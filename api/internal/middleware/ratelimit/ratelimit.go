@@ -29,6 +29,7 @@ import (
 	"strings"
 
 	"github.com/numun/numun/api/internal/auth"
+	"github.com/numun/numun/api/internal/middleware/edge"
 )
 
 // Limits the per-minute caps the package applies. Exposed for tests + callers
@@ -57,10 +58,10 @@ func PerIP(limits Limits) func(http.Handler) http.Handler {
 	authed := newStorePerMin(limits.PerIPAuthedPerMin)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			ip := clientIP(r)
+			ip := edge.ClientIP(r.Header)
 			if ip == "" {
-				// Couldn't identify the caller's IP. API Gateway always sets
-				// X-Forwarded-For, so absence indicates a local dev call —
+				// Couldn't identify the caller's IP. CloudFront always stamps
+				// the viewer IP, so absence indicates a local dev call —
 				// don't rate limit.
 				next.ServeHTTP(w, r)
 				return
@@ -117,21 +118,6 @@ func isAnonymousPath(p string) bool {
 		return true
 	}
 	return false
-}
-
-// clientIP extracts the caller's IP. API Gateway HTTP API sets
-// X-Forwarded-For with the client first; we take the first hop.
-func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if comma := strings.IndexByte(xff, ','); comma > 0 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
-	if v := r.Header.Get("X-Real-Ip"); v != "" {
-		return v
-	}
-	return ""
 }
 
 func write429(w http.ResponseWriter, msg string) {

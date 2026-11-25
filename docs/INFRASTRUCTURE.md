@@ -26,7 +26,7 @@ This document defines the cloud infrastructure for the NUMUN landing page and co
 |---|---|---|
 | `numun.org`, `www.numun.org` | Public landing page | S3 + CloudFront (static) |
 | `portal.numun.org` | Portal web app (advisors, staff) | S3 + CloudFront (static SPA) |
-| `api.numun.org` | Portal backend API | API Gateway (HTTP API) → Lambda |
+| `api.numun.org` | Portal backend API | CloudFront → API Gateway (HTTP API) → Lambda |
 | `cms.numun.org` | Decap CMS admin UI | S3 + CloudFront (static) |
 | `assets.numun.org` | Public-readable file assets (background guides, CMS images) | S3 + CloudFront |
 
@@ -43,8 +43,11 @@ This document defines the cloud infrastructure for the NUMUN landing page and co
 │        │                     │                    │                  │        │
 │        ▼                     ▼                    ▼                  ▼        │
 │   ┌─────────┐           ┌─────────┐         ┌──────────────┐    ┌─────────┐   │
-│   │CloudFrnt│           │CloudFrnt│         │  API Gateway │    │CloudFrnt│   │
-│   └────┬────┘           └────┬────┘         │   (HTTP API) │    └────┬────┘   │
+│   │CloudFrnt│           │CloudFrnt│         │  CloudFront  │    │CloudFrnt│   │
+│   └────┬────┘           └────┬────┘         └──────┬───────┘    └────┬────┘   │
+│        │                     │              ┌──────▼───────┐         │        │
+│        │                     │              │  API Gateway │         │        │
+│        │                     │              │   (HTTP API) │         │        │
 │        │                     │              └──────┬───────┘         │        │
 │        ▼                     ▼                     ▼                 ▼        │
 │   ┌─────────┐           ┌─────────┐         ┌──────────────┐    ┌─────────┐   │
@@ -102,7 +105,7 @@ This document defines the cloud infrastructure for the NUMUN landing page and co
 - **API Gateway:** **HTTP API** (not REST API). $1.00 per million requests vs. $3.50 for REST. NUMUN won't approach 1M requests/month.
 - **Compute:** AWS Lambda. Free tier: 1M requests + 400,000 GB-seconds per month, **always free** (not 12-month trial).
 - **Runtime:** **Go** on `provided.al2023` (APPLICATION.md §4).
-- **Custom domain:** `api.numun.org` mapped via API Gateway custom domain + ACM cert.
+- **Custom domain:** `api.numun.org` is a CloudFront distribution (HTTP/2 + HTTP/3, caching disabled, `Managed-AllViewerExceptHostHeader`) whose origin is the HTTP API's `execute-api` endpoint. It reuses the `us-east-1` wildcard cert; API Gateway has no custom domain. The Lambdalith rejects requests that bypass CloudFront (SECURITY.md §3.6). Cost: within CloudFront's always-free tier (10M requests + 1 TB/mo).
 - **CORS:** allow `https://portal.numun.org` only.
 - **Auth:** JWT issued by the backend, validated on each request. SSO is a future upgrade (PROJECT.md).
 

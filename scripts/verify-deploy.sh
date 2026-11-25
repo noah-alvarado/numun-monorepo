@@ -10,8 +10,8 @@
 #
 # Inputs (pass via env vars to keep secrets out of `ps`):
 #
-#   API_BASE_URL       e.g. https://6dx8ilgqp3.execute-api.us-east-2.amazonaws.com
-#                      or https://api.test.numun.org once DNS is cut over
+#   API_BASE_URL       e.g. https://api.test.numun.org (the CloudFront front
+#                      door; the raw execute-api URL rejects direct calls)
 #   COGNITO_USER_POOL  e.g. us-east-2_mFmtWvKtQ
 #   COGNITO_CLIENT_ID  e.g. 7j6o7ub2h7tl4ln21tfqljobun
 #   AWS_PROFILE        e.g. numun-prod (or whichever profile reaches the pool)
@@ -38,7 +38,7 @@ if [[ $# -ge 1 ]]; then
       --stack-name "numun-${ENV_NAME}-$1" \
       --query "Stacks[0].Outputs[?OutputKey=='$2'].OutputValue" --output text
   }
-  API_BASE_URL="${API_BASE_URL:-$(stack_output api HttpApiEndpoint)}"
+  API_BASE_URL="${API_BASE_URL:-$(stack_output api ApiBaseUrl)}"
   COGNITO_USER_POOL="${COGNITO_USER_POOL:-$(stack_output base-data CognitoUserPoolId)}"
   COGNITO_CLIENT_ID="${COGNITO_CLIENT_ID:-$(stack_output base-data CognitoClientId)}"
   echo "env=${ENV_NAME} api=${API_BASE_URL} pool=${COGNITO_USER_POOL}"

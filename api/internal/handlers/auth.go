@@ -6,7 +6,6 @@ import (
 	"encoding/base64"
 	"errors"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
@@ -16,6 +15,7 @@ import (
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
 	authv1 "github.com/numun/numun/api/internal/gen/numun/v1"
+	"github.com/numun/numun/api/internal/middleware/edge"
 	"github.com/numun/numun/api/internal/store"
 )
 
@@ -148,7 +148,7 @@ func (s *AuthService) Exchange(ctx context.Context, req *connect.Request[authv1.
 		CachedAccessToken:          req.Msg.GetAccessToken(),
 		CachedAccessTokenExpiresAt: accessExpiresAt,
 		CSRFToken:                  csrf,
-		IP:                         clientIP(req.Header()),
+		IP:                         edge.ClientIP(req.Header()),
 		UserAgent:                  req.Header().Get("User-Agent"),
 		ExpiresAt:                  expiresAt,
 	}
@@ -235,7 +235,7 @@ func (s *AuthService) RecordPasswordResetCompleted(ctx context.Context, req *con
 		UserID:      sub,
 		ActorUserID: sub,
 		Kind:        domain.AuthEventPasswordResetCompleted,
-		IP:          clientIP(req.Header()),
+		IP:          edge.ClientIP(req.Header()),
 		UserAgent:   req.Header().Get("User-Agent"),
 	})
 	return connect.NewResponse(&authv1.RecordPasswordResetCompletedResponse{}), nil
@@ -256,18 +256,6 @@ func randomToken(nBytes int) (string, error) {
 		return "", err
 	}
 	return base64.RawURLEncoding.EncodeToString(b), nil
-}
-
-func clientIP(h http.Header) string {
-	// Prefer X-Forwarded-For first hop; fall back to remote addr (unset on
-	// Connect requests because we don't have the *http.Request directly).
-	if xff := h.Get("X-Forwarded-For"); xff != "" {
-		if comma := strings.IndexByte(xff, ','); comma > 0 {
-			return strings.TrimSpace(xff[:comma])
-		}
-		return strings.TrimSpace(xff)
-	}
-	return h.Get("X-Real-Ip")
 }
 
 func int64Or(v int32, fallback int64) int64 {

@@ -1,6 +1,6 @@
 # Runbook — DDoS or API abuse
 
-Operator playbook for when traffic against `api.numun.org` or the CloudFront-fronted static surfaces looks abusive. The layers already in place (CloudFront edge cache, API Gateway account-level throttle, in-memory rate limits in `api/internal/middleware/ratelimit`, the bulk-import DDB counter, the $10/mo billing alarm) absorb the vast majority of bad traffic. This runbook is the escalation path when they don't.
+Operator playbook for when traffic against `api.numun.org` or the static surfaces looks abusive. Every public hostname, including the API, is a CloudFront distribution. The layers already in place (CloudFront edge cache for static surfaces, API Gateway account-level throttle, in-memory rate limits in `api/internal/middleware/ratelimit`, the bulk-import DDB counter, the $10/mo billing alarm) absorb the vast majority of bad traffic. This runbook is the escalation path when they don't.
 
 **Read first:** [`../SECURITY.md`](../SECURITY.md) §2.10 (rate limits), §3.7 (alarms), §6 (abuse threats). Related: [`./sign-up-abuse.md`](./sign-up-abuse.md), [`./email-reputation-collapse.md`](./email-reputation-collapse.md).
 
@@ -85,16 +85,31 @@ aws cloudfront update-function \
 aws cloudfront publish-function --name numun-ip-blocklist --if-match <ETAG>
 ```
 
-For API Gateway (which sits in front of Lambda separately from CloudFront), use Stage C instead.
+For the API, extend the existing viewer-request function instead of creating a new one: `numun-<env>-api-viewer-request`, defined as `ApiViewerRequestFunction` in `infra/api/template.yaml`. Add the check before the header stamp and ship it through the api deploy workflow:
 
-### Stage C — enable AWS WAF on the API Gateway custom domain
+```js
+var BLOCKED = { "203.0.113.7": true }; // incident <id>
+function handler(event) {
+  if (BLOCKED[event.viewer.ip]) {
+    return { statusCode: 403, statusDescription: "Forbidden" };
+  }
+  var request = event.request;
+  request.headers["x-numun-viewer-ip"] = { value: event.viewer.ip };
+  return request;
+}
+```
 
-When abuse is distributed (botnet) or persistent, turn on WAF. **Not enabled in v1** (SECURITY.md §3.7) — this is the documented escalation. Cost: ~$5/mo base + ~$1/managed rule + traffic. Acceptable for an active incident.
+If waiting for CI is too slow, use `update-function` / `publish-function` (above) on `numun-<env>-api-viewer-request` directly, then backport the code to the template so the next deploy doesn't revert it.
+
+### Stage C — enable AWS WAF on the API CloudFront distribution
+
+When abuse is distributed (botnet) or persistent, turn on WAF. **Not enabled in v1** (SECURITY.md §3.7) — this is the documented escalation. Cost: ~$5/mo base + ~$1/managed rule + traffic. Acceptable for an active incident. (HTTP APIs can't take a WAF association directly; the CloudFront distribution in front of the API can.)
 
 ```bash
-# 1. Create the WebACL with two AWS-managed rule groups.
+# 1. Create the WebACL with two AWS-managed rule groups. CloudFront-scoped
+#    ACLs must live in us-east-1.
 aws wafv2 create-web-acl \
-  --name numun-api-waf --scope REGIONAL --region us-east-2 \
+  --name numun-api-waf --scope CLOUDFRONT --region us-east-1 \
   --default-action Allow={} \
   --visibility-config SampledRequestsEnabled=true,CloudWatchMetricsEnabled=true,MetricName=numun-api-waf \
   --rules '[
@@ -105,13 +120,9 @@ aws wafv2 create-web-acl \
      "Statement":{"ManagedRuleGroupStatement":{"VendorName":"AWS","Name":"AWSManagedRulesAmazonIpReputationList"}},
      "VisibilityConfig":{"SampledRequestsEnabled":true,"CloudWatchMetricsEnabled":true,"MetricName":"ipreputation"}}
   ]'
-
-# 2. Associate it with the API Gateway stage.
-aws wafv2 associate-web-acl \
-  --web-acl-arn arn:aws:wafv2:us-east-2:<ACCOUNT_ID>:regional/webacl/numun-api-waf/<UUID> \
-  --resource-arn arn:aws:apigateway:us-east-2::/restapis/<API_ID>/stages/prod \
-  --region us-east-2
 ```
+
+2. Attach it: add `WebACLId: <web-acl-arn>` under `ApiDistribution.Properties.DistributionConfig` in `infra/api/template.yaml` and deploy. In an emergency, set it in the CloudFront console and backport to the template afterwards to avoid drift.
 
 **Verify** in CloudWatch (`AWS/WAFV2`) that `BlockedRequests` is non-zero and `AllowedRequests` still includes the venue IP's legitimate traffic. The reputation list catches known-bad IPs; the common rule set catches OWASP-shaped probes. Watch the sampled-requests dashboard for the first hour to confirm no legitimate user (especially venue IP) is blocked.
 

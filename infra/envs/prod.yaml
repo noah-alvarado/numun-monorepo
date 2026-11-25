@@ -24,6 +24,5 @@ SAM_ARTIFACTS_BUCKET: "" # numun-prod-sam-deploys-<accountId> once known
 # Account-level infrastructure (manually bootstrapped). Populate after
 # the prod hosted zone + ACM certs are created.
 HOSTED_ZONE_ID: ""
-API_CERTIFICATE_ARN: "" # arn:aws:acm:us-east-2:<account>:certificate/<id>
 CDN_CERTIFICATE_ARN: "" # arn:aws:acm:us-east-1:<account>:certificate/<id>
 PREVIEW_CERTIFICATE_ARN: "" # PR previews live in test only

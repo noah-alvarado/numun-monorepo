@@ -39,32 +39,26 @@ Set these once before running any commands; they're referenced throughout.
 
 ### P1. ACM certificates
 
-Two certs needed. Use the same DNS-validation path that produced the M1
-certs — `aws acm describe-certificate` against the existing cert ARNs
+One cert needed. Use the same DNS-validation path that produced the M1
+cert — `aws acm describe-certificate` against the existing cert ARN
 records what worked:
 
-- **us-east-1** (CloudFront): SANs `${APEX}`, `*.${APEX}`.
-- **us-east-2** (API Gateway custom domain): SAN `api.${APEX}`.
+- **us-east-1** (CloudFront): SANs `${APEX}`, `*.${APEX}`. This also
+  covers `api.${APEX}`, which is a CloudFront distribution owned by the
+  api stack (no API Gateway custom domain, so no us-east-2 cert).
 
 ```bash
-# Request the us-east-1 wildcard
 aws acm request-certificate \
   --profile "$AWS_PROFILE" --region us-east-1 \
   --domain-name "$APEX" \
   --subject-alternative-names "*.$APEX" \
-  --validation-method DNS
-
-# Request the us-east-2 api cert
-aws acm request-certificate \
-  --profile "$AWS_PROFILE" --region us-east-2 \
-  --domain-name "api.$APEX" \
   --validation-method DNS
 ```
 
 Add the validation CNAMEs to the Route 53 hosted zone (or wherever DNS
 is authoritative). Wait for `Status: ISSUED`.
 
-Capture the two ARNs — they're inputs to the rebuild.
+Capture the ARN — it's an input to the rebuild.
 
 ### P2. Route 53 hosted zone
 
@@ -258,7 +252,6 @@ ALARM_EMAIL: ops@example.com
 SAM_ARTIFACTS_BUCKET: numun-${ENV}-sam-deploys-${ACCOUNT_ID}
 
 HOSTED_ZONE_ID: ${HOSTED_ZONE_ID}
-API_CERTIFICATE_ARN: <from P1: us-east-2 cert ARN>
 CDN_CERTIFICATE_ARN: <from P1: us-east-1 cert ARN>
 ```
 
@@ -359,20 +352,37 @@ aws cloudformation deploy \
 
 ### R10. Deploy the api stack via CI
 
-Push to `main` (or trigger `workflow_dispatch` on `.github/workflows/api.yml`).
+First create the shared secret CloudFront sends to the API origin
+(SECURITY.md §3.6). It must be a plain `String` — CloudFormation can't
+resolve `SecureString` into CloudFront config — and the deploy fails
+fast if it's missing:
+
+```bash
+aws ssm put-parameter \
+  --profile "$AWS_PROFILE" --region "$AWS_REGION" \
+  --name "/numun/${ENV}/api/origin_verify_secret" \
+  --type String \
+  --value "$(openssl rand -hex 32)"
+```
+
+Then push to `main` (or trigger `workflow_dispatch` on `.github/workflows/api.yml`).
 The deploy should succeed using the new OIDC role + the `infra/envs/${ENV}.yaml`
 config + the base-data/base-cdn stack outputs read at deploy time.
 
 Smoke-check the new endpoint (CI does this automatically, but
-double-check):
+double-check). The raw `HttpApiEndpoint` should return 403 once
+`EnforceOriginVerify` is `true`:
 
 ```bash
-ENDPOINT=$(aws cloudformation describe-stacks \
-  --profile "$AWS_PROFILE" --region "$AWS_REGION" \
-  --stack-name "numun-${ENV}-api" \
-  --query "Stacks[0].Outputs[?OutputKey=='HttpApiEndpoint'].OutputValue | [0]" \
-  --output text)
-curl -s "$ENDPOINT/v1/health" | jq .
+stack_output() {
+  aws cloudformation describe-stacks \
+    --profile "$AWS_PROFILE" --region "$AWS_REGION" \
+    --stack-name "numun-${ENV}-api" \
+    --query "Stacks[0].Outputs[?OutputKey=='$1'].OutputValue | [0]" \
+    --output text
+}
+curl -s "$(stack_output ApiBaseUrl)/v1/health" | jq .
+curl -s -o /dev/null -w '%{http_code}\n' "$(stack_output HttpApiEndpoint)/v1/health"  # 403
 ```
 
 ### R11. Wire the Cognito post-confirmation trigger
@@ -394,8 +404,9 @@ V1. `aws cloudformation list-stacks` shows five stacks named
 `numun-${ENV}-*` (bootstrap, base-data, base-cdn, billing-alarms, api),
 all `CREATE_COMPLETE` or `UPDATE_COMPLETE`.
 
-V2. `curl https://api.${APEX}/v1/health` returns 200 (or hit the API
-Gateway invoke URL until DNS is live).
+V2. `curl https://api.${APEX}/v1/health` returns 200, and
+`curl -sI --http3 https://api.${APEX}/v1/health` (curl built with HTTP/3)
+negotiates `HTTP/3`.
 
 V3. `scripts/verify-deploy.sh` succeeds end-to-end with the new admin:
 

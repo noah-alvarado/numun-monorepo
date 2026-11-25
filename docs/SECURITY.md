@@ -135,7 +135,7 @@ JSON and Protobuf binary deserialization are handled by the Connect framework �
 |---|---|---|
 | Cognito sign-in | 5 failed attempts/min/user, plus per-IP global limits | Built-in |
 | Per-user (all authenticated RPCs) | 300 req/min | In-memory `golang.org/x/time/rate` bucket per Lambda env, keyed by `userId` |
-| Per-IP (authenticated RPCs, defense-in-depth) | 600 req/min | In-memory bucket per Lambda env, keyed by `X-Forwarded-For` client IP |
+| Per-IP (authenticated RPCs, defense-in-depth) | 600 req/min | In-memory bucket per Lambda env, keyed by the client IP CloudFront stamps into `X-Numun-Viewer-Ip` (§3.6) |
 | Per-IP (anonymous surfaces: `PublicService.*`, `AuthService.Exchange`, `/cms-oauth/*`, `/v1/diag` Sentry tunnel) | 60 req/min | In-memory bucket per Lambda env, keyed by client IP |
 | Bulk import | 10 previews + 10 commits per hour per advisor (BULK_IMPORT.md §8.2) | DDB conditional counter at `USER#<id>#BULK_IMPORT_HOUR#<floor(unix/3600)>` with 1h TTL — one write per attempt |
 | Per-route ceiling | API Gateway HTTP API account-level throttle (default 10k burst / 5k sustained) | AWS-managed; acts as the wallet shield against runaway traffic |
@@ -245,6 +245,7 @@ Reviewed 2026-11-24 to answer: should `infra.yml` deploy `numun-${Env}-oidc-role
 | Where | Stored as |
 |---|---|
 | Application secrets (JWT signing key if used, Sentry DSN, GitHub OAuth client secret + ID, etc.) | SSM Parameter Store SecureString under `/numun/prod/...` |
+| API origin-verify secret (`/numun/<env>/api/origin_verify_secret`, §3.6) | SSM Parameter Store **String** — CloudFormation can't resolve SecureString into CloudFront config. Low sensitivity: it only proves a request came through CloudFront. |
 | Cognito refresh tokens (in DDB Session rows) | DDB-default at-rest encryption (AWS-managed KMS) |
 | Long-lived AWS credentials in CI | **None.** OIDC federation only. |
 | GitHub Actions `secrets.*` | None except GitHub's own `GITHUB_TOKEN` |
@@ -254,8 +255,8 @@ Reviewed 2026-11-24 to answer: should `infra.yml` deploy `numun-${Env}-oidc-role
 
 ### 3.4 TLS
 
-- All public-facing endpoints (CloudFront distributions, API Gateway custom domain) use ACM certs in `us-east-1` with **`TLSv1.2_2021`** security policy (TLS 1.2 minimum, modern cipher suites).
-- HTTP requests are redirected to HTTPS at CloudFront / API Gateway.
+- All public-facing endpoints, including `api.numun.org`, are CloudFront distributions using the `us-east-1` ACM cert with the **`TLSv1.2_2021`** security policy (TLS 1.2 minimum, modern cipher suites). All serve HTTP/2 and HTTP/3.
+- HTTP requests are redirected to HTTPS on the static distributions. The API distribution is HTTPS-only: plain HTTP gets a 403 rather than a redirect, so a misconfigured client fails loudly instead of leaking a request in the clear on every call.
 - **HSTS:** set on the landing page and portal via CloudFront response-headers policy:
   ```
   Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
@@ -276,6 +277,9 @@ CORS preflight responses are cached for 600 s to avoid extra round-trips on busy
 
 - No VPC; everything runs in Lambda's default network. Egress is via public AWS endpoints (DDB, SES, etc.). At NUMUN's cost ceiling, a VPC + NAT Gateway ($32/mo) is unjustifiable.
 - Outbound network from Lambda is unrestricted by default; the SSRF allowlist in §2.7 is the application-layer control.
+- **API origin lock.** `api.numun.org` is a CloudFront distribution in front of the API Gateway HTTP API (`infra/api/template.yaml`). HTTP APIs can't be made private, so the raw `execute-api` URL stays internet-reachable. CloudFront adds an `X-Origin-Verify` origin custom header (overwriting any viewer-supplied value), and `edge.VerifyOrigin` (`api/internal/middleware/edge`) 403s requests without the matching secret before any other middleware runs, then strips the header so it never reaches logs or Sentry. The `EnforceOriginVerify` stack parameter can drop this to report-only (log `origin verify failed`, serve anyway) as a rollout aid or emergency off-switch. The Lambda refuses to boot without the secret unless `DEV_MODE=true`.
+- **Trusted client IP.** A viewer-request CloudFront Function sets `X-Numun-Viewer-Ip` from `event.viewer.ip`, overwriting anything the client sent. `edge.ClientIP` prefers it for rate limiting (§2.10) and auth audit events; the `X-Forwarded-For` first hop is client-controlled and is only a local-dev fallback.
+- **Rotating the origin secret:** `aws ssm put-parameter --name /numun/<env>/api/origin_verify_secret --type String --overwrite --value "$(openssl rand -hex 32)"`, then redeploy the api stack. The Lambda picks up the new value seconds before CloudFront finishes propagating, so either set `EnforceOriginVerify=false` for that deploy or expect a few minutes of 403s.
 
 ### 3.7 Logging and monitoring
 
@@ -547,6 +551,7 @@ NUMUN is **not** currently certified under any compliance framework. The system 
 | IAM | Per-Lambda least-privilege roles; per-workflow OIDC roles; one break-glass admin | Minimize blast radius |
 | Secrets | SSM Parameter Store; no long-lived AWS keys; OIDC for CI | Per INFRASTRUCTURE.md |
 | TLS | TLS 1.2+ minimum (`TLSv1.2_2021`); HSTS with preload | Modern baseline |
+| API edge | CloudFront (HTTP/2 + HTTP/3) in front of API Gateway, origin locked by a shared-secret header; client IP from a CloudFront Function | HTTP/3 and one edge layer for every surface at ~$0 (free tier). Makes CloudFront-scoped WAF / IP blocklists apply to the API too. |
 | Logging hygiene | `slog` redaction wrapper; Sentry `BeforeSend` scrubber | Avoid leaking PII via logs |
 | MFA | TOTP available (opt-in); UI deferred to v1.1; CLI enrollment runbook for staff | Free, Cognito-native |
 | IP/UA-binding for sessions | Not enforced | Mobile network instability |
