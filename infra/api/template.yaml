@@ -59,9 +59,9 @@ Parameters:
     Description: >
       "true" → the Lambdalith 403s requests lacking a valid X-Origin-Verify
       (i.e. that bypassed CloudFront). "false" → report-only: log
-      "origin verify failed" and serve. Use "false" as an emergency
-      off-switch or for a deploy that rotates the origin secret
-      (SECURITY.md §3.6).
+      "origin verify failed" and serve. CI passes ENFORCE_ORIGIN_VERIFY from
+      infra/envs/<env>.yaml; set it "false" as an emergency off-switch or
+      for a deploy that rotates the origin secret (SECURITY.md §3.6).
   HostedZoneId:
     Type: String
     Description: Route 53 zone id for RootDomain.
