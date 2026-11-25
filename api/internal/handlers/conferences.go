@@ -3,6 +3,7 @@ package handlers
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -121,6 +122,9 @@ func (s *ConferenceService) CreateConference(ctx context.Context, req *connect.R
 	if !in.StartsAt.Before(in.EndsAt) {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("starts_at must precede ends_at"))
 	}
+	if err := s.ensureSoleActive(ctx, "", status); err != nil {
+		return nil, err
+	}
 	created, err := s.Store.CreateConference(ctx, in)
 	if err != nil {
 		s.log().Error("CreateConference: store", "err", err)
@@ -161,11 +165,14 @@ func (s *ConferenceService) UpdateConference(ctx context.Context, req *connect.R
 		patch.EndsAt = &v
 	}
 	if req.Msg.Status != nil {
-		if d, ok := domainConferenceStatus(*req.Msg.Status); ok {
-			patch.Status = &d
-		} else {
+		d, ok := domainConferenceStatus(*req.Msg.Status)
+		if !ok {
 			return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("invalid status"))
 		}
+		if err := s.ensureSoleActive(ctx, id, d); err != nil {
+			return nil, err
+		}
+		patch.Status = &d
 	}
 	if req.Msg.GetMetadataSet() {
 		m := req.Msg.GetMetadata()
@@ -186,6 +193,29 @@ func (s *ConferenceService) UpdateConference(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
 	return connect.NewResponse(&v1.UpdateConferenceResponse{Conference: conferenceToProto(updated)}), nil
+}
+
+// ensureSoleActive refuses to make conferenceID ("" for a new one) open or
+// in progress while another conference is: the portal and site resolve "the"
+// active conference, and two would break GetActiveConference for everyone.
+func (s *ConferenceService) ensureSoleActive(ctx context.Context, conferenceID string, status domain.ConferenceStatus) error {
+	if status != domain.ConferenceStatusOpenForRegistration && status != domain.ConferenceStatusInProgress {
+		return nil
+	}
+	active, err := s.Store.FindActiveConference(ctx)
+	switch {
+	case errors.Is(err, store.ErrNotFound):
+		return nil
+	case errors.Is(err, store.ErrMultipleActiveConferences):
+		return connect.NewError(connect.CodeFailedPrecondition, errors.New("more than one conference is already open or in progress; close the extras first"))
+	case err != nil:
+		s.log().Error("ensureSoleActive: store", "err", err)
+		return connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+	if active.ID == conferenceID {
+		return nil
+	}
+	return connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("%s is already open or in progress; close or archive it first, since only one conference can be active", active.Name))
 }
 
 func (s *ConferenceService) log() *slog.Logger {

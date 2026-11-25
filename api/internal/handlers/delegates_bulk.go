@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -38,6 +39,9 @@ func (s *DelegateService) PreviewUpsertDelegatesBulk(ctx context.Context, req *c
 	}
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
+	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
 	}
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLPreview); err != nil {
@@ -181,11 +185,18 @@ func (s *DelegateService) buildParseRequest(ctx context.Context, callerUserID st
 		}
 		return domain.BulkImportSourceGoogleSheet, url, parse.ParseRequest{
 			SheetURL:   url,
-			HTTPClient: httpclient.New(),
+			HTTPClient: s.sheetsClient(),
 			TabName:    strings.TrimSpace(g.GetTabName()),
 		}, nil
 	}
 	return "", "", parse.ParseRequest{}, connect.NewError(connect.CodeInvalidArgument, errors.New("source required"))
+}
+
+func (s *DelegateService) sheetsClient() *http.Client {
+	if s.SheetsHTTPClient != nil {
+		return s.SheetsHTTPClient
+	}
+	return httpclient.New()
 }
 
 // UpsertDelegatesBulk applies the previewed import. Re-validates the rows,
@@ -203,6 +214,9 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 	}
 	if err := s.Scoper.MustHaveScopeOnDelegation(ctx, delID); err != nil {
 		return nil, mapScopeErr(err)
+	}
+	if err := advisorMayEdit(ctx, s.Store, delID); err != nil {
+		return nil, err
 	}
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLCommit); err != nil {
@@ -275,7 +289,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 		// Idempotent no-op commit; still delete the preview cache.
 		_ = s.Store.DeleteBulkImportPreview(ctx, uploadID)
 		return connect.NewResponse(&v1.UpsertDelegatesBulkResponse{
-			Summary: &v1.CommitSummary{},
+			Summary: &v1.CommitSummary{UnchangedCount: summary.UnchangedCount},
 		}), nil
 	}
 
@@ -305,6 +319,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 				CreateCount:     int32(len(creates)),
 				UpdateCount:     int32(len(updates)),
 				SoftDeleteCount: int32(len(softDeletes)),
+				UnchangedCount:  summary.UnchangedCount,
 			},
 		}), nil
 	}
@@ -367,6 +382,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 			CreateCount:      int32(len(creates)),
 			UpdateCount:      int32(len(updates)),
 			SoftDeleteCount:  int32(len(softDeletes)),
+			UnchangedCount:   summary.UnchangedCount,
 			BulkImportJobId:  persistedJob.ID,
 			TotalBatches:     int32(persistedJob.TotalBatches),
 			CompletedBatches: int32(persistedJob.CompletedBatches),
@@ -555,7 +571,8 @@ func chunkOps(creates []domain.Delegate, updates []store.DelegateUpdate, softDel
 
 // computeRosterMatches sets PreviewRow.Match to Create or Update against the
 // live roster. Same-upload Conflict matches are preserved if already set.
-// Also populates summary's create/update/match-by-* counts, and its
+// Also populates summary's create/update/unchanged/match-by-* counts (an
+// Update match with an empty diff counts as unchanged), and its
 // soft-delete count with how many roster delegates the rows leave unmatched,
 // i.e. what Full sync would soft-delete (BULK_IMPORT.md §5).
 func computeRosterMatches(rows []*v1.PreviewRow, roster []domain.Delegate, summary *v1.PreviewSummary) {
@@ -584,7 +601,11 @@ func computeRosterMatches(rows []*v1.PreviewRow, roster []domain.Delegate, summa
 				Diff:               diff,
 			},
 		}
-		summary.UpdateCount++
+		if len(diff) == 0 {
+			summary.UnchangedCount++
+		} else {
+			summary.UpdateCount++
+		}
 		if strings.HasPrefix(key, "email:") {
 			summary.MatchByEmail++
 		} else if strings.HasPrefix(key, "name:") {
@@ -644,7 +665,8 @@ func diffFields(existing domain.Delegate, in *v1.DelegateInput) map[string]*v1.F
 }
 
 // planWrites enumerates the create/update/soft-delete operations implied by
-// the matched rows + mode.
+// the matched rows + mode. Unchanged rows (empty diff) write nothing but still
+// keep their delegate out of a Full sync's soft-deletes.
 func planWrites(rows []*v1.PreviewRow, roster []domain.Delegate, mode domain.UpsertMode, actorUserID, conferenceID, delegationID string) ([]domain.Delegate, []store.DelegateUpdate, []store.DelegateSoftDelete) {
 	var creates []domain.Delegate
 	var updates []store.DelegateUpdate
@@ -668,6 +690,9 @@ func planWrites(rows []*v1.PreviewRow, roster []domain.Delegate, mode domain.Ups
 				continue
 			}
 			touched[existing.ID] = true
+			if len(m.Update.GetDiff()) == 0 {
+				continue
+			}
 			updates = append(updates, store.DelegateUpdate{
 				ID:              existing.ID,
 				DelegationID:    existing.DelegationID,

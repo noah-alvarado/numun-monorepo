@@ -1,7 +1,7 @@
 import { createSignal, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 
-import { forgotPassword } from "@/lib/cognito";
+import { cognitoMessage, forgotPassword } from "@/lib/cognito";
 
 export default function ForgotPassword() {
   const [email, setEmail] = createSignal("");
@@ -17,7 +17,7 @@ export default function ForgotPassword() {
       await forgotPassword(email().trim());
       navigate(`/sign-in/reset?email=${encodeURIComponent(email().trim())}`);
     } catch (err) {
-      setError((err as Error).message || "Could not start password reset");
+      setError(cognitoMessage(err, "Could not start password reset"));
     } finally {
       setPending(false);
     }

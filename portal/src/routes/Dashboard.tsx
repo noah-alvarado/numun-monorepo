@@ -37,7 +37,15 @@ export default function Dashboard() {
         {(u) => (
           <>
             <section class="mt-6 rounded border border-nu-purple-200 bg-white p-4">
-              <h2 class="text-lg font-semibold">Signed in as</h2>
+              <div class="flex items-center justify-between">
+                <h2 class="text-lg font-semibold">Signed in as</h2>
+                <a
+                  href="/profile"
+                  class="text-sm text-nu-purple-700 underline hover:text-nu-purple"
+                >
+                  Edit profile
+                </a>
+              </div>
               <dl class="mt-2 grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 text-sm">
                 <dt class="text-nu-purple-700">Name</dt>
                 <dd>{u().name}</dd>
@@ -67,6 +75,7 @@ export default function Dashboard() {
                   onClick={() => navigate("/delegation")}
                 />
                 <AwardsCard onClick={() => navigate("/awards")} />
+                <ExportsCard onClick={() => navigate("/exports")} />
               </section>
             </Show>
 
@@ -104,6 +113,22 @@ export default function Dashboard() {
                 <CheckInCard onClick={() => navigate("/admin/check-in")} />
                 <AwardsCard onClick={() => navigate("/awards")} />
                 <NavCard
+                  title="Announcements"
+                  description="Email the advisors of this conference's delegations."
+                  onClick={() => navigate("/admin/announcements")}
+                />
+                <ExportsCard onClick={() => navigate("/exports")} />
+                <NavCard
+                  title="Conferences"
+                  description="Create conferences and open or close registration."
+                  onClick={() => navigate("/admin/conferences")}
+                />
+                <NavCard
+                  title="Staff"
+                  description="See staff accounts and invite new staff."
+                  onClick={() => navigate("/admin/staff")}
+                />
+                <NavCard
                   title="Email Health"
                   description="Review bounced or complaining recipients and unsuppress them."
                   onClick={() => navigate("/admin/email-health")}
@@ -115,6 +140,7 @@ export default function Dashboard() {
               <section class="mt-6 grid gap-3">
                 <CheckInCard onClick={() => navigate("/admin/check-in")} />
                 <AwardsCard onClick={() => navigate("/awards")} />
+                <ExportsCard onClick={() => navigate("/exports")} />
               </section>
             </Show>
           </>
@@ -129,6 +155,16 @@ function CheckInCard(props: { onClick: () => void }) {
     <NavCard
       title="Day-of Check-In"
       description="Find delegates by name and check them in."
+      onClick={props.onClick}
+    />
+  );
+}
+
+function ExportsCard(props: { onClick: () => void }) {
+  return (
+    <NavCard
+      title="Exports"
+      description="Download delegates, payments and assignments as CSV."
       onClick={props.onClick}
     />
   );

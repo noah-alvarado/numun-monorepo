@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -227,6 +228,16 @@ func (c *Client) ListDelegatesByDelegation(ctx context.Context, delegationID, cu
 // delegation. Caller responsibility to handle the unbounded result; used by
 // the bulk-import commit path to compute roster matches.
 func (c *Client) ListAllDelegatesByDelegation(ctx context.Context, delegationID string) ([]domain.Delegate, error) {
+	return c.listDelegatesByDelegation(ctx, delegationID, false)
+}
+
+// ListAllDelegatesIncludingDeleted is ListAllDelegatesByDelegation plus the
+// soft-deleted rows (IsDeleted set), for staff restore.
+func (c *Client) ListAllDelegatesIncludingDeleted(ctx context.Context, delegationID string) ([]domain.Delegate, error) {
+	return c.listDelegatesByDelegation(ctx, delegationID, true)
+}
+
+func (c *Client) listDelegatesByDelegation(ctx context.Context, delegationID string, includeDeleted bool) ([]domain.Delegate, error) {
 	var all []domain.Delegate
 	var startKey map[string]ddbtypes.AttributeValue
 	for {
@@ -248,7 +259,7 @@ func (c *Client) ListAllDelegatesByDelegation(ctx context.Context, delegationID 
 			if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
 				return nil, fmt.Errorf("unmarshal delegate: %w", err)
 			}
-			if it.IsDeleted {
+			if it.IsDeleted && !includeDeleted {
 				continue
 			}
 			all = append(all, delegateFromItem(it))
@@ -412,6 +423,73 @@ func (c *Client) SoftDeleteDelegate(ctx context.Context, delegationID, id string
 		return fmt.Errorf("soft-delete delegate: %w", err)
 	}
 	return nil
+}
+
+// RestoreDelegate clears isDeleted on a soft-deleted delegate with optimistic
+// locking. ErrNotFound if the row is missing or not deleted.
+func (c *Client) RestoreDelegate(ctx context.Context, delegationID, id string, expectedVersion int, actorUserID string) (domain.Delegate, error) {
+	out, err := c.DDB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(c.Table),
+		Key: map[string]ddbtypes.AttributeValue{
+			"PK": &ddbtypes.AttributeValueMemberS{Value: delegatePK(delegationID)},
+			"SK": &ddbtypes.AttributeValueMemberS{Value: delegateSK(id)},
+		},
+		UpdateExpression:    aws.String("SET isDeleted = :false, version = :nv, updatedAt = :now, updatedBy = :ub"),
+		ConditionExpression: aws.String("isDeleted = :true AND version = :ev"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":true":  &ddbtypes.AttributeValueMemberBOOL{Value: true},
+			":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+			":ev":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(expectedVersion)},
+			":nv":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(expectedVersion + 1)},
+			":now":   &ddbtypes.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339Nano)},
+			":ub":    &ddbtypes.AttributeValueMemberS{Value: actorUserID},
+		},
+		ReturnValues: ddbtypes.ReturnValueAllNew,
+	})
+	if err != nil {
+		var ccf *ddbtypes.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return domain.Delegate{}, ErrNotFound
+		}
+		return domain.Delegate{}, fmt.Errorf("restore delegate: %w", err)
+	}
+	var it delegateItem
+	if err := attributevalue.UnmarshalMap(out.Attributes, &it); err != nil {
+		return domain.Delegate{}, fmt.Errorf("unmarshal delegate: %w", err)
+	}
+	return delegateFromItem(it), nil
+}
+
+// UndoCheckInDelegate clears checkedInAt on a live delegate (idempotent).
+func (c *Client) UndoCheckInDelegate(ctx context.Context, delegationID, id string, actorUserID string) (domain.Delegate, error) {
+	out, err := c.DDB.UpdateItem(ctx, &dynamodb.UpdateItemInput{
+		TableName: aws.String(c.Table),
+		Key: map[string]ddbtypes.AttributeValue{
+			"PK": &ddbtypes.AttributeValueMemberS{Value: delegatePK(delegationID)},
+			"SK": &ddbtypes.AttributeValueMemberS{Value: delegateSK(id)},
+		},
+		UpdateExpression:    aws.String("REMOVE checkedInAt SET version = version + :one, updatedAt = :now, updatedBy = :ub"),
+		ConditionExpression: aws.String("attribute_exists(PK) AND isDeleted = :false"),
+		ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+			":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+			":one":   &ddbtypes.AttributeValueMemberN{Value: "1"},
+			":now":   &ddbtypes.AttributeValueMemberS{Value: time.Now().UTC().Format(time.RFC3339Nano)},
+			":ub":    &ddbtypes.AttributeValueMemberS{Value: actorUserID},
+		},
+		ReturnValues: ddbtypes.ReturnValueAllNew,
+	})
+	if err != nil {
+		var ccf *ddbtypes.ConditionalCheckFailedException
+		if errors.As(err, &ccf) {
+			return domain.Delegate{}, ErrNotFound
+		}
+		return domain.Delegate{}, fmt.Errorf("undo check-in: %w", err)
+	}
+	var it delegateItem
+	if err := attributevalue.UnmarshalMap(out.Attributes, &it); err != nil {
+		return domain.Delegate{}, fmt.Errorf("unmarshal delegate: %w", err)
+	}
+	return delegateFromItem(it), nil
 }
 
 // DelegateUpdate carries the resolved fields for a bulk-import update op.

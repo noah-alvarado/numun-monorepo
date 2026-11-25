@@ -28,6 +28,8 @@ message Delegate {
   ExperienceLevel experience_level = 7;
   // Optional. Set day-of by CheckIn.
   google.protobuf.Timestamp checked_in_at = 8;
+  // True only on rows returned by ListAllDelegates with include_deleted.
+  bool is_deleted = 9;
 
   int32 version = 10;
   google.protobuf.Timestamp created_at = 11;
@@ -98,6 +100,9 @@ message PreviewSummary {
   // on Preview for transparency when mode is fixed at preview time (it isn't
   // in v1, so always 0 here).
   int32 soft_delete_count = 9;
+  // Rows that match an existing delegate with no field changes. Counted
+  // separately from update_count; committing them writes nothing.
+  int32 unchanged_count = 10;
 }
 
 // UpsertMode — additive (default) vs. full-sync (destructive). See
@@ -124,6 +129,7 @@ message CommitSummary {
   // Populated when a batch failed; the portal renders a resume affordance.
   // See BULK_IMPORT.md §6.4.
   string last_error = 8;
+  int32 unchanged_count = 9;
 }
 
 // DelegateService — see API.md §10.6 and BULK_IMPORT.md.
@@ -135,6 +141,11 @@ service DelegateService {
   rpc UpdateDelegate(UpdateDelegateRequest) returns (UpdateDelegateResponse) {}
   rpc DeleteDelegate(DeleteDelegateRequest) returns (DeleteDelegateResponse) {}
   rpc CheckIn(CheckInRequest) returns (CheckInResponse) {}
+  // Reverses a mistaken check-in. Staff only, same scope as CheckIn.
+  rpc UndoCheckIn(UndoCheckInRequest) returns (UndoCheckInResponse) {}
+  // Undoes a soft delete (DeleteDelegate or a Full-sync import). Staff-admin
+  // only.
+  rpc RestoreDelegate(RestoreDelegateRequest) returns (RestoreDelegateResponse) {}
 
   // SearchDelegates returns delegates whose first/last name matches the query
   // (case-insensitive substring), scoped to the conference. Backs the day-of
@@ -162,6 +173,9 @@ message ListDelegatesResponse {
 
 message ListAllDelegatesRequest {
   string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  // Staff-admin only: also return soft-deleted delegates (is_deleted = true)
+  // so they can be restored.
+  bool include_deleted = 2;
 }
 message ListAllDelegatesResponse {
   repeated Delegate items = 1;
@@ -201,6 +215,22 @@ message DeleteDelegateRequest {
   int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
 }
 message DeleteDelegateResponse {}
+
+message RestoreDelegateRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+  string delegate_id = 2 [(buf.validate.field).string.min_len = 1];
+  int32 expected_version = 3 [(buf.validate.field).int32.gt = 0];
+}
+message RestoreDelegateResponse {
+  Delegate delegate = 1;
+}
+
+message UndoCheckInRequest {
+  string delegate_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message UndoCheckInResponse {
+  Delegate delegate = 1;
+}
 
 message CheckInRequest {
   string delegate_id = 1 [(buf.validate.field).string.min_len = 1];

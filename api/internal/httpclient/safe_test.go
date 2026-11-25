@@ -227,23 +227,32 @@ func TestRejectsPrivateIPv6(t *testing.T) {
 	}
 }
 
-func TestRefusesCrossOriginRedirect(t *testing.T) {
+func TestRedirectPolicy(t *testing.T) {
 	t.Parallel()
-	// Two test servers; the first 302s to the second. Both bind on 127.0.0.1
-	// which the safe client refuses for IP reasons — so to isolate the
-	// CheckRedirect logic we exercise it via the http.Client's CheckRedirect
-	// directly with synthetic requests.
+	// Both test servers would bind on 127.0.0.1, which the safe client
+	// refuses for IP reasons — so exercise CheckRedirect directly with
+	// synthetic requests.
 	c := httpclient.NewWithOptions(httpclient.Options{})
-	req, _ := http.NewRequest("GET", "http://b.example/", nil)
-	via, _ := http.NewRequest("GET", "http://a.example/", nil)
-	err := c.CheckRedirect(req, []*http.Request{via})
-	if err == nil || !strings.Contains(err.Error(), "cross-origin") {
-		t.Fatalf("expected cross-origin refusal, got %v", err)
+	via, _ := http.NewRequest("GET", "https://docs.google.com/spreadsheets/d/x/export", nil)
+	cases := []struct {
+		to      string
+		allowed bool
+	}{
+		{"https://docs.google.com/other", true},
+		{"https://doc-08-4o-sheets.googleusercontent.com/export/x", true},
+		{"http://doc-08-4o-sheets.googleusercontent.com/export/x", false},
+		{"https://evil.example/", false},
+		{"https://googleusercontent.com.evil.example/", false},
 	}
-	// Same-host redirect must be allowed.
-	req2, _ := http.NewRequest("GET", "http://a.example/x", nil)
-	if err := c.CheckRedirect(req2, []*http.Request{via}); err != nil {
-		t.Fatalf("same-host redirect refused: %v", err)
+	for _, tc := range cases {
+		req, _ := http.NewRequest("GET", tc.to, nil)
+		err := c.CheckRedirect(req, []*http.Request{via})
+		if tc.allowed && err != nil {
+			t.Errorf("redirect to %s refused: %v", tc.to, err)
+		}
+		if !tc.allowed && (err == nil || !strings.Contains(err.Error(), "non-allowlisted")) {
+			t.Errorf("redirect to %s: want refusal, got %v", tc.to, err)
+		}
 	}
 }
 

@@ -374,10 +374,12 @@ const (
 	AuthEventBulkDelegatesPresign AuthAuditEventKind = "bulk_delegates_presigned"
 
 	// Delegate lifecycle (M6).
-	AuthEventDelegateCreated   AuthAuditEventKind = "delegate_created"
-	AuthEventDelegateUpdated   AuthAuditEventKind = "delegate_updated"
-	AuthEventDelegateDeleted   AuthAuditEventKind = "delegate_deleted"
-	AuthEventDelegateCheckedIn AuthAuditEventKind = "delegate_checked_in"
+	AuthEventDelegateCreated       AuthAuditEventKind = "delegate_created"
+	AuthEventDelegateUpdated       AuthAuditEventKind = "delegate_updated"
+	AuthEventDelegateDeleted       AuthAuditEventKind = "delegate_deleted"
+	AuthEventDelegateCheckedIn     AuthAuditEventKind = "delegate_checked_in"
+	AuthEventDelegateCheckInUndone AuthAuditEventKind = "delegate_check_in_undone"
+	AuthEventDelegateRestored      AuthAuditEventKind = "delegate_restored"
 
 	// Committee + position lifecycle (M7).
 	AuthEventCommitteeCreated AuthAuditEventKind = "committee_created"

@@ -306,11 +306,11 @@ The portal accepts a `https://docs.google.com/spreadsheets/d/<sheetId>/edit...` 
 
 1. Validates the URL syntactically.
 2. Extracts the `sheetId` (and optional `gid` for the tab).
-3. Fetches `https://docs.google.com/spreadsheets/d/<sheetId>/export?format=csv&gid=<gid>` (no auth).
+3. Fetches `https://docs.google.com/spreadsheets/d/<sheetId>/export?format=csv&gid=<gid>` (no auth). Google answers with a redirect to `*.googleusercontent.com`, which the fetcher follows (SECURITY.md §2.7).
 4. If the response is HTTP 403 or 404 → `invalid_argument`: `"sheet is not publicly viewable — set sharing to 'Anyone with the link can view'"`.
 5. If success: parse as CSV using the same parser as §2.3 and proceed.
 
-A `gid=0` default is used if no `gid` is in the URL; the tab listing for multi-tab workbooks is fetched via the **HTML** export (`?format=html`) and parsed for `<sheet>` titles — cheap, no API key needed.
+Tabs are listed from the sheet's `/htmlview` page, whose inline script holds one `items.push({name, pageUrl, gid})` entry per tab — cheap, no API key needed. (`export?format=html` can't be used: it returns 400.) A chosen `tab_name` is resolved to its `gid`; otherwise the URL's `gid` is used, then the only tab's, then `gid=0`.
 
 The Sheets path **never writes the file to S3.** Parsed rows go straight into the preview cache.
 

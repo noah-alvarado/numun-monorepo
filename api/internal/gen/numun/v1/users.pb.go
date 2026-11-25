@@ -551,6 +551,86 @@ func (x *UpdateUserResponse) GetUser() *User {
 	return nil
 }
 
+type ListStaffRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStaffRequest) Reset() {
+	*x = ListStaffRequest{}
+	mi := &file_numun_v1_users_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStaffRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStaffRequest) ProtoMessage() {}
+
+func (x *ListStaffRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_users_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStaffRequest.ProtoReflect.Descriptor instead.
+func (*ListStaffRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{7}
+}
+
+type ListStaffResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*User                `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStaffResponse) Reset() {
+	*x = ListStaffResponse{}
+	mi := &file_numun_v1_users_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStaffResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStaffResponse) ProtoMessage() {}
+
+func (x *ListStaffResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_users_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStaffResponse.ProtoReflect.Descriptor instead.
+func (*ListStaffResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *ListStaffResponse) GetItems() []*User {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type InviteStaffRequest struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Email string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
@@ -563,7 +643,7 @@ type InviteStaffRequest struct {
 
 func (x *InviteStaffRequest) Reset() {
 	*x = InviteStaffRequest{}
-	mi := &file_numun_v1_users_proto_msgTypes[7]
+	mi := &file_numun_v1_users_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -575,7 +655,7 @@ func (x *InviteStaffRequest) String() string {
 func (*InviteStaffRequest) ProtoMessage() {}
 
 func (x *InviteStaffRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_users_proto_msgTypes[7]
+	mi := &file_numun_v1_users_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -588,7 +668,7 @@ func (x *InviteStaffRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InviteStaffRequest.ProtoReflect.Descriptor instead.
 func (*InviteStaffRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_users_proto_rawDescGZIP(), []int{7}
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *InviteStaffRequest) GetEmail() string {
@@ -622,7 +702,7 @@ type InviteStaffResponse struct {
 
 func (x *InviteStaffResponse) Reset() {
 	*x = InviteStaffResponse{}
-	mi := &file_numun_v1_users_proto_msgTypes[8]
+	mi := &file_numun_v1_users_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -634,7 +714,7 @@ func (x *InviteStaffResponse) String() string {
 func (*InviteStaffResponse) ProtoMessage() {}
 
 func (x *InviteStaffResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_users_proto_msgTypes[8]
+	mi := &file_numun_v1_users_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -647,7 +727,7 @@ func (x *InviteStaffResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InviteStaffResponse.ProtoReflect.Descriptor instead.
 func (*InviteStaffResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_users_proto_rawDescGZIP(), []int{8}
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *InviteStaffResponse) GetUser() *User {
@@ -666,7 +746,7 @@ type DismissAwardRequest struct {
 
 func (x *DismissAwardRequest) Reset() {
 	*x = DismissAwardRequest{}
-	mi := &file_numun_v1_users_proto_msgTypes[9]
+	mi := &file_numun_v1_users_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -678,7 +758,7 @@ func (x *DismissAwardRequest) String() string {
 func (*DismissAwardRequest) ProtoMessage() {}
 
 func (x *DismissAwardRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_users_proto_msgTypes[9]
+	mi := &file_numun_v1_users_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -691,7 +771,7 @@ func (x *DismissAwardRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissAwardRequest.ProtoReflect.Descriptor instead.
 func (*DismissAwardRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_users_proto_rawDescGZIP(), []int{9}
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *DismissAwardRequest) GetAwardId() string {
@@ -710,7 +790,7 @@ type DismissAwardResponse struct {
 
 func (x *DismissAwardResponse) Reset() {
 	*x = DismissAwardResponse{}
-	mi := &file_numun_v1_users_proto_msgTypes[10]
+	mi := &file_numun_v1_users_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -722,7 +802,7 @@ func (x *DismissAwardResponse) String() string {
 func (*DismissAwardResponse) ProtoMessage() {}
 
 func (x *DismissAwardResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_users_proto_msgTypes[10]
+	mi := &file_numun_v1_users_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -735,7 +815,7 @@ func (x *DismissAwardResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DismissAwardResponse.ProtoReflect.Descriptor instead.
 func (*DismissAwardResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_users_proto_rawDescGZIP(), []int{10}
+	return file_numun_v1_users_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *DismissAwardResponse) GetUser() *User {
@@ -792,7 +872,10 @@ const file_numun_v1_users_proto_rawDesc = "" +
 	"\x06_phoneB\x17\n" +
 	"\x15_announcements_opt_in\"8\n" +
 	"\x12UpdateUserResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user\"g\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user\"\x12\n" +
+	"\x10ListStaffRequest\"9\n" +
+	"\x11ListStaffResponse\x12$\n" +
+	"\x05items\x18\x01 \x03(\v2\x0e.numun.v1.UserR\x05items\"g\n" +
 	"\x12InviteStaffRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12'\n" +
@@ -802,13 +885,14 @@ const file_numun_v1_users_proto_rawDesc = "" +
 	"\x13DismissAwardRequest\x12\"\n" +
 	"\baward_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\aawardId\":\n" +
 	"\x14DismissAwardResponse\x12\"\n" +
-	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user2\xf5\x02\n" +
+	"\x04user\x18\x01 \x01(\v2\x0e.numun.v1.UserR\x04user2\xbd\x03\n" +
 	"\vUserService\x12:\n" +
 	"\x05GetMe\x12\x16.numun.v1.GetMeRequest\x1a\x17.numun.v1.GetMeResponse\"\x00\x12@\n" +
 	"\aGetUser\x12\x18.numun.v1.GetUserRequest\x1a\x19.numun.v1.GetUserResponse\"\x00\x12I\n" +
 	"\n" +
 	"UpdateUser\x12\x1b.numun.v1.UpdateUserRequest\x1a\x1c.numun.v1.UpdateUserResponse\"\x00\x12L\n" +
-	"\vInviteStaff\x12\x1c.numun.v1.InviteStaffRequest\x1a\x1d.numun.v1.InviteStaffResponse\"\x00\x12O\n" +
+	"\vInviteStaff\x12\x1c.numun.v1.InviteStaffRequest\x1a\x1d.numun.v1.InviteStaffResponse\"\x00\x12F\n" +
+	"\tListStaff\x12\x1a.numun.v1.ListStaffRequest\x1a\x1b.numun.v1.ListStaffResponse\"\x00\x12O\n" +
 	"\fDismissAward\x12\x1d.numun.v1.DismissAwardRequest\x1a\x1e.numun.v1.DismissAwardResponse\"\x00B\x95\x01\n" +
 	"\fcom.numun.v1B\n" +
 	"UsersProtoP\x01Z8github.com/numun/numun/api/internal/gen/numun/v1;numunv1\xa2\x02\x03NXX\xaa\x02\bNumun.V1\xca\x02\bNumun\\V1\xe2\x02\x14Numun\\V1\\GPBMetadata\xea\x02\tNumun::V1b\x06proto3"
@@ -826,7 +910,7 @@ func file_numun_v1_users_proto_rawDescGZIP() []byte {
 }
 
 var file_numun_v1_users_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_numun_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
+var file_numun_v1_users_proto_msgTypes = make([]protoimpl.MessageInfo, 13)
 var file_numun_v1_users_proto_goTypes = []any{
 	(User_Role)(0),                // 0: numun.v1.User.Role
 	(User_EmailStatus)(0),         // 1: numun.v1.User.EmailStatus
@@ -837,38 +921,43 @@ var file_numun_v1_users_proto_goTypes = []any{
 	(*GetUserResponse)(nil),       // 6: numun.v1.GetUserResponse
 	(*UpdateUserRequest)(nil),     // 7: numun.v1.UpdateUserRequest
 	(*UpdateUserResponse)(nil),    // 8: numun.v1.UpdateUserResponse
-	(*InviteStaffRequest)(nil),    // 9: numun.v1.InviteStaffRequest
-	(*InviteStaffResponse)(nil),   // 10: numun.v1.InviteStaffResponse
-	(*DismissAwardRequest)(nil),   // 11: numun.v1.DismissAwardRequest
-	(*DismissAwardResponse)(nil),  // 12: numun.v1.DismissAwardResponse
-	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
+	(*ListStaffRequest)(nil),      // 9: numun.v1.ListStaffRequest
+	(*ListStaffResponse)(nil),     // 10: numun.v1.ListStaffResponse
+	(*InviteStaffRequest)(nil),    // 11: numun.v1.InviteStaffRequest
+	(*InviteStaffResponse)(nil),   // 12: numun.v1.InviteStaffResponse
+	(*DismissAwardRequest)(nil),   // 13: numun.v1.DismissAwardRequest
+	(*DismissAwardResponse)(nil),  // 14: numun.v1.DismissAwardResponse
+	(*timestamppb.Timestamp)(nil), // 15: google.protobuf.Timestamp
 }
 var file_numun_v1_users_proto_depIdxs = []int32{
 	0,  // 0: numun.v1.User.role:type_name -> numun.v1.User.Role
 	1,  // 1: numun.v1.User.email_status:type_name -> numun.v1.User.EmailStatus
-	13, // 2: numun.v1.User.created_at:type_name -> google.protobuf.Timestamp
-	13, // 3: numun.v1.User.updated_at:type_name -> google.protobuf.Timestamp
+	15, // 2: numun.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	15, // 3: numun.v1.User.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 4: numun.v1.GetMeResponse.user:type_name -> numun.v1.User
 	2,  // 5: numun.v1.GetUserResponse.user:type_name -> numun.v1.User
 	2,  // 6: numun.v1.UpdateUserResponse.user:type_name -> numun.v1.User
-	0,  // 7: numun.v1.InviteStaffRequest.role:type_name -> numun.v1.User.Role
-	2,  // 8: numun.v1.InviteStaffResponse.user:type_name -> numun.v1.User
-	2,  // 9: numun.v1.DismissAwardResponse.user:type_name -> numun.v1.User
-	3,  // 10: numun.v1.UserService.GetMe:input_type -> numun.v1.GetMeRequest
-	5,  // 11: numun.v1.UserService.GetUser:input_type -> numun.v1.GetUserRequest
-	7,  // 12: numun.v1.UserService.UpdateUser:input_type -> numun.v1.UpdateUserRequest
-	9,  // 13: numun.v1.UserService.InviteStaff:input_type -> numun.v1.InviteStaffRequest
-	11, // 14: numun.v1.UserService.DismissAward:input_type -> numun.v1.DismissAwardRequest
-	4,  // 15: numun.v1.UserService.GetMe:output_type -> numun.v1.GetMeResponse
-	6,  // 16: numun.v1.UserService.GetUser:output_type -> numun.v1.GetUserResponse
-	8,  // 17: numun.v1.UserService.UpdateUser:output_type -> numun.v1.UpdateUserResponse
-	10, // 18: numun.v1.UserService.InviteStaff:output_type -> numun.v1.InviteStaffResponse
-	12, // 19: numun.v1.UserService.DismissAward:output_type -> numun.v1.DismissAwardResponse
-	15, // [15:20] is the sub-list for method output_type
-	10, // [10:15] is the sub-list for method input_type
-	10, // [10:10] is the sub-list for extension type_name
-	10, // [10:10] is the sub-list for extension extendee
-	0,  // [0:10] is the sub-list for field type_name
+	2,  // 7: numun.v1.ListStaffResponse.items:type_name -> numun.v1.User
+	0,  // 8: numun.v1.InviteStaffRequest.role:type_name -> numun.v1.User.Role
+	2,  // 9: numun.v1.InviteStaffResponse.user:type_name -> numun.v1.User
+	2,  // 10: numun.v1.DismissAwardResponse.user:type_name -> numun.v1.User
+	3,  // 11: numun.v1.UserService.GetMe:input_type -> numun.v1.GetMeRequest
+	5,  // 12: numun.v1.UserService.GetUser:input_type -> numun.v1.GetUserRequest
+	7,  // 13: numun.v1.UserService.UpdateUser:input_type -> numun.v1.UpdateUserRequest
+	11, // 14: numun.v1.UserService.InviteStaff:input_type -> numun.v1.InviteStaffRequest
+	9,  // 15: numun.v1.UserService.ListStaff:input_type -> numun.v1.ListStaffRequest
+	13, // 16: numun.v1.UserService.DismissAward:input_type -> numun.v1.DismissAwardRequest
+	4,  // 17: numun.v1.UserService.GetMe:output_type -> numun.v1.GetMeResponse
+	6,  // 18: numun.v1.UserService.GetUser:output_type -> numun.v1.GetUserResponse
+	8,  // 19: numun.v1.UserService.UpdateUser:output_type -> numun.v1.UpdateUserResponse
+	12, // 20: numun.v1.UserService.InviteStaff:output_type -> numun.v1.InviteStaffResponse
+	10, // 21: numun.v1.UserService.ListStaff:output_type -> numun.v1.ListStaffResponse
+	14, // 22: numun.v1.UserService.DismissAward:output_type -> numun.v1.DismissAwardResponse
+	17, // [17:23] is the sub-list for method output_type
+	11, // [11:17] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_numun_v1_users_proto_init() }
@@ -883,7 +972,7 @@ func file_numun_v1_users_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numun_v1_users_proto_rawDesc), len(file_numun_v1_users_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   11,
+			NumMessages:   13,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

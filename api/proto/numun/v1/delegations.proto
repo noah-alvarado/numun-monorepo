@@ -5,6 +5,7 @@ package numun.v1;
 import "buf/validate/validate.proto";
 import "google/protobuf/timestamp.proto";
 import "numun/v1/common.proto";
+import "numun/v1/users.proto";
 
 // Trinary expresses positive/negative/neutral preferences along committee
 // axes (type and size). Consumed by the assignment algorithm. See
@@ -76,6 +77,10 @@ message DelegationAdvisor {
   int32 version = 5;
   google.protobuf.Timestamp created_at = 6;
   google.protobuf.Timestamp updated_at = 7;
+  // The advisor's display name and email, resolved at read time so
+  // co-advisors can see who else manages the delegation.
+  string name = 8;
+  string email = 9;
 
   enum Role {
     ROLE_UNSPECIFIED = 0;
@@ -102,6 +107,8 @@ service DelegationService {
 
   rpc AssignStaffer(AssignStafferRequest) returns (AssignStafferResponse) {}
   rpc UnassignStaffer(UnassignStafferRequest) returns (UnassignStafferResponse) {}
+  // Staffers with direct oversight of a delegation. Staff-admin only.
+  rpc ListStaffers(ListStaffersRequest) returns (ListStaffersResponse) {}
 }
 
 message ListDelegationsRequest {
@@ -177,8 +184,11 @@ message RejectResponse {
 
 message AddAdvisorRequest {
   string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
-  string user_id = 2 [(buf.validate.field).string.min_len = 1];
+  // Exactly one of user_id or email. Advisors add co-advisors by email; the
+  // server resolves it to an existing advisor account.
+  string user_id = 2;
   DelegationAdvisor.Role role = 3;
+  string email = 4;
 }
 message AddAdvisorResponse {
   DelegationAdvisor advisor = 1;
@@ -221,6 +231,13 @@ message AssignStafferRequest {
   string user_id = 2 [(buf.validate.field).string.min_len = 1];
 }
 message AssignStafferResponse {}
+
+message ListStaffersRequest {
+  string delegation_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListStaffersResponse {
+  repeated User items = 1;
+}
 
 message UnassignStafferRequest {
   string delegation_id = 1 [(buf.validate.field).string.min_len = 1];

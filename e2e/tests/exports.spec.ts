@@ -55,9 +55,13 @@ test("admin downloads the CSV exports", async ({
 
   await signInAs("admin");
 
-  await step("open awards (export links)", async () => {
-    await page.goto("/awards");
+  await step("open exports from the dashboard", async () => {
+    await page.getByRole("button", { name: /^Exports/ }).click();
+    await expect(page).toHaveURL(/\/exports$/);
     await expect(page.getByText(seedConferenceName)).toBeVisible();
+    await expect(
+      page.getByText("Files cover every delegation in the conference."),
+    ).toBeVisible();
   });
 
   await step("delegates.csv", async () => {

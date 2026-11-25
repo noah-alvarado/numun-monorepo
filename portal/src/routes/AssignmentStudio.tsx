@@ -236,14 +236,35 @@ export default function AssignmentStudio() {
     }
   }
 
+  // With a committee or delegation filter on, "Approve all" approves only
+  // the proposed rows on screen.
+  const narrowed = () => !!committeeFilter() || !!delegationFilter();
+  const shownProposed = () =>
+    (assignments() ?? []).filter((a) => a.status === AssignmentStatus.PROPOSED);
+
   async function doApproveAll() {
     setBusyAction("approve-all");
     setError(null);
     try {
-      await assignmentClient.approveAll({
-        conferenceId: conferenceId(),
-        runId: "",
-      });
+      if (narrowed()) {
+        const resp = await assignmentClient.approveByIds({
+          conferenceId: conferenceId(),
+          items: shownProposed().map((a) => ({
+            assignmentId: a.id,
+            expectedVersion: a.version,
+          })),
+        });
+        if (resp.failures.length > 0) {
+          setError(
+            `Approved ${resp.approvedCount}. ${resp.failures.length} row(s) failed; reload and retry.`,
+          );
+        }
+      } else {
+        await assignmentClient.approveAll({
+          conferenceId: conferenceId(),
+          runId: "",
+        });
+      }
       setApproveAllOpen(false);
       await refetchAssignments();
     } catch (err) {
@@ -398,14 +419,12 @@ export default function AssignmentStudio() {
                   type="button"
                   disabled={
                     busyAction() === "approve-all" ||
-                    (assignments() ?? []).every(
-                      (a) => a.status === AssignmentStatus.APPROVED,
-                    )
+                    shownProposed().length === 0
                   }
                   onClick={() => setApproveAllOpen(true)}
                   class="rounded bg-nu-purple px-3 py-1 text-xs text-white disabled:opacity-50"
                 >
-                  Approve all
+                  {narrowed() ? "Approve shown" : "Approve all"}
                 </button>
               </div>
             </div>
@@ -628,12 +647,18 @@ export default function AssignmentStudio() {
 
       <Show when={approveAllOpen()}>
         <ModalShell
-          title="Approve all proposed assignments?"
+          title={
+            narrowed()
+              ? `Approve the ${shownProposed().length} proposed assignment${shownProposed().length === 1 ? "" : "s"} shown?`
+              : "Approve all proposed assignments?"
+          }
           onClose={() => setApproveAllOpen(false)}
         >
           <p class="text-sm text-nu-purple-700">
-            This will flip every proposed assignment in this conference to
-            approved. Approved assignments are pinned across re-runs.
+            {narrowed()
+              ? "Only assignments matching the current filters are approved."
+              : "This will flip every proposed assignment in this conference to approved."}{" "}
+            Approved assignments are pinned across re-runs.
           </p>
           <div class="mt-4 flex justify-end gap-2">
             <button
@@ -649,7 +674,11 @@ export default function AssignmentStudio() {
               onClick={doApproveAll}
               class="rounded bg-nu-purple px-3 py-1 text-sm text-white disabled:opacity-50"
             >
-              {busyAction() === "approve-all" ? "Approving…" : "Approve all"}
+              {busyAction() === "approve-all"
+                ? "Approving…"
+                : narrowed()
+                  ? "Approve shown"
+                  : "Approve all"}
             </button>
           </div>
         </ModalShell>
@@ -974,6 +1003,9 @@ function ModalShell(props: {
       onClick={props.onClose}
     >
       <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={props.title}
         class="w-full max-w-md rounded border border-nu-purple-200 bg-white p-4 shadow-lg"
         onClick={(e) => e.stopPropagation()}
       >

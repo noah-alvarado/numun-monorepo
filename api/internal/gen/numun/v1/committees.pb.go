@@ -1436,7 +1436,7 @@ var File_numun_v1_committees_proto protoreflect.FileDescriptor
 
 const file_numun_v1_committees_proto_rawDesc = "" +
 	"\n" +
-	"\x19numun/v1/committees.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15numun/v1/common.proto\"\xf0\x02\n" +
+	"\x19numun/v1/committees.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xf0\x02\n" +
 	"\tCommittee\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
 	"\rconference_id\x18\x02 \x01(\tR\fconferenceId\x12\x12\n" +
@@ -1661,7 +1661,6 @@ func file_numun_v1_committees_proto_init() {
 	if File_numun_v1_committees_proto != nil {
 		return
 	}
-	file_numun_v1_common_proto_init()
 	file_numun_v1_committees_proto_msgTypes[8].OneofWrappers = []any{}
 	file_numun_v1_committees_proto_msgTypes[18].OneofWrappers = []any{}
 	type x struct{}

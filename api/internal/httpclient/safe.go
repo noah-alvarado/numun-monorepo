@@ -14,7 +14,8 @@
 //   - Refuses any IP in private / loopback / link-local / unspecified /
 //     CGNAT-style ranges (IPv4 + IPv6) per the SECURITY.md list.
 //   - 5 s connect timeout, 10 s total.
-//   - Refuses cross-origin redirects.
+//   - Follows redirects only to the same host or to another allowlisted
+//     host over HTTPS (Google redirects exports to googleusercontent.com).
 package httpclient
 
 import (
@@ -24,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -172,13 +174,20 @@ func NewWithOptions(opts Options) *http.Client {
 			if len(via) == 0 {
 				return nil
 			}
+			if len(via) >= 10 {
+				return errors.New("safehttp: too many redirects")
+			}
 			if strings.EqualFold(req.URL.Host, via[0].URL.Host) {
-				if len(via) >= 10 {
-					return errors.New("safehttp: too many redirects")
-				}
 				return nil
 			}
-			return fmt.Errorf("safehttp: cross-origin redirect refused (%s -> %s)", via[0].URL.Host, req.URL.Host)
+			// Google serves sheet exports by redirecting docs.google.com to
+			// *.googleusercontent.com, so follow redirects to other
+			// allowlisted hosts — over HTTPS only. The dialer re-checks the
+			// allowlist and IP ranges for every hop.
+			if req.URL.Scheme == "https" && al.permits(strings.ToLower(req.URL.Hostname())) {
+				return nil
+			}
+			return fmt.Errorf("safehttp: redirect to non-allowlisted origin refused (%s -> %s)", via[0].URL.Host, req.URL.Host)
 		},
 	}
 }
@@ -216,3 +225,24 @@ func isDisallowedIP(ip net.IP) bool {
 	}
 	return false
 }
+
+// NewDevSheetsProxy returns a client that sends every request to origin
+// (e.g. http://127.0.0.1:4599) instead of the Google host in the URL, so
+// local dev and e2e can import from a fake Google Sheets server. It skips
+// every SSRF check: callers must only use it when DEV_MODE=true.
+func NewDevSheetsProxy(origin *url.URL) *http.Client {
+	return &http.Client{
+		Timeout: defaultTotalTimeout,
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			r = r.Clone(r.Context())
+			r.URL.Scheme = origin.Scheme
+			r.URL.Host = origin.Host
+			r.Host = origin.Host
+			return http.DefaultTransport.RoundTrip(r)
+		}),
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

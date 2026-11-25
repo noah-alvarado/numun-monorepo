@@ -158,7 +158,7 @@ func (e *ExportRoutes) scopedDelegations(ctx context.Context, caller auth.Caller
 
 // handleAssignmentsCSV streams the conference's assignments as UTF-8-with-BOM
 // CSV with CRLF endings, scoped per API.md §12.2 — admin sees all, advisor
-// sees own delegations, staff-staffer sees the delegations they oversee
+// sees own delegations' approved rows, staff-staffer sees the delegations they oversee
 // (case-a). Committee-only staffers (case-c) without any delegation
 // assignments end up with an empty result set rather than 403; case-c access
 // to assignments via committee is intentionally out of scope here.
@@ -226,6 +226,9 @@ func (e *ExportRoutes) handleAssignmentsCSV(w http.ResponseWriter, r *http.Reque
 		}
 		del, ok := allowedDelegations[a.DelegationID]
 		if !ok {
+			continue
+		}
+		if caller.Role == domain.RoleAdvisor && a.Status != domain.AssignmentStatusApproved {
 			continue
 		}
 		committee, ok := committees[a.CommitteeID]

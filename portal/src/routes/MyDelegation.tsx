@@ -10,7 +10,9 @@
 //      active conference (M4 advisor flow).
 //   3. Zero rows on the advisor flow → render the create form. Non-zero →
 //      render the edit form preloaded from the existing delegation, alongside
-//      tab navigation (Overview / Delegates / Payments).
+//      tab navigation (Overview / Delegates / Advisors / Payments). Admins
+//      also approve or reject here and assign staffers. A rejected delegation
+//      is read-only for advisors.
 //   4. Edits go through UpdateDelegation with expected_version. A 409
 //      (Connect Aborted) prompts the user to re-fetch.
 
@@ -24,9 +26,16 @@ import {
   userSignal,
 } from "@/lib/session";
 import { delegationClient } from "@/lib/api";
-import type { Delegation } from "@/gen/numun/v1/delegations_pb";
+import {
+  Delegation_Status,
+  type Delegation,
+} from "@/gen/numun/v1/delegations_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import DelegationForm from "@/components/DelegationForm";
+import DelegateRoster from "@/components/DelegateRoster";
+import DelegationAdvisors from "@/components/DelegationAdvisors";
+import DelegationStaff from "@/components/DelegationStaff";
+import RejectDelegationDialog from "@/components/RejectDelegationDialog";
 import DelegationPayments from "@/routes/DelegationPayments";
 import { type DelegationFormValues } from "@/lib/delegation-schema";
 import {
@@ -36,12 +45,14 @@ import {
   formToPrefs,
 } from "@/lib/delegation-mappers";
 import { connectMessage } from "@/lib/errors";
+import { conferenceLabel } from "@/lib/conference";
 
-type TabKey = "overview" | "delegates" | "payments";
+type TabKey = "overview" | "delegates" | "advisors" | "payments";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "overview", label: "Overview" },
   { key: "delegates", label: "Delegates" },
+  { key: "advisors", label: "Advisors" },
   { key: "payments", label: "Payments" },
 ];
 
@@ -61,9 +72,7 @@ export default function MyDelegation() {
     const raw = Array.isArray(searchParams.tab)
       ? searchParams.tab[0]
       : searchParams.tab;
-    if (raw === "delegates" || raw === "payments" || raw === "overview") {
-      return raw;
-    }
+    if (TABS.some((t) => t.key === raw)) return raw as TabKey;
     return "overview";
   });
 
@@ -124,6 +133,51 @@ export default function MyDelegation() {
 
   onMount(reload);
 
+  // A delegation opened by id may belong to a conference other than the
+  // session's active one.
+  const delegationConference = conferenceLabel(
+    () => delegation()?.conferenceId,
+  );
+
+  const isAdmin = () => user()?.role === User_Role.STAFF_ADMIN;
+  // Rejected registrations are read-only for the school (the API enforces
+  // it too); staff can still edit.
+  const readOnly = () =>
+    !isAdmin() && delegation()?.status === Delegation_Status.REJECTED;
+
+  const [deciding, setDeciding] = createSignal(false);
+  const [rejecting, setRejecting] = createSignal(false);
+
+  async function decide(kind: "approve" | "reject", reason = "") {
+    const current = delegation();
+    if (!current) return;
+    setDeciding(true);
+    setBanner(null);
+    try {
+      const resp =
+        kind === "approve"
+          ? await delegationClient.approve({
+              delegationId: current.id,
+              expectedVersion: current.version,
+            })
+          : await delegationClient.reject({
+              delegationId: current.id,
+              expectedVersion: current.version,
+              reason,
+            });
+      setDelegation(resp.delegation ?? null);
+    } catch (err) {
+      setBanner(
+        err instanceof ConnectError && err.code === Code.Aborted
+          ? "Another change was saved meanwhile. Reload and try again."
+          : (connectMessage(err) ?? "Failed to update the delegation."),
+      );
+    } finally {
+      setDeciding(false);
+      setRejecting(false);
+    }
+  }
+
   async function handleCreate(values: DelegationFormValues) {
     const conf = conference();
     if (!conf) {
@@ -177,14 +231,27 @@ export default function MyDelegation() {
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">
-            {params.delegationId ? "Delegation" : "My Delegation"}
+            {params.delegationId
+              ? (delegation()?.school ?? "Delegation")
+              : "My Delegation"}
           </h1>
-          <Show when={conference()}>
-            {(c) => (
-              <p class="mt-1 text-sm text-nu-purple-700">
-                {c().name} · Edition {c().editionNumber} · {c().year}
-              </p>
-            )}
+          <Show
+            when={!params.delegationId}
+            fallback={
+              <Show when={delegationConference()}>
+                {(label) => (
+                  <p class="mt-1 text-sm text-nu-purple-700">{label()}</p>
+                )}
+              </Show>
+            }
+          >
+            <Show when={conference()}>
+              {(c) => (
+                <p class="mt-1 text-sm text-nu-purple-700">
+                  {c().name} · Edition {c().editionNumber} · {c().year}
+                </p>
+              )}
+            </Show>
           </Show>
         </div>
         <div class="flex gap-2 text-sm">
@@ -268,12 +335,26 @@ export default function MyDelegation() {
                     would be saved against the newer expected_version. */}
                 <Show when={delegation()} keyed>
                   {(current) => (
-                    <EditBlock delegation={current} onSubmit={handleUpdate} />
+                    <EditBlock
+                      delegation={current}
+                      onSubmit={handleUpdate}
+                      readOnly={readOnly()}
+                      canDecide={isAdmin()}
+                      deciding={deciding()}
+                      onApprove={() => decide("approve")}
+                      onReject={() => setRejecting(true)}
+                    />
                   )}
+                </Show>
+                <Show when={isAdmin()}>
+                  <DelegationStaff delegation={d()} />
                 </Show>
               </Show>
               <Show when={activeTab() === "delegates"}>
-                <DelegatesPlaceholder delegationId={d().id} />
+                <DelegateRoster delegation={d()} readOnly={readOnly()} />
+              </Show>
+              <Show when={activeTab() === "advisors"}>
+                <DelegationAdvisors delegation={d()} readOnly={readOnly()} />
               </Show>
               <Show when={activeTab() === "payments"}>
                 <DelegationPayments delegation={d()} onLedgerChanged={reload} />
@@ -281,6 +362,16 @@ export default function MyDelegation() {
             </section>
           )}
         </Show>
+      </Show>
+      <Show when={rejecting() && delegation()}>
+        {(d) => (
+          <RejectDelegationDialog
+            school={d().school}
+            busy={deciding()}
+            onCancel={() => setRejecting(false)}
+            onReject={(reason) => decide("reject", reason)}
+          />
+        )}
       </Show>
     </main>
   );
@@ -303,20 +394,6 @@ function TabStrip(props: { current: TabKey; onSelect: (t: TabKey) => void }) {
         </button>
       ))}
     </nav>
-  );
-}
-
-function DelegatesPlaceholder(props: { delegationId: string }) {
-  return (
-    <div class="rounded border border-nu-purple-200 bg-white p-6 text-sm">
-      <p class="text-nu-purple-700">Delegate roster lives on its own screen.</p>
-      <a
-        href={`/delegations/${props.delegationId}/delegates/import`}
-        class="mt-3 inline-block rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700 hover:bg-nu-purple-50"
-      >
-        Bulk import delegates
-      </a>
-    </div>
   );
 }
 
@@ -346,19 +423,25 @@ function CreateBlock(props: {
 function EditBlock(props: {
   delegation: Delegation;
   onSubmit: (v: DelegationFormValues) => Promise<void>;
+  readOnly: boolean;
+  canDecide: boolean;
+  deciding: boolean;
+  onApprove: () => void;
+  onReject: () => void;
 }) {
   const statusLabel = (s: Delegation["status"]): string => {
     switch (s) {
-      case 1:
+      case Delegation_Status.PENDING:
         return "Pending review";
-      case 2:
+      case Delegation_Status.APPROVED:
         return "Approved";
-      case 3:
+      case Delegation_Status.REJECTED:
         return "Rejected";
       default:
         return "—";
     }
   };
+  const pending = () => props.delegation.status === Delegation_Status.PENDING;
   return (
     <div class="space-y-4">
       <div class="flex items-center gap-3 rounded border border-nu-purple-200 bg-white p-4 text-sm">
@@ -368,20 +451,72 @@ function EditBlock(props: {
         <span class="text-nu-purple-700">
           Version {props.delegation.version}
         </span>
-        <a
-          href={`/delegations/${props.delegation.id}/delegates/import`}
-          class="ml-auto rounded border border-nu-purple-300 px-3 py-1 text-xs text-nu-purple-700 hover:bg-nu-purple-50"
-        >
-          Bulk import delegates
-        </a>
+        <Show when={props.canDecide && pending()}>
+          <div class="ml-auto flex gap-2">
+            <button
+              type="button"
+              disabled={props.deciding}
+              onClick={() => props.onApprove()}
+              class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
+            >
+              {props.deciding ? "…" : "Approve"}
+            </button>
+            <button
+              type="button"
+              disabled={props.deciding}
+              onClick={() => props.onReject()}
+              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700 disabled:opacity-50"
+            >
+              Reject
+            </button>
+          </div>
+        </Show>
       </div>
-      <div class="rounded border border-nu-purple-200 bg-white p-6">
-        <DelegationForm
-          initialValues={delegationToForm(props.delegation)}
-          onSubmit={props.onSubmit}
-          submitLabel="Save changes"
-        />
-      </div>
+      <Show
+        when={!props.readOnly}
+        fallback={<RejectedSummary delegation={props.delegation} />}
+      >
+        <div class="rounded border border-nu-purple-200 bg-white p-6">
+          <DelegationForm
+            initialValues={delegationToForm(props.delegation)}
+            onSubmit={props.onSubmit}
+            submitLabel="Save changes"
+          />
+        </div>
+      </Show>
+    </div>
+  );
+}
+
+// What a school sees once its registration is rejected: the details it
+// submitted, read-only, and who to ask. The rejection reason stays in the
+// audit log.
+function RejectedSummary(props: { delegation: Delegation }) {
+  const d = () => props.delegation;
+  return (
+    <div class="space-y-4">
+      <p class="rounded bg-amber-50 p-3 text-sm text-amber-900">
+        NUMUN staff didn't approve this registration, so it can no longer be
+        changed. If you have questions, contact NUMUN staff.
+      </p>
+      <dl class="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-2 rounded border border-nu-purple-200 bg-white p-6 text-sm">
+        <dt class="text-nu-purple-700">School</dt>
+        <dd>{d().school}</dd>
+        <dt class="text-nu-purple-700">Address</dt>
+        <dd>
+          <Show when={d().address} fallback="—">
+            {(a) => (
+              <>
+                {a().street}, {a().city}
+                {a().state ? `, ${a().state}` : ""} {a().postalCode}{" "}
+                {a().country}
+              </>
+            )}
+          </Show>
+        </dd>
+        <dt class="text-nu-purple-700">Estimated delegates</dt>
+        <dd>{d().estimatedDelegates?.total ?? 0}</dd>
+      </dl>
     </div>
   );
 }

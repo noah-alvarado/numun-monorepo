@@ -297,6 +297,7 @@ func delegateToProto(d domain.Delegate) *v1.Delegate {
 		Email:           d.Email,
 		ExperienceLevel: protoExperienceLevel(d.ExperienceLevel),
 		CheckedInAt:     tsOrNilFor(d.CheckedInAt),
+		IsDeleted:       d.IsDeleted,
 		Version:         int32(d.Version),
 		CreatedAt:       tsOrNilFor(d.CreatedAt),
 		UpdatedAt:       tsOrNilFor(d.UpdatedAt),

@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { DismissAwardRequest, DismissAwardResponse, GetMeRequest, GetMeResponse, GetUserRequest, GetUserResponse, InviteStaffRequest, InviteStaffResponse, UpdateUserRequest, UpdateUserResponse } from "./users_pb.js";
+import { DismissAwardRequest, DismissAwardResponse, GetMeRequest, GetMeResponse, GetUserRequest, GetUserResponse, InviteStaffRequest, InviteStaffResponse, ListStaffRequest, ListStaffResponse, UpdateUserRequest, UpdateUserResponse } from "./users_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -58,6 +58,17 @@ export const UserService = {
       name: "InviteStaff",
       I: InviteStaffRequest,
       O: InviteStaffResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Every staff-admin and staff-staffer account. Staff only.
+     *
+     * @generated from rpc numun.v1.UserService.ListStaff
+     */
+    listStaff: {
+      name: "ListStaff",
+      I: ListStaffRequest,
+      O: ListStaffResponse,
       kind: MethodKind.Unary,
     },
     /**

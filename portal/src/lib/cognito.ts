@@ -21,11 +21,17 @@ const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID as
   | string
   | undefined;
 const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID as string | undefined;
+// Overrides the Cognito API URL; the e2e suite points it at a fake server.
+const endpoint = import.meta.env.VITE_COGNITO_ENDPOINT as string | undefined;
 export const devBypass = import.meta.env.VITE_DEV_BYPASS === "true";
 
 const pool =
   !devBypass && userPoolId && clientId
-    ? new CognitoUserPool({ UserPoolId: userPoolId, ClientId: clientId })
+    ? new CognitoUserPool({
+        UserPoolId: userPoolId,
+        ClientId: clientId,
+        endpoint: endpoint || undefined,
+      })
     : null;
 
 export type AuthTokens = {
@@ -175,3 +181,47 @@ export async function confirmForgotPassword(
     });
   });
 }
+
+export async function resendSignUpCode(email: string): Promise<void> {
+  if (!pool) return;
+  const user = new CognitoUser({ Username: email, Pool: pool });
+  await new Promise<void>((resolve, reject) => {
+    user.resendConfirmationCode((err) => (err ? reject(err) : resolve()));
+  });
+}
+
+export function cognitoErrorCode(err: unknown): string | undefined {
+  return (err as { code?: string } | null)?.code;
+}
+
+// cognitoMessage turns a Cognito error into copy for the auth screens.
+// Wrong-password and unknown-user errors share one message so the screens
+// don't reveal which emails have accounts (AUTH.md §3.1).
+export function cognitoMessage(err: unknown, fallback: string): string {
+  const message = (err as Error | null)?.message ?? "";
+  switch (cognitoErrorCode(err)) {
+    case "NotAuthorizedException":
+      if (/attempts exceeded/i.test(message)) return TOO_MANY;
+      if (/disabled/i.test(message)) {
+        return "This account is disabled. Contact NUMUN staff.";
+      }
+      return "Incorrect email or password.";
+    case "UserNotFoundException":
+      return "Incorrect email or password.";
+    case "TooManyRequestsException":
+    case "LimitExceededException":
+    case "TooManyFailedAttemptsException":
+      return TOO_MANY;
+    case "InvalidPasswordException":
+      return "Use at least 12 characters, including a lowercase letter and a number.";
+    case "CodeMismatchException":
+      return "That code doesn't match. Check the email we sent and try again.";
+    case "ExpiredCodeException":
+      return "That code has expired. Request a new one.";
+    case "NetworkError":
+      return "Couldn't reach the sign-in service. Check your connection and try again.";
+  }
+  return message || fallback;
+}
+
+const TOO_MANY = "Too many attempts. Wait a few minutes and try again.";

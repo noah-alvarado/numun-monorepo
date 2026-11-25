@@ -20,6 +20,9 @@ export const seedUsers = {
 
 export type SeedRole = keyof typeof seedUsers;
 
+// Global setup registers the seed users in the fake Cognito with this.
+export const seedPassword = "seed password 1";
+
 export const seedConferenceId = "0190a000-0000-7000-9000-000000000001";
 
 // The pending delegation global-setup ensures the seed advisor owns.

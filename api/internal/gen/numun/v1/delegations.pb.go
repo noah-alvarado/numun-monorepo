@@ -438,14 +438,18 @@ func (x *Delegation) GetUpdatedAt() *timestamppb.Timestamp {
 
 // DelegationAdvisor — the User ↔ Delegation link entity. DATA_MODEL.md §2.5.
 type DelegationAdvisor struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
-	DelegationId  string                 `protobuf:"bytes,2,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
-	ConferenceId  string                 `protobuf:"bytes,3,opt,name=conference_id,json=conferenceId,proto3" json:"conference_id,omitempty"`
-	Role          DelegationAdvisor_Role `protobuf:"varint,4,opt,name=role,proto3,enum=numun.v1.DelegationAdvisor_Role" json:"role,omitempty"`
-	Version       int32                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
-	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
-	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	UserId       string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	DelegationId string                 `protobuf:"bytes,2,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	ConferenceId string                 `protobuf:"bytes,3,opt,name=conference_id,json=conferenceId,proto3" json:"conference_id,omitempty"`
+	Role         DelegationAdvisor_Role `protobuf:"varint,4,opt,name=role,proto3,enum=numun.v1.DelegationAdvisor_Role" json:"role,omitempty"`
+	Version      int32                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	CreatedAt    *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	UpdatedAt    *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	// The advisor's display name and email, resolved at read time so
+	// co-advisors can see who else manages the delegation.
+	Name          string `protobuf:"bytes,8,opt,name=name,proto3" json:"name,omitempty"`
+	Email         string `protobuf:"bytes,9,opt,name=email,proto3" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -527,6 +531,20 @@ func (x *DelegationAdvisor) GetUpdatedAt() *timestamppb.Timestamp {
 		return x.UpdatedAt
 	}
 	return nil
+}
+
+func (x *DelegationAdvisor) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *DelegationAdvisor) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
 }
 
 type ListDelegationsRequest struct {
@@ -1279,10 +1297,13 @@ func (x *RejectResponse) GetDelegation() *Delegation {
 }
 
 type AddAdvisorRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	DelegationId  string                 `protobuf:"bytes,1,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	DelegationId string                 `protobuf:"bytes,1,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	// Exactly one of user_id or email. Advisors add co-advisors by email; the
+	// server resolves it to an existing advisor account.
 	UserId        string                 `protobuf:"bytes,2,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	Role          DelegationAdvisor_Role `protobuf:"varint,3,opt,name=role,proto3,enum=numun.v1.DelegationAdvisor_Role" json:"role,omitempty"`
+	Email         string                 `protobuf:"bytes,4,opt,name=email,proto3" json:"email,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1336,6 +1357,13 @@ func (x *AddAdvisorRequest) GetRole() DelegationAdvisor_Role {
 		return x.Role
 	}
 	return DelegationAdvisor_ROLE_UNSPECIFIED
+}
+
+func (x *AddAdvisorRequest) GetEmail() string {
+	if x != nil {
+		return x.Email
+	}
+	return ""
 }
 
 type AddAdvisorResponse struct {
@@ -1862,6 +1890,94 @@ func (*AssignStafferResponse) Descriptor() ([]byte, []int) {
 	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{29}
 }
 
+type ListStaffersRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DelegationId  string                 `protobuf:"bytes,1,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStaffersRequest) Reset() {
+	*x = ListStaffersRequest{}
+	mi := &file_numun_v1_delegations_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStaffersRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStaffersRequest) ProtoMessage() {}
+
+func (x *ListStaffersRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_delegations_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStaffersRequest.ProtoReflect.Descriptor instead.
+func (*ListStaffersRequest) Descriptor() ([]byte, []int) {
+	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *ListStaffersRequest) GetDelegationId() string {
+	if x != nil {
+		return x.DelegationId
+	}
+	return ""
+}
+
+type ListStaffersResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*User                `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListStaffersResponse) Reset() {
+	*x = ListStaffersResponse{}
+	mi := &file_numun_v1_delegations_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListStaffersResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListStaffersResponse) ProtoMessage() {}
+
+func (x *ListStaffersResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_numun_v1_delegations_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListStaffersResponse.ProtoReflect.Descriptor instead.
+func (*ListStaffersResponse) Descriptor() ([]byte, []int) {
+	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *ListStaffersResponse) GetItems() []*User {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
 type UnassignStafferRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	DelegationId  string                 `protobuf:"bytes,1,opt,name=delegation_id,json=delegationId,proto3" json:"delegation_id,omitempty"`
@@ -1872,7 +1988,7 @@ type UnassignStafferRequest struct {
 
 func (x *UnassignStafferRequest) Reset() {
 	*x = UnassignStafferRequest{}
-	mi := &file_numun_v1_delegations_proto_msgTypes[30]
+	mi := &file_numun_v1_delegations_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1884,7 +2000,7 @@ func (x *UnassignStafferRequest) String() string {
 func (*UnassignStafferRequest) ProtoMessage() {}
 
 func (x *UnassignStafferRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegations_proto_msgTypes[30]
+	mi := &file_numun_v1_delegations_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1897,7 +2013,7 @@ func (x *UnassignStafferRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignStafferRequest.ProtoReflect.Descriptor instead.
 func (*UnassignStafferRequest) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{30}
+	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *UnassignStafferRequest) GetDelegationId() string {
@@ -1922,7 +2038,7 @@ type UnassignStafferResponse struct {
 
 func (x *UnassignStafferResponse) Reset() {
 	*x = UnassignStafferResponse{}
-	mi := &file_numun_v1_delegations_proto_msgTypes[31]
+	mi := &file_numun_v1_delegations_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1934,7 +2050,7 @@ func (x *UnassignStafferResponse) String() string {
 func (*UnassignStafferResponse) ProtoMessage() {}
 
 func (x *UnassignStafferResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegations_proto_msgTypes[31]
+	mi := &file_numun_v1_delegations_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1947,7 +2063,7 @@ func (x *UnassignStafferResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UnassignStafferResponse.ProtoReflect.Descriptor instead.
 func (*UnassignStafferResponse) Descriptor() ([]byte, []int) {
-	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{31}
+	return file_numun_v1_delegations_proto_rawDescGZIP(), []int{33}
 }
 
 type CommitteePreferences_TypePrefs struct {
@@ -1960,7 +2076,7 @@ type CommitteePreferences_TypePrefs struct {
 
 func (x *CommitteePreferences_TypePrefs) Reset() {
 	*x = CommitteePreferences_TypePrefs{}
-	mi := &file_numun_v1_delegations_proto_msgTypes[32]
+	mi := &file_numun_v1_delegations_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1972,7 +2088,7 @@ func (x *CommitteePreferences_TypePrefs) String() string {
 func (*CommitteePreferences_TypePrefs) ProtoMessage() {}
 
 func (x *CommitteePreferences_TypePrefs) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegations_proto_msgTypes[32]
+	mi := &file_numun_v1_delegations_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2013,7 +2129,7 @@ type CommitteePreferences_SizePrefs struct {
 
 func (x *CommitteePreferences_SizePrefs) Reset() {
 	*x = CommitteePreferences_SizePrefs{}
-	mi := &file_numun_v1_delegations_proto_msgTypes[33]
+	mi := &file_numun_v1_delegations_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2025,7 +2141,7 @@ func (x *CommitteePreferences_SizePrefs) String() string {
 func (*CommitteePreferences_SizePrefs) ProtoMessage() {}
 
 func (x *CommitteePreferences_SizePrefs) ProtoReflect() protoreflect.Message {
-	mi := &file_numun_v1_delegations_proto_msgTypes[33]
+	mi := &file_numun_v1_delegations_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2066,7 +2182,7 @@ var File_numun_v1_delegations_proto protoreflect.FileDescriptor
 
 const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\n" +
-	"\x1anumun/v1/delegations.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15numun/v1/common.proto\"\x87\x03\n" +
+	"\x1anumun/v1/delegations.proto\x12\bnumun.v1\x1a\x1bbuf/validate/validate.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x15numun/v1/common.proto\x1a\x14numun/v1/users.proto\"\x87\x03\n" +
 	"\x14CommitteePreferences\x12<\n" +
 	"\x04type\x18\x01 \x01(\v2(.numun.v1.CommitteePreferences.TypePrefsR\x04type\x12<\n" +
 	"\x04size\x18\x02 \x01(\v2(.numun.v1.CommitteePreferences.SizePrefsR\x04size\x1ah\n" +
@@ -2108,7 +2224,7 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x12\n" +
 	"\x0eSTATUS_PENDING\x10\x01\x12\x13\n" +
 	"\x0fSTATUS_APPROVED\x10\x02\x12\x13\n" +
-	"\x0fSTATUS_REJECTED\x10\x03\"\xfd\x02\n" +
+	"\x0fSTATUS_REJECTED\x10\x03\"\xa7\x03\n" +
 	"\x11DelegationAdvisor\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12#\n" +
 	"\rdelegation_id\x18\x02 \x01(\tR\fdelegationId\x12#\n" +
@@ -2118,7 +2234,9 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"?\n" +
+	"updated_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12\x12\n" +
+	"\x04name\x18\b \x01(\tR\x04name\x12\x14\n" +
+	"\x05email\x18\t \x01(\tR\x05email\"?\n" +
 	"\x04Role\x12\x14\n" +
 	"\x10ROLE_UNSPECIFIED\x10\x00\x12\r\n" +
 	"\tROLE_LEAD\x10\x01\x12\x12\n" +
@@ -2183,11 +2301,12 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\x0eRejectResponse\x124\n" +
 	"\n" +
 	"delegation\x18\x01 \x01(\v2\x14.numun.v1.DelegationR\n" +
-	"delegation\"\x99\x01\n" +
+	"delegation\"\xa6\x01\n" +
 	"\x11AddAdvisorRequest\x12,\n" +
-	"\rdelegation_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fdelegationId\x12 \n" +
-	"\auser_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\x124\n" +
-	"\x04role\x18\x03 \x01(\x0e2 .numun.v1.DelegationAdvisor.RoleR\x04role\"K\n" +
+	"\rdelegation_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fdelegationId\x12\x17\n" +
+	"\auser_id\x18\x02 \x01(\tR\x06userId\x124\n" +
+	"\x04role\x18\x03 \x01(\x0e2 .numun.v1.DelegationAdvisor.RoleR\x04role\x12\x14\n" +
+	"\x05email\x18\x04 \x01(\tR\x05email\"K\n" +
 	"\x12AddAdvisorResponse\x125\n" +
 	"\aadvisor\x18\x01 \x01(\v2\x1b.numun.v1.DelegationAdvisorR\aadvisor\"f\n" +
 	"\x14RemoveAdvisorRequest\x12,\n" +
@@ -2214,7 +2333,11 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\x14AssignStafferRequest\x12,\n" +
 	"\rdelegation_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fdelegationId\x12 \n" +
 	"\auser_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\"\x17\n" +
-	"\x15AssignStafferResponse\"h\n" +
+	"\x15AssignStafferResponse\"C\n" +
+	"\x13ListStaffersRequest\x12,\n" +
+	"\rdelegation_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fdelegationId\"<\n" +
+	"\x14ListStaffersResponse\x12$\n" +
+	"\x05items\x18\x01 \x03(\v2\x0e.numun.v1.UserR\x05items\"h\n" +
 	"\x16UnassignStafferRequest\x12,\n" +
 	"\rdelegation_id\x18\x01 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\fdelegationId\x12 \n" +
 	"\auser_id\x18\x02 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x06userId\"\x19\n" +
@@ -2223,7 +2346,7 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\x13TRINARY_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10TRINARY_POSITIVE\x10\x01\x12\x14\n" +
 	"\x10TRINARY_NEGATIVE\x10\x02\x12\x13\n" +
-	"\x0fTRINARY_NEUTRAL\x10\x032\xae\t\n" +
+	"\x0fTRINARY_NEUTRAL\x10\x032\xff\t\n" +
 	"\x11DelegationService\x12X\n" +
 	"\x0fListDelegations\x12 .numun.v1.ListDelegationsRequest\x1a!.numun.v1.ListDelegationsResponse\"\x00\x12a\n" +
 	"\x12ListAllDelegations\x12#.numun.v1.ListAllDelegationsRequest\x1a$.numun.v1.ListAllDelegationsResponse\"\x00\x12R\n" +
@@ -2239,7 +2362,8 @@ const file_numun_v1_delegations_proto_rawDesc = "" +
 	"\fListAdvisors\x12\x1d.numun.v1.ListAdvisorsRequest\x1a\x1e.numun.v1.ListAdvisorsResponse\"\x00\x12X\n" +
 	"\x0fListAllAdvisors\x12 .numun.v1.ListAllAdvisorsRequest\x1a!.numun.v1.ListAllAdvisorsResponse\"\x00\x12R\n" +
 	"\rAssignStaffer\x12\x1e.numun.v1.AssignStafferRequest\x1a\x1f.numun.v1.AssignStafferResponse\"\x00\x12X\n" +
-	"\x0fUnassignStaffer\x12 .numun.v1.UnassignStafferRequest\x1a!.numun.v1.UnassignStafferResponse\"\x00B\x9b\x01\n" +
+	"\x0fUnassignStaffer\x12 .numun.v1.UnassignStafferRequest\x1a!.numun.v1.UnassignStafferResponse\"\x00\x12O\n" +
+	"\fListStaffers\x12\x1d.numun.v1.ListStaffersRequest\x1a\x1e.numun.v1.ListStaffersResponse\"\x00B\x9b\x01\n" +
 	"\fcom.numun.v1B\x10DelegationsProtoP\x01Z8github.com/numun/numun/api/internal/gen/numun/v1;numunv1\xa2\x02\x03NXX\xaa\x02\bNumun.V1\xca\x02\bNumun\\V1\xe2\x02\x14Numun\\V1\\GPBMetadata\xea\x02\tNumun::V1b\x06proto3"
 
 var (
@@ -2255,7 +2379,7 @@ func file_numun_v1_delegations_proto_rawDescGZIP() []byte {
 }
 
 var file_numun_v1_delegations_proto_enumTypes = make([]protoimpl.EnumInfo, 3)
-var file_numun_v1_delegations_proto_msgTypes = make([]protoimpl.MessageInfo, 34)
+var file_numun_v1_delegations_proto_msgTypes = make([]protoimpl.MessageInfo, 36)
 var file_numun_v1_delegations_proto_goTypes = []any{
 	(Trinary)(0),                           // 0: numun.v1.Trinary
 	(Delegation_Status)(0),                 // 1: numun.v1.Delegation.Status
@@ -2290,42 +2414,45 @@ var file_numun_v1_delegations_proto_goTypes = []any{
 	(*ListAllAdvisorsResponse)(nil),        // 30: numun.v1.ListAllAdvisorsResponse
 	(*AssignStafferRequest)(nil),           // 31: numun.v1.AssignStafferRequest
 	(*AssignStafferResponse)(nil),          // 32: numun.v1.AssignStafferResponse
-	(*UnassignStafferRequest)(nil),         // 33: numun.v1.UnassignStafferRequest
-	(*UnassignStafferResponse)(nil),        // 34: numun.v1.UnassignStafferResponse
-	(*CommitteePreferences_TypePrefs)(nil), // 35: numun.v1.CommitteePreferences.TypePrefs
-	(*CommitteePreferences_SizePrefs)(nil), // 36: numun.v1.CommitteePreferences.SizePrefs
-	(*Address)(nil),                        // 37: numun.v1.Address
-	(*Money)(nil),                          // 38: numun.v1.Money
-	(*timestamppb.Timestamp)(nil),          // 39: google.protobuf.Timestamp
-	(*PageRequest)(nil),                    // 40: numun.v1.PageRequest
-	(*Page)(nil),                           // 41: numun.v1.Page
+	(*ListStaffersRequest)(nil),            // 33: numun.v1.ListStaffersRequest
+	(*ListStaffersResponse)(nil),           // 34: numun.v1.ListStaffersResponse
+	(*UnassignStafferRequest)(nil),         // 35: numun.v1.UnassignStafferRequest
+	(*UnassignStafferResponse)(nil),        // 36: numun.v1.UnassignStafferResponse
+	(*CommitteePreferences_TypePrefs)(nil), // 37: numun.v1.CommitteePreferences.TypePrefs
+	(*CommitteePreferences_SizePrefs)(nil), // 38: numun.v1.CommitteePreferences.SizePrefs
+	(*Address)(nil),                        // 39: numun.v1.Address
+	(*Money)(nil),                          // 40: numun.v1.Money
+	(*timestamppb.Timestamp)(nil),          // 41: google.protobuf.Timestamp
+	(*PageRequest)(nil),                    // 42: numun.v1.PageRequest
+	(*Page)(nil),                           // 43: numun.v1.Page
+	(*User)(nil),                           // 44: numun.v1.User
 }
 var file_numun_v1_delegations_proto_depIdxs = []int32{
-	35, // 0: numun.v1.CommitteePreferences.type:type_name -> numun.v1.CommitteePreferences.TypePrefs
-	36, // 1: numun.v1.CommitteePreferences.size:type_name -> numun.v1.CommitteePreferences.SizePrefs
-	37, // 2: numun.v1.Delegation.address:type_name -> numun.v1.Address
+	37, // 0: numun.v1.CommitteePreferences.type:type_name -> numun.v1.CommitteePreferences.TypePrefs
+	38, // 1: numun.v1.CommitteePreferences.size:type_name -> numun.v1.CommitteePreferences.SizePrefs
+	39, // 2: numun.v1.Delegation.address:type_name -> numun.v1.Address
 	1,  // 3: numun.v1.Delegation.status:type_name -> numun.v1.Delegation.Status
 	4,  // 4: numun.v1.Delegation.estimated_delegates:type_name -> numun.v1.EstimatedDelegates
 	3,  // 5: numun.v1.Delegation.committee_preferences:type_name -> numun.v1.CommitteePreferences
-	38, // 6: numun.v1.Delegation.balance_due:type_name -> numun.v1.Money
-	39, // 7: numun.v1.Delegation.approved_at:type_name -> google.protobuf.Timestamp
-	39, // 8: numun.v1.Delegation.created_at:type_name -> google.protobuf.Timestamp
-	39, // 9: numun.v1.Delegation.updated_at:type_name -> google.protobuf.Timestamp
+	40, // 6: numun.v1.Delegation.balance_due:type_name -> numun.v1.Money
+	41, // 7: numun.v1.Delegation.approved_at:type_name -> google.protobuf.Timestamp
+	41, // 8: numun.v1.Delegation.created_at:type_name -> google.protobuf.Timestamp
+	41, // 9: numun.v1.Delegation.updated_at:type_name -> google.protobuf.Timestamp
 	2,  // 10: numun.v1.DelegationAdvisor.role:type_name -> numun.v1.DelegationAdvisor.Role
-	39, // 11: numun.v1.DelegationAdvisor.created_at:type_name -> google.protobuf.Timestamp
-	39, // 12: numun.v1.DelegationAdvisor.updated_at:type_name -> google.protobuf.Timestamp
-	40, // 13: numun.v1.ListDelegationsRequest.page:type_name -> numun.v1.PageRequest
+	41, // 11: numun.v1.DelegationAdvisor.created_at:type_name -> google.protobuf.Timestamp
+	41, // 12: numun.v1.DelegationAdvisor.updated_at:type_name -> google.protobuf.Timestamp
+	42, // 13: numun.v1.ListDelegationsRequest.page:type_name -> numun.v1.PageRequest
 	1,  // 14: numun.v1.ListDelegationsRequest.status:type_name -> numun.v1.Delegation.Status
 	5,  // 15: numun.v1.ListDelegationsResponse.items:type_name -> numun.v1.Delegation
-	41, // 16: numun.v1.ListDelegationsResponse.page:type_name -> numun.v1.Page
+	43, // 16: numun.v1.ListDelegationsResponse.page:type_name -> numun.v1.Page
 	1,  // 17: numun.v1.ListAllDelegationsRequest.status:type_name -> numun.v1.Delegation.Status
 	5,  // 18: numun.v1.ListAllDelegationsResponse.items:type_name -> numun.v1.Delegation
 	5,  // 19: numun.v1.GetDelegationResponse.delegation:type_name -> numun.v1.Delegation
-	37, // 20: numun.v1.CreateDelegationRequest.address:type_name -> numun.v1.Address
+	39, // 20: numun.v1.CreateDelegationRequest.address:type_name -> numun.v1.Address
 	4,  // 21: numun.v1.CreateDelegationRequest.estimated_delegates:type_name -> numun.v1.EstimatedDelegates
 	3,  // 22: numun.v1.CreateDelegationRequest.committee_preferences:type_name -> numun.v1.CommitteePreferences
 	5,  // 23: numun.v1.CreateDelegationResponse.delegation:type_name -> numun.v1.Delegation
-	37, // 24: numun.v1.UpdateDelegationRequest.address:type_name -> numun.v1.Address
+	39, // 24: numun.v1.UpdateDelegationRequest.address:type_name -> numun.v1.Address
 	4,  // 25: numun.v1.UpdateDelegationRequest.estimated_delegates:type_name -> numun.v1.EstimatedDelegates
 	3,  // 26: numun.v1.UpdateDelegationRequest.committee_preferences:type_name -> numun.v1.CommitteePreferences
 	5,  // 27: numun.v1.UpdateDelegationResponse.delegation:type_name -> numun.v1.Delegation
@@ -2335,48 +2462,51 @@ var file_numun_v1_delegations_proto_depIdxs = []int32{
 	6,  // 31: numun.v1.AddAdvisorResponse.advisor:type_name -> numun.v1.DelegationAdvisor
 	2,  // 32: numun.v1.SetAdvisorRoleRequest.role:type_name -> numun.v1.DelegationAdvisor.Role
 	6,  // 33: numun.v1.SetAdvisorRoleResponse.advisor:type_name -> numun.v1.DelegationAdvisor
-	40, // 34: numun.v1.ListAdvisorsRequest.page:type_name -> numun.v1.PageRequest
+	42, // 34: numun.v1.ListAdvisorsRequest.page:type_name -> numun.v1.PageRequest
 	6,  // 35: numun.v1.ListAdvisorsResponse.items:type_name -> numun.v1.DelegationAdvisor
-	41, // 36: numun.v1.ListAdvisorsResponse.page:type_name -> numun.v1.Page
+	43, // 36: numun.v1.ListAdvisorsResponse.page:type_name -> numun.v1.Page
 	6,  // 37: numun.v1.ListAllAdvisorsResponse.items:type_name -> numun.v1.DelegationAdvisor
-	0,  // 38: numun.v1.CommitteePreferences.TypePrefs.crisis:type_name -> numun.v1.Trinary
-	0,  // 39: numun.v1.CommitteePreferences.TypePrefs.non_crisis:type_name -> numun.v1.Trinary
-	0,  // 40: numun.v1.CommitteePreferences.SizePrefs.small:type_name -> numun.v1.Trinary
-	0,  // 41: numun.v1.CommitteePreferences.SizePrefs.medium:type_name -> numun.v1.Trinary
-	0,  // 42: numun.v1.CommitteePreferences.SizePrefs.large:type_name -> numun.v1.Trinary
-	7,  // 43: numun.v1.DelegationService.ListDelegations:input_type -> numun.v1.ListDelegationsRequest
-	9,  // 44: numun.v1.DelegationService.ListAllDelegations:input_type -> numun.v1.ListAllDelegationsRequest
-	11, // 45: numun.v1.DelegationService.GetDelegation:input_type -> numun.v1.GetDelegationRequest
-	13, // 46: numun.v1.DelegationService.CreateDelegation:input_type -> numun.v1.CreateDelegationRequest
-	15, // 47: numun.v1.DelegationService.UpdateDelegation:input_type -> numun.v1.UpdateDelegationRequest
-	17, // 48: numun.v1.DelegationService.Approve:input_type -> numun.v1.ApproveRequest
-	19, // 49: numun.v1.DelegationService.Reject:input_type -> numun.v1.RejectRequest
-	21, // 50: numun.v1.DelegationService.AddAdvisor:input_type -> numun.v1.AddAdvisorRequest
-	23, // 51: numun.v1.DelegationService.RemoveAdvisor:input_type -> numun.v1.RemoveAdvisorRequest
-	25, // 52: numun.v1.DelegationService.SetAdvisorRole:input_type -> numun.v1.SetAdvisorRoleRequest
-	27, // 53: numun.v1.DelegationService.ListAdvisors:input_type -> numun.v1.ListAdvisorsRequest
-	29, // 54: numun.v1.DelegationService.ListAllAdvisors:input_type -> numun.v1.ListAllAdvisorsRequest
-	31, // 55: numun.v1.DelegationService.AssignStaffer:input_type -> numun.v1.AssignStafferRequest
-	33, // 56: numun.v1.DelegationService.UnassignStaffer:input_type -> numun.v1.UnassignStafferRequest
-	8,  // 57: numun.v1.DelegationService.ListDelegations:output_type -> numun.v1.ListDelegationsResponse
-	10, // 58: numun.v1.DelegationService.ListAllDelegations:output_type -> numun.v1.ListAllDelegationsResponse
-	12, // 59: numun.v1.DelegationService.GetDelegation:output_type -> numun.v1.GetDelegationResponse
-	14, // 60: numun.v1.DelegationService.CreateDelegation:output_type -> numun.v1.CreateDelegationResponse
-	16, // 61: numun.v1.DelegationService.UpdateDelegation:output_type -> numun.v1.UpdateDelegationResponse
-	18, // 62: numun.v1.DelegationService.Approve:output_type -> numun.v1.ApproveResponse
-	20, // 63: numun.v1.DelegationService.Reject:output_type -> numun.v1.RejectResponse
-	22, // 64: numun.v1.DelegationService.AddAdvisor:output_type -> numun.v1.AddAdvisorResponse
-	24, // 65: numun.v1.DelegationService.RemoveAdvisor:output_type -> numun.v1.RemoveAdvisorResponse
-	26, // 66: numun.v1.DelegationService.SetAdvisorRole:output_type -> numun.v1.SetAdvisorRoleResponse
-	28, // 67: numun.v1.DelegationService.ListAdvisors:output_type -> numun.v1.ListAdvisorsResponse
-	30, // 68: numun.v1.DelegationService.ListAllAdvisors:output_type -> numun.v1.ListAllAdvisorsResponse
-	32, // 69: numun.v1.DelegationService.AssignStaffer:output_type -> numun.v1.AssignStafferResponse
-	34, // 70: numun.v1.DelegationService.UnassignStaffer:output_type -> numun.v1.UnassignStafferResponse
-	57, // [57:71] is the sub-list for method output_type
-	43, // [43:57] is the sub-list for method input_type
-	43, // [43:43] is the sub-list for extension type_name
-	43, // [43:43] is the sub-list for extension extendee
-	0,  // [0:43] is the sub-list for field type_name
+	44, // 38: numun.v1.ListStaffersResponse.items:type_name -> numun.v1.User
+	0,  // 39: numun.v1.CommitteePreferences.TypePrefs.crisis:type_name -> numun.v1.Trinary
+	0,  // 40: numun.v1.CommitteePreferences.TypePrefs.non_crisis:type_name -> numun.v1.Trinary
+	0,  // 41: numun.v1.CommitteePreferences.SizePrefs.small:type_name -> numun.v1.Trinary
+	0,  // 42: numun.v1.CommitteePreferences.SizePrefs.medium:type_name -> numun.v1.Trinary
+	0,  // 43: numun.v1.CommitteePreferences.SizePrefs.large:type_name -> numun.v1.Trinary
+	7,  // 44: numun.v1.DelegationService.ListDelegations:input_type -> numun.v1.ListDelegationsRequest
+	9,  // 45: numun.v1.DelegationService.ListAllDelegations:input_type -> numun.v1.ListAllDelegationsRequest
+	11, // 46: numun.v1.DelegationService.GetDelegation:input_type -> numun.v1.GetDelegationRequest
+	13, // 47: numun.v1.DelegationService.CreateDelegation:input_type -> numun.v1.CreateDelegationRequest
+	15, // 48: numun.v1.DelegationService.UpdateDelegation:input_type -> numun.v1.UpdateDelegationRequest
+	17, // 49: numun.v1.DelegationService.Approve:input_type -> numun.v1.ApproveRequest
+	19, // 50: numun.v1.DelegationService.Reject:input_type -> numun.v1.RejectRequest
+	21, // 51: numun.v1.DelegationService.AddAdvisor:input_type -> numun.v1.AddAdvisorRequest
+	23, // 52: numun.v1.DelegationService.RemoveAdvisor:input_type -> numun.v1.RemoveAdvisorRequest
+	25, // 53: numun.v1.DelegationService.SetAdvisorRole:input_type -> numun.v1.SetAdvisorRoleRequest
+	27, // 54: numun.v1.DelegationService.ListAdvisors:input_type -> numun.v1.ListAdvisorsRequest
+	29, // 55: numun.v1.DelegationService.ListAllAdvisors:input_type -> numun.v1.ListAllAdvisorsRequest
+	31, // 56: numun.v1.DelegationService.AssignStaffer:input_type -> numun.v1.AssignStafferRequest
+	35, // 57: numun.v1.DelegationService.UnassignStaffer:input_type -> numun.v1.UnassignStafferRequest
+	33, // 58: numun.v1.DelegationService.ListStaffers:input_type -> numun.v1.ListStaffersRequest
+	8,  // 59: numun.v1.DelegationService.ListDelegations:output_type -> numun.v1.ListDelegationsResponse
+	10, // 60: numun.v1.DelegationService.ListAllDelegations:output_type -> numun.v1.ListAllDelegationsResponse
+	12, // 61: numun.v1.DelegationService.GetDelegation:output_type -> numun.v1.GetDelegationResponse
+	14, // 62: numun.v1.DelegationService.CreateDelegation:output_type -> numun.v1.CreateDelegationResponse
+	16, // 63: numun.v1.DelegationService.UpdateDelegation:output_type -> numun.v1.UpdateDelegationResponse
+	18, // 64: numun.v1.DelegationService.Approve:output_type -> numun.v1.ApproveResponse
+	20, // 65: numun.v1.DelegationService.Reject:output_type -> numun.v1.RejectResponse
+	22, // 66: numun.v1.DelegationService.AddAdvisor:output_type -> numun.v1.AddAdvisorResponse
+	24, // 67: numun.v1.DelegationService.RemoveAdvisor:output_type -> numun.v1.RemoveAdvisorResponse
+	26, // 68: numun.v1.DelegationService.SetAdvisorRole:output_type -> numun.v1.SetAdvisorRoleResponse
+	28, // 69: numun.v1.DelegationService.ListAdvisors:output_type -> numun.v1.ListAdvisorsResponse
+	30, // 70: numun.v1.DelegationService.ListAllAdvisors:output_type -> numun.v1.ListAllAdvisorsResponse
+	32, // 71: numun.v1.DelegationService.AssignStaffer:output_type -> numun.v1.AssignStafferResponse
+	36, // 72: numun.v1.DelegationService.UnassignStaffer:output_type -> numun.v1.UnassignStafferResponse
+	34, // 73: numun.v1.DelegationService.ListStaffers:output_type -> numun.v1.ListStaffersResponse
+	59, // [59:74] is the sub-list for method output_type
+	44, // [44:59] is the sub-list for method input_type
+	44, // [44:44] is the sub-list for extension type_name
+	44, // [44:44] is the sub-list for extension extendee
+	0,  // [0:44] is the sub-list for field type_name
 }
 
 func init() { file_numun_v1_delegations_proto_init() }
@@ -2385,6 +2515,7 @@ func file_numun_v1_delegations_proto_init() {
 		return
 	}
 	file_numun_v1_common_proto_init()
+	file_numun_v1_users_proto_init()
 	file_numun_v1_delegations_proto_msgTypes[12].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -2392,7 +2523,7 @@ func file_numun_v1_delegations_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_numun_v1_delegations_proto_rawDesc), len(file_numun_v1_delegations_proto_rawDesc)),
 			NumEnums:      3,
-			NumMessages:   34,
+			NumMessages:   36,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

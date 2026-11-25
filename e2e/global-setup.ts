@@ -1,9 +1,32 @@
 import { createDelegation, rpc, type Delegation } from "./support/api";
-import { e2eSchool, seedConferenceId, seedUsers } from "./support/seed";
+import { putCognitoUser } from "./support/fakes";
+import {
+  e2eSchool,
+  seedConferenceId,
+  seedPassword,
+  seedUsers,
+} from "./support/seed";
 
-// Verifies the seed dataset is loaded and gives the seed advisor a pending
-// delegation (the seed itself creates none) for the advisor and admin flows.
+const cognitoRole = {
+  advisor: "advisor",
+  staffer: "staff-staffer",
+  admin: "staff-admin",
+} as const;
+
+// Verifies the seed dataset is loaded, registers the seed users with the
+// fake Cognito, and gives the seed advisor a pending delegation (the seed
+// itself creates none) for the advisor and admin flows.
 export default async function globalSetup() {
+  for (const role of ["advisor", "staffer", "admin"] as const) {
+    const u = seedUsers[role];
+    await putCognitoUser({
+      email: u.email,
+      password: seedPassword,
+      sub: u.id,
+      name: u.name,
+      role: cognitoRole[role],
+    });
+  }
   for (const role of ["advisor", "staffer", "admin"] as const) {
     try {
       await rpc(seedUsers[role].id, "UserService/GetMe");

@@ -5,8 +5,11 @@ import { activeConferenceSignal } from "@/lib/session";
 
 // conferenceLabel resolves a conference id to "Name (year)" for page headers,
 // reusing the session's active conference when it matches. Resolves to "" if
-// the lookup fails, so callers never fall back to showing the raw id.
-export function conferenceLabel(conferenceId: () => string): Resource<string> {
+// the lookup fails, so callers never fall back to showing the raw id. An
+// undefined id (e.g. not loaded yet) fetches nothing.
+export function conferenceLabel(
+  conferenceId: () => string | undefined,
+): Resource<string> {
   const [active] = activeConferenceSignal;
   const [label] = createResource(conferenceId, async (id) => {
     const a = active();

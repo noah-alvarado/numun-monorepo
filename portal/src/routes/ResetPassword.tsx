@@ -2,7 +2,7 @@ import { createSignal, Show } from "solid-js";
 import { A, useNavigate, useSearchParams } from "@solidjs/router";
 
 import { authClient } from "@/lib/api";
-import { confirmForgotPassword } from "@/lib/cognito";
+import { cognitoMessage, confirmForgotPassword } from "@/lib/cognito";
 
 export default function ResetPassword() {
   const [params] = useSearchParams();
@@ -31,9 +31,9 @@ export default function ResetPassword() {
       } catch {
         /* best-effort */
       }
-      navigate("/sign-in");
+      navigate("/sign-in?reset=1");
     } catch (err) {
-      setError((err as Error).message || "Could not reset password");
+      setError(cognitoMessage(err, "Could not reset password"));
     } finally {
       setPending(false);
     }

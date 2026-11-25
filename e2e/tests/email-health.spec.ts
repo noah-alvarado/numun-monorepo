@@ -1,8 +1,9 @@
 import { expect, test } from "../fixtures";
-import { createAdvisor, setEmailStatus } from "../support/api";
+import { createAdvisor } from "../support/api";
+import { sesComplaint, sesHardBounce, sesSoftBounce } from "../support/ses";
 
-// PROCEDURES_ADMIN.md §11, EMAIL.md §9. Suppression normally comes from the
-// SES feedback Lambda; setEmailStatus stands in for it locally.
+// PROCEDURES_ADMIN.md §11, EMAIL.md §9. Suppression comes from the SES
+// feedback Lambda, run here on a hand-built SNS notification.
 
 test("email health is admin-only and loads", async ({
   page,
@@ -36,10 +37,11 @@ test("admin unsuppresses bounced and complained users", async ({
   signInAs,
   step,
 }) => {
-  // Dev-bypass advisors have no email address, so rows are matched by name.
-  const bounced = await createAdvisor("Bounced");
-  const complained = await createAdvisor("Complained");
-  await setEmailStatus(bounced.id, "bounced");
+  const bounced = await createAdvisor("Bounced", { withEmail: true });
+  const complained = await createAdvisor("Complained", { withEmail: true });
+  const mailboxFull = await createAdvisor("MailboxFull", { withEmail: true });
+  await sesHardBounce(bounced.email!);
+  await sesSoftBounce(mailboxFull.email!);
   const row = (name: string) => page.getByRole("row").filter({ hasText: name });
 
   await signInAs("admin");
@@ -48,10 +50,12 @@ test("admin unsuppresses bounced and complained users", async ({
     await page.goto("/admin/email-health");
     await expect(row(bounced.name)).toContainText("bounced");
     await expect(row(complained.name)).toHaveCount(0);
+    // A soft bounce (mailbox full) is logged but doesn't suppress.
+    await expect(row(mailboxFull.name)).toHaveCount(0);
   });
 
   await step("reload picks up a new complaint", async () => {
-    await setEmailStatus(complained.id, "complained");
+    await sesComplaint(complained.email!);
     await page.getByRole("button", { name: "Reload" }).click();
     await expect(row(complained.name)).toContainText("complained");
   });

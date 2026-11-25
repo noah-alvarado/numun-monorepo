@@ -35,10 +35,11 @@ test("staff check in a delegate by name", async ({
 
   await step("check one delegate in", async () => {
     await hit("Rosalind").getByRole("button", { name: "Check in" }).click();
+    await expect(hit("Rosalind")).toContainText("✓ Checked in");
+    await expect(hit("Rosalind")).toContainText("· checked in");
     await expect(
-      hit("Rosalind").getByRole("button", { name: "✓ Checked in" }),
-    ).toBeDisabled();
-    await expect(hit("Rosalind")).toContainText("checked in");
+      hit("Rosalind").getByRole("button", { name: "Check in" }),
+    ).toHaveCount(0);
     await expect(
       hit("Lise").getByRole("button", { name: "Check in" }),
     ).toBeEnabled();
@@ -48,12 +49,31 @@ test("staff check in a delegate by name", async ({
     await page.reload();
     await page.getByPlaceholder(/Search by first or last name/).fill(surname);
     await page.getByRole("button", { name: "Search" }).click();
-    await expect(
-      hit("Rosalind").getByRole("button", { name: "✓ Checked in" }),
-    ).toBeVisible();
+    await expect(hit("Rosalind")).toContainText("✓ Checked in");
     await expect(
       hit("Lise").getByRole("button", { name: "Check in" }),
     ).toBeVisible();
+  });
+
+  await step("the roster shows the check-in", async () => {
+    await page.goto(`/delegations/${delegation.id}?tab=delegates`);
+    const row = page
+      .getByRole("row")
+      .filter({ hasText: `Rosalind ${surname}` });
+    await expect(row.getByRole("cell").nth(4)).not.toHaveText("—");
+  });
+
+  await step("undo a mistaken check-in", async () => {
+    await page.goto("/admin/check-in");
+    await page.getByPlaceholder(/Search by first or last name/).fill(surname);
+    await page.getByRole("button", { name: "Search" }).click();
+    await hit("Rosalind")
+      .getByRole("button", { name: `Undo check-in for Rosalind ${surname}` })
+      .click();
+    await expect(
+      hit("Rosalind").getByRole("button", { name: "Check in" }),
+    ).toBeVisible();
+    await expect(hit("Rosalind")).not.toContainText("checked in");
   });
 
   await step("too-short queries are refused", async () => {
@@ -99,8 +119,6 @@ test("check-in is staff-only and scoped", async ({
       .getByRole("listitem")
       .filter({ hasText: `${surname}, Ada` });
     await hit.getByRole("button", { name: "Check in" }).click();
-    await expect(
-      hit.getByRole("button", { name: "✓ Checked in" }),
-    ).toBeDisabled();
+    await expect(hit).toContainText("✓ Checked in");
   });
 });

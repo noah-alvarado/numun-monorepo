@@ -9,6 +9,10 @@ const dashboardCards = [
   "Assignment Studio",
   "Day-of Check-In",
   "Awards",
+  "Announcements",
+  "Exports",
+  "Conferences",
+  "Staff",
   "Email Health",
 ] as const;
 
@@ -31,13 +35,13 @@ test("dashboard shows each role its own tools", async ({
   await signInAs("advisor");
   await step("advisor dashboard", async () => {
     await expect(page.getByText("Advisor", { exact: true })).toBeVisible();
-    await expectCards(page, ["My Delegation", "Awards"]);
+    await expectCards(page, ["My Delegation", "Awards", "Exports"]);
   });
 
   await signInAs("staffer");
   await step("staffer dashboard", async () => {
     await expect(page.getByText("Staffer", { exact: true })).toBeVisible();
-    await expectCards(page, ["Day-of Check-In", "Awards"]);
+    await expectCards(page, ["Day-of Check-In", "Awards", "Exports"]);
   });
 
   await signInAs("admin");
@@ -51,6 +55,10 @@ test("dashboard shows each role its own tools", async ({
       "Assignment Studio",
       "Day-of Check-In",
       "Awards",
+      "Announcements",
+      "Exports",
+      "Conferences",
+      "Staff",
       "Email Health",
     ]);
   });
@@ -59,6 +67,10 @@ test("dashboard shows each role its own tools", async ({
     for (const [title, url, heading] of [
       ["Day-of Check-In", "/admin/check-in", "Day-of Check-In"],
       ["Awards", "/awards", "Awards"],
+      ["Announcements", "/admin/announcements", "Announcements"],
+      ["Exports", "/exports", "Exports"],
+      ["Conferences", "/admin/conferences", "Conferences"],
+      ["Staff", "/admin/staff", "Staff"],
       ["Email Health", "/admin/email-health", "Email Health"],
     ] as const) {
       await page.goto("/dashboard");
@@ -67,6 +79,7 @@ test("dashboard shows each role its own tools", async ({
       await expect(
         page.getByRole("heading", { level: 1, name: heading }),
       ).toBeVisible();
+      await expect(page.getByText(/^Loading/)).toHaveCount(0);
     }
   });
 });

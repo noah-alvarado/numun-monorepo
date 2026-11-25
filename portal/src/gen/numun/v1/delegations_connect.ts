@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { AddAdvisorRequest, AddAdvisorResponse, ApproveRequest, ApproveResponse, AssignStafferRequest, AssignStafferResponse, CreateDelegationRequest, CreateDelegationResponse, GetDelegationRequest, GetDelegationResponse, ListAdvisorsRequest, ListAdvisorsResponse, ListAllAdvisorsRequest, ListAllAdvisorsResponse, ListAllDelegationsRequest, ListAllDelegationsResponse, ListDelegationsRequest, ListDelegationsResponse, RejectRequest, RejectResponse, RemoveAdvisorRequest, RemoveAdvisorResponse, SetAdvisorRoleRequest, SetAdvisorRoleResponse, UnassignStafferRequest, UnassignStafferResponse, UpdateDelegationRequest, UpdateDelegationResponse } from "./delegations_pb.js";
+import { AddAdvisorRequest, AddAdvisorResponse, ApproveRequest, ApproveResponse, AssignStafferRequest, AssignStafferResponse, CreateDelegationRequest, CreateDelegationResponse, GetDelegationRequest, GetDelegationResponse, ListAdvisorsRequest, ListAdvisorsResponse, ListAllAdvisorsRequest, ListAllAdvisorsResponse, ListAllDelegationsRequest, ListAllDelegationsResponse, ListDelegationsRequest, ListDelegationsResponse, ListStaffersRequest, ListStaffersResponse, RejectRequest, RejectResponse, RemoveAdvisorRequest, RemoveAdvisorResponse, SetAdvisorRoleRequest, SetAdvisorRoleResponse, UnassignStafferRequest, UnassignStafferResponse, UpdateDelegationRequest, UpdateDelegationResponse } from "./delegations_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -138,6 +138,17 @@ export const DelegationService = {
       name: "UnassignStaffer",
       I: UnassignStafferRequest,
       O: UnassignStafferResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Staffers with direct oversight of a delegation. Staff-admin only.
+     *
+     * @generated from rpc numun.v1.DelegationService.ListStaffers
+     */
+    listStaffers: {
+      name: "ListStaffers",
+      I: ListStaffersRequest,
+      O: ListStaffersResponse,
       kind: MethodKind.Unary,
     },
   }

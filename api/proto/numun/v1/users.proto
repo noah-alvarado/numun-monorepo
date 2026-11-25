@@ -55,6 +55,8 @@ service UserService {
   // Admin invites a new staff user (AdminCreateUser in Cognito; mirror row in
   // DDB written immediately). See AUTH.md §3.2.
   rpc InviteStaff(InviteStaffRequest) returns (InviteStaffResponse) {}
+  // Every staff-admin and staff-staffer account. Staff only.
+  rpc ListStaff(ListStaffRequest) returns (ListStaffResponse) {}
 
   // DismissAward records that the caller has dismissed the given award from
   // their congratulatory hero. Idempotent. M11.
@@ -87,6 +89,11 @@ message UpdateUserRequest {
 }
 message UpdateUserResponse {
   User user = 1;
+}
+
+message ListStaffRequest {}
+message ListStaffResponse {
+  repeated User items = 1;
 }
 
 message InviteStaffRequest {

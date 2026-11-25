@@ -1,7 +1,7 @@
 import { createSignal, Show } from "solid-js";
 import { A, useNavigate } from "@solidjs/router";
 
-import { signUp } from "@/lib/cognito";
+import { cognitoMessage, signUp } from "@/lib/cognito";
 import { normalizePhone } from "@/lib/phone";
 
 export default function SignUp() {
@@ -43,7 +43,7 @@ export default function SignUp() {
       });
       setSubmitted(true);
     } catch (err) {
-      setError((err as Error).message || "Sign-up failed");
+      setError(cognitoMessage(err, "Sign-up failed"));
     } finally {
       setPending(false);
     }
