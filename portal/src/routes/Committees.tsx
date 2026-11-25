@@ -22,6 +22,7 @@ import {
 } from "@/gen/numun/v1/committees_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
+import { guideUrl } from "@/lib/site";
 
 type CommitteeFormState = {
   name: string;
@@ -291,7 +292,21 @@ function CommitteeRow(props: {
             when={props.committee.backgroundGuideRef}
             fallback={<span class="text-nu-purple-300">—</span>}
           >
-            {props.committee.backgroundGuideRef}
+            {(ref) => (
+              <Show when={guideUrl(ref())} fallback={ref()}>
+                {(url) => (
+                  <a
+                    href={url()}
+                    target="_blank"
+                    rel="noopener"
+                    class="underline"
+                    title={ref()}
+                  >
+                    View guide
+                  </a>
+                )}
+              </Show>
+            )}
           </Show>
         </td>
         <td class="px-2 py-2 align-top text-right">
@@ -600,15 +615,20 @@ function CommitteeModal(props: {
         </label>
         <label class="block">
           <span class="text-xs font-semibold uppercase tracking-wide text-nu-purple-700">
-            Background guide ref
+            Background guide
           </span>
           <input
             type="text"
             value={guide()}
             onInput={(e) => setGuide(e.currentTarget.value)}
-            placeholder="/content/background-guides/…"
+            placeholder="/content/background-guides/numun-xxiv/unsc.md"
+            aria-describedby="guide-hint"
             class="mt-1 w-full rounded border border-nu-purple-300 px-2 py-1"
           />
+          <span id="guide-hint" class="mt-1 block text-xs text-nu-purple-700">
+            Path of the guide's entry in the CMS. Leave blank if it isn't
+            published yet.
+          </span>
         </label>
         <div class="flex justify-end gap-2 pt-2">
           <button
