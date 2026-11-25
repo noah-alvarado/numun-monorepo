@@ -1,18 +1,15 @@
 name: E2E
 
 # Playwright against the local stack (DDB Local + LocalStack, Go API with
-# LOCAL_HTTP=true, portal via vite preview). Not a required check yet — make
-# it required once it has run green for a while. See /e2e and DEVELOPERS.md §5.
+# LOCAL_HTTP=true, portal via vite preview). See /e2e and DEVELOPERS.md §5.3.
+#
+# "Playwright e2e" is a required check on main, so the workflow runs on every
+# PR and the job always reports. It only does the (slow) run when the PR
+# touches a path that can change portal behaviour; otherwise it passes
+# straight away.
 
 on:
   pull_request:
-    paths:
-      - "portal/**"
-      - "api/**"
-      - "e2e/**"
-      - "docker-compose.yml"
-      - "scripts/localstack-init.sh"
-      - ".github/workflows/e2e.yml"
 
 permissions:
   contents: read
@@ -28,24 +25,44 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Check for relevant changes
+        id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git diff --name-only "$BASE"...HEAD | grep -Eq '^(portal/|api/|e2e/|packages/|docker-compose\.yml$|scripts/localstack-init\.sh$|package\.json$|pnpm-lock\.yaml$|\.nvmrc$|Makefile$|\.github/workflows/e2e\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No portal/API/e2e changes; skipping the Playwright run."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
       - uses: actions/setup-go@v5
+        if: steps.changes.outputs.run == 'true'
         with:
           go-version-file: api/go.mod
           cache-dependency-path: api/go.sum
       - uses: pnpm/action-setup@v4
+        if: steps.changes.outputs.run == 'true'
       - uses: actions/setup-node@v4
+        if: steps.changes.outputs.run == 'true'
         with:
           node-version-file: .nvmrc
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
+        if: steps.changes.outputs.run == 'true'
       - name: Install Chromium
+        if: steps.changes.outputs.run == 'true'
         run: pnpm --filter @numun/e2e exec playwright install --with-deps chromium
       - name: Start DDB Local + LocalStack and seed
+        if: steps.changes.outputs.run == 'true'
         run: make e2e-stack
       - name: Run Playwright
+        if: steps.changes.outputs.run == 'true'
         run: pnpm --filter @numun/e2e run e2e
       - name: Upload report + step screenshots
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.changes.outputs.run == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: playwright-report

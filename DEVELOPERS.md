@@ -214,7 +214,7 @@ make e2e ARGS="tests/awards.spec.ts"       # one spec
 pnpm --filter @numun/e2e run e2e:report    # open the HTML report
 ```
 
-Playwright starts the API and portal itself (and reuses them if already running locally). Global setup gives the seed advisor a pending delegation if it has none. Wrap each user-visible action in the `step` fixture: it attaches a full-page screenshot per step to the report and writes it to `e2e/test-results/<test>/NN-<step>.png`, and fails the step if a raw UUID is visible on the page (users should only ever see names). Traces are kept on failure. The `E2E` workflow runs on PRs touching `portal/`, `api/` or `e2e/` and uploads the report + screenshots as an artifact; it isn't a required check yet.
+Playwright starts the API and portal itself (and reuses them if already running locally). Global setup gives the seed advisor a pending delegation if it has none. Wrap each user-visible action in the `step` fixture: it attaches a full-page screenshot per step to the report and writes it to `e2e/test-results/<test>/NN-<step>.png`, and fails the step if a raw UUID is visible on the page (users should only ever see names). Traces are kept on failure. The `E2E` workflow's `Playwright e2e` job is a required check on `main`: it runs on every PR, does the full run when the PR touches `portal/`, `api/`, `e2e/` or the local-stack/tooling files (passing immediately otherwise), and uploads the report + screenshots as an artifact.
 
 Tests share one table, so keep them independent of each other and of leftover local data:
 
