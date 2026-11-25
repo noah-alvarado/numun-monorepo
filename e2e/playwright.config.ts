@@ -23,6 +23,8 @@ const apiEnv = {
   // Catch-all so nothing (e.g. the CMS SSM lookup) reaches real AWS.
   AWS_ENDPOINT_URL: "http://localhost:4566",
   AWS_ENDPOINT_URL_DYNAMODB: "http://localhost:8000",
+  // Also switches presigned URLs to path-style, which LocalStack needs.
+  AWS_ENDPOINT_URL_S3: "http://localhost:4566",
   DDB_TABLE_NAME: "numun-test",
   UPLOADS_BUCKET_NAME: "numun-test-uploads",
   EMAIL_SENDER_TRANSACTIONAL: "noreply@mail.test.numun.org",
