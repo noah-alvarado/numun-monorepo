@@ -16,6 +16,7 @@ import {
   type PaymentRecord,
 } from "@/gen/numun/v1/payments_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
+import { connectMessage } from "@/lib/errors";
 
 type LedgerRow = {
   payment: PaymentRecord;
@@ -770,10 +771,4 @@ function DeleteModal(props: {
       </div>
     </ModalShell>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

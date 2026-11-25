@@ -8,7 +8,6 @@
 
 import { createSignal, For, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { delegateClient } from "@/lib/api";
 import { activeConferenceSignal, userSignal } from "@/lib/session";
@@ -17,6 +16,7 @@ import type {
   Delegate,
   SearchDelegatesResponse_Hit,
 } from "@/gen/numun/v1/delegates_pb";
+import { connectMessage } from "@/lib/errors";
 
 export default function AdminCheckIn() {
   const [user] = userSignal;
@@ -180,10 +180,4 @@ export default function AdminCheckIn() {
       </Show>
     </main>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

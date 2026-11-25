@@ -13,6 +13,7 @@ import {
   type Delegation,
 } from "@/gen/numun/v1/delegations_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
+import { connectMessage } from "@/lib/errors";
 
 export default function AdminDelegations() {
   const [user] = userSignal;
@@ -86,7 +87,7 @@ export default function AdminDelegations() {
       return;
     }
     if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
-      setError(err.message);
+      setError(err.rawMessage);
       return;
     }
     setError(connectMessage(err) ?? "Failed to update delegation.");
@@ -201,10 +202,4 @@ export default function AdminDelegations() {
       </Show>
     </main>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

@@ -5,7 +5,6 @@
 
 import { createSignal, Show } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { delegateClient, uploadClient } from "@/lib/api";
 import {
@@ -16,6 +15,7 @@ import { UploadPurpose } from "@/gen/numun/v1/uploads_pb";
 import DelegateImportTabPicker from "@/routes/DelegateImportTabPicker";
 import csvTemplateUrl from "@/assets/templates/delegate-import-template.csv?url&no-inline";
 import xlsxTemplateUrl from "@/assets/templates/delegate-import-template.xlsx?url&no-inline";
+import { connectMessage } from "@/lib/errors";
 
 type Mode = "file" | "sheet";
 
@@ -346,10 +346,4 @@ export default function DelegateImport() {
       </Show>
     </main>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

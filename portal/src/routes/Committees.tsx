@@ -21,6 +21,7 @@ import {
   type Position,
 } from "@/gen/numun/v1/committees_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
+import { connectMessage } from "@/lib/errors";
 
 type CommitteeFormState = {
   name: string;
@@ -842,18 +843,12 @@ function committeeSizeLabel(s: CommitteeSize): string {
   }
 }
 
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
-}
-
 function handleMutationError(err: unknown): string {
   if (err instanceof ConnectError && err.code === Code.Aborted) {
     return "Another change happened first. Reload to fetch the latest state.";
   }
   if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
-    return err.message;
+    return err.rawMessage;
   }
   return connectMessage(err) ?? "Operation failed.";
 }

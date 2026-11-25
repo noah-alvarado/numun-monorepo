@@ -35,6 +35,7 @@ import {
   formToEstimated,
   formToPrefs,
 } from "@/lib/delegation-mappers";
+import { connectMessage } from "@/lib/errors";
 
 type TabKey = "overview" | "delegates" | "payments";
 
@@ -393,14 +394,4 @@ function Banner(props: { message: string; kind: "error" | "info" }) {
       {props.message}
     </div>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) {
-    return err.message;
-  }
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return null;
 }

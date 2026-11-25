@@ -3,7 +3,6 @@
 
 import { createMemo, createSignal, For, Index, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { create } from "@bufbuild/protobuf";
 
@@ -16,6 +15,7 @@ import {
   type PreviewSummary,
   type PreviewUpsertDelegatesBulkResponse,
 } from "@/gen/numun/v1/delegates_pb";
+import { connectMessage } from "@/lib/errors";
 
 type ImportSource =
   | { kind: "upload"; uploadKey: string; format: number }
@@ -545,10 +545,4 @@ function toEditable(r: PreviewRow): EditableRow {
     errors: r.errors.map((e) => ({ field: e.field, message: e.message })),
     match: r.match,
   };
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

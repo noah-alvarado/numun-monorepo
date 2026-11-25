@@ -37,6 +37,7 @@ import {
 } from "@/gen/numun/v1/awards_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
+import { connectMessage } from "@/lib/errors";
 
 type RecipientFormRow = {
   kind: AwardRecipientKind;
@@ -147,7 +148,7 @@ export default function Awards() {
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
-      setError(connectMessage(err) ?? "Failed to create award.");
+      setError(handleMutationError(err));
     }
   }
 
@@ -738,12 +739,6 @@ function formRowToProto(r: RecipientFormRow): AwardRecipient {
     id: r.id,
     displayName: r.displayName,
   } as AwardRecipient;
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }
 
 function handleMutationError(err: unknown): string {

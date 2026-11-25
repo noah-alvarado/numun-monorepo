@@ -3,10 +3,10 @@
 
 import { createSignal, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { delegateClient } from "@/lib/api";
 import type { CommitSummary } from "@/gen/numun/v1/delegates_pb";
+import { connectMessage } from "@/lib/errors";
 
 type ResultState = {
   summary?: CommitSummary;
@@ -142,10 +142,4 @@ function SuccessBlock(props: { summary: CommitSummary; delegationId: string }) {
       </div>
     </section>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }
