@@ -54,7 +54,7 @@ func (s *UploadService) Presign(ctx context.Context, req *connect.Request[v1.Pre
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("size_bytes must be > 0"))
 	}
 	if sizeBytes > bulkDelegatesMaxBytes {
-		return nil, connect.NewError(connect.CodeInvalidArgument, fmt.Errorf("size_bytes exceeds limit of %d", bulkDelegatesMaxBytes))
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("the file is larger than 5 MB"))
 	}
 	if err := validateBulkDelegatesFilename(filename, contentType); err != nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, err)

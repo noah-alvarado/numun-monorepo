@@ -20,6 +20,8 @@ import { connectMessage } from "@/lib/errors";
 type Mode = "file" | "sheet";
 
 const CSV_TYPE = "text/csv";
+// BULK_IMPORT.md §2.2; the API refuses larger uploads too.
+const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const XLSX_TYPE =
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
 
@@ -97,6 +99,12 @@ export default function DelegateImport() {
         const fmt = detectFormat(f);
         if (fmt === null) {
           setError("Only .csv and .xlsx files are supported.");
+          return;
+        }
+        if (f.size > MAX_FILE_BYTES) {
+          setError(
+            "This file is larger than 5 MB. Remove unused columns or split it into smaller imports.",
+          );
           return;
         }
         const uploadKey = await presignAndUpload(f, fmt);

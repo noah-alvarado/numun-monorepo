@@ -253,6 +253,115 @@ test("non-roster files are refused before upload", async ({
   });
 });
 
+test("files over the size and row limits are refused", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportLimits"),
+  );
+  await signInAs(newAdvisor);
+  await page.goto(`/delegations/${delegation.id}/delegates/import`);
+
+  await step("a file over 5 MB", async () => {
+    const big = "firstName,lastName\r\n" + "Ada,Lovelace\r\n".repeat(400_000);
+    await page.getByLabel("File").setInputFiles({
+      name: "roster.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(big),
+    });
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(page.getByText(/larger than 5 MB/)).toBeVisible();
+  });
+
+  await step("more than 2,000 rows", async () => {
+    const rows = [["firstName", "lastName"]];
+    for (let i = 0; i < 2001; i++) rows.push([`Delegate${i}`, "Many"]);
+    await page.getByLabel("File").setInputFiles(csv(rows));
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(page.getByText(/more than 2,000 rows/)).toBeVisible();
+  });
+});
+
+test("previews are limited to 10 an hour", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportHourly"),
+  );
+  await signInAs(newAdvisor);
+  const file = csv([
+    ["firstName", "lastName"],
+    ["Ada", "Lovelace"],
+  ]);
+
+  await step("the 11th preview in an hour is refused", async () => {
+    for (let i = 0; i < 10; i++) {
+      await page.goto(`/delegations/${delegation.id}/delegates/import`);
+      await page.getByLabel("File").setInputFiles(file);
+      await page.getByRole("button", { name: "Preview import" }).click();
+      await expect(page).toHaveURL(/\/import\/preview$/);
+    }
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page.getByLabel("File").setInputFiles(file);
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(
+      page.getByText(
+        "You can preview 10 imports an hour; try again after the top of the hour",
+      ),
+    ).toBeVisible();
+  });
+});
+
+test("a large import that fails partway can be resumed", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportResume"),
+  );
+  // Imports over 25 changes are saved in parts of 25. The API's e2e fault
+  // hook (DEV_BULK_IMPORT_FAIL_SURNAME) fails the part that creates the
+  // "Zfail…" delegate, once.
+  const rows = [["firstName", "lastName"]];
+  for (let i = 0; i < 60; i++) {
+    rows.push([`Delegate${i}`, i === 29 ? `Zfail${Date.now()}` : "Resume"]);
+  }
+  await signInAs(newAdvisor);
+
+  await step("the second part fails", async () => {
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page.getByLabel("File").setInputFiles(csv(rows));
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await expect(page.getByText("Import partially failed")).toBeVisible();
+    await expect(page.getByText(/part 2 of 3 couldn't be saved/)).toBeVisible();
+  });
+
+  await step("resume saves the rest", async () => {
+    await page.getByRole("button", { name: "Resume" }).click();
+    await expect(page.getByText("Imported 60 delegates")).toBeVisible();
+    await expect(page.getByText("60 created")).toBeVisible();
+  });
+
+  await step("the roster has each delegate once", async () => {
+    await page.getByRole("button", { name: "View roster" }).click();
+    await expect(page.getByRole("heading", { name: /Delegates/ })).toHaveText(
+      "Delegates (60)",
+    );
+  });
+});
+
 test("advisor imports an XLSX roster from a chosen tab", async ({
   page,
   signInAs,

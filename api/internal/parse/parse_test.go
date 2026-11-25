@@ -213,8 +213,8 @@ func TestParseCSV_TooManyRows(t *testing.T) {
 	if err == nil || !errors.Is(err, ErrInvalidArgument) {
 		t.Fatalf("expected row-cap error, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "exceeds maximum") {
-		t.Errorf("want 'exceeds maximum' in error, got %v", err)
+	if !strings.Contains(err.Error(), "more than 2,000 rows") {
+		t.Errorf("want 'more than 2,000 rows' in error, got %v", err)
 	}
 }
 

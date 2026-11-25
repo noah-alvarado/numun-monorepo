@@ -39,7 +39,17 @@ export default function DelegateImportResult() {
       const resp = await delegateClient.resumeBulkImport({
         bulkImportJobId: s.bulkImportJobId,
       });
-      setSummary(resp.summary);
+      // Resume reports only the job's progress; the counts are the commit's.
+      const job = resp.summary;
+      if (job) {
+        setSummary({
+          ...s,
+          status: job.status,
+          totalBatches: job.totalBatches,
+          completedBatches: job.completedBatches,
+          lastError: job.lastError,
+        });
+      }
     } catch (err) {
       setError(connectMessage(err) ?? "Failed to resume import.");
     } finally {
@@ -84,8 +94,10 @@ export default function DelegateImportResult() {
                 Import partially failed
               </div>
               <p class="mt-1 text-nu-black-800">
-                Failed at batch {s().completedBatches + 1} of {s().totalBatches}
-                .{s().lastError ? ` ${s().lastError}` : ""}
+                Large imports are saved in parts, and part{" "}
+                {s().completedBatches + 1} of {s().totalBatches} couldn't be
+                saved. The parts before it were. Resume saves the rest within 30
+                minutes of the preview; after that, upload the file again.
               </p>
               <div class="mt-3 flex gap-2">
                 <button
@@ -98,10 +110,14 @@ export default function DelegateImportResult() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigate("/delegation")}
+                  onClick={() =>
+                    navigate(
+                      `/delegations/${params.delegationId}?tab=delegates`,
+                    )
+                  }
                   class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
                 >
-                  Back to delegation
+                  View roster
                 </button>
               </div>
               <Show when={error()}>

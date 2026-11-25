@@ -28,6 +28,9 @@ type DelegateService struct {
 	// SheetsHTTPClient fetches Google Sheets; nil means the SSRF-hardened
 	// httpclient.New(). Local dev swaps in a fake-server proxy.
 	SheetsHTTPClient *http.Client
+	// DevFailBatch, when set (DEV_MODE only), is asked about each bulk-import
+	// batch with the last names it creates; returning true fails that batch.
+	DevFailBatch func(createdLastNames []string) bool
 }
 
 // ListDelegates within a delegation. Scope: any role with scope on the

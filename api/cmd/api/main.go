@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -186,6 +188,21 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	mux.Handle(delPath, delHandler)
 
 	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
+	if prefix := os.Getenv("DEV_BULK_IMPORT_FAIL_SURNAME"); prefix != "" && os.Getenv("DEV_MODE") == "true" {
+		// The first batch creating a delegate whose last name starts with
+		// prefix fails, once per last name, so e2e can exercise Resume.
+		var failed sync.Map
+		delegateSvc.DevFailBatch = func(names []string) bool {
+			for _, n := range names {
+				if strings.HasPrefix(n, prefix) {
+					if _, seen := failed.LoadOrStore(n, true); !seen {
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
 	if origin := os.Getenv("DEV_SHEETS_ORIGIN"); origin != "" && os.Getenv("DEV_MODE") == "true" {
 		u, err := url.Parse(origin)
 		if err != nil || u.Host == "" {
