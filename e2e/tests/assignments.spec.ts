@@ -316,6 +316,24 @@ test("admin filters, edits, swaps and approves all", async ({
     }
   });
 
+  await step("with a filter on, approve only what's shown", async () => {
+    await filter("Delegation").selectOption({ label: otherSchool });
+    await page.getByRole("button", { name: "Approve shown" }).click();
+    const dialog = page.getByRole("dialog", {
+      name: "Approve the 1 proposed assignment shown?",
+    });
+    await expect(dialog).toContainText(
+      "Only assignments matching the current filters are approved.",
+    );
+    await dialog.getByRole("button", { name: "Approve shown" }).click();
+    await expect(dialog).toBeHidden();
+    await expect(assignmentRow(page, all[2])).toContainText("Approved");
+    await filter("Delegation").selectOption({ label: "All" });
+    for (const name of all.slice(0, 2)) {
+      await expect(assignmentRow(page, name)).toContainText("Proposed");
+    }
+  });
+
   await step("approve all", async () => {
     await page.getByRole("button", { name: "Approve all" }).click();
     const dialog = page
