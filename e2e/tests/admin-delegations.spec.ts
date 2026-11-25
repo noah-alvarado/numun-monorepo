@@ -16,6 +16,12 @@ test("admin opens a pending delegation from the list", async ({
     await expect(item).toBeVisible();
   });
 
+  await step("list survives a full reload", async () => {
+    await page.reload();
+    await expect(item).toBeVisible();
+    await expect(page.getByText("No active conference.")).toHaveCount(0);
+  });
+
   await step("open delegation detail", async () => {
     await item.getByRole("link", { name: "Open" }).click();
     await expect(page).toHaveURL(/\/delegations\/[0-9a-f-]+$/);
