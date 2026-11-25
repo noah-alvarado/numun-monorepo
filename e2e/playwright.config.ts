@@ -42,6 +42,10 @@ const apiEnv = {
   AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER: FAKES_URL,
   COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
   COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
+  // Mail goes to Mailpit (docker compose) instead of SES; tests read it back
+  // through its API (support/mail.ts).
+  DEV_SMTP_ADDR: "localhost:1025",
+  DEV_REGISTRATION_SUMMARY_DELAY: "1s",
 };
 
 // The portal talks to the fake Cognito like it would to the real one; the
@@ -93,6 +97,17 @@ export default defineConfig({
       url: `${API_URL}/v1/health`,
       reuseExistingServer: !isCI,
       timeout: 180_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      // Drains the LocalStack email queue like the SQS-triggered Lambda.
+      // No readiness URL: it has no HTTP surface, and a second copy polling
+      // the same queue is harmless.
+      name: "email-worker",
+      command: "go run ./cmd/email-worker -local",
+      cwd: "../api",
+      env: apiEnv,
       stdout: "ignore",
       stderr: "pipe",
     },

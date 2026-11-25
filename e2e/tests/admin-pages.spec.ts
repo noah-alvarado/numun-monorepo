@@ -6,6 +6,7 @@ import {
   uniqueSchool,
 } from "../support/api";
 import { getCognitoUser } from "../support/fakes";
+import { showMail, waitForMail } from "../support/mail";
 import { seedConferenceName } from "../support/seed";
 
 test("admin creates a conference and can't open a second one", async ({
@@ -181,5 +182,51 @@ test("an advisor opts in to announcements and an admin sends one", async ({
     await expect(
       page.getByRole("listitem").filter({ hasText: subject }),
     ).toContainText("Advisors of approved delegations");
+  });
+
+  let unsubscribeUrl = "";
+  await step("the advisor receives it, with an unsubscribe link", async () => {
+    const mail = await waitForMail(advisor.email!, new RegExp(`^${subject}$`));
+    await showMail(page, mail);
+    expect(mail.from).toBe("NUMUN <announcements@mail.test.numun.org>");
+    expect(mail.text).toContain("Position papers are due Friday.");
+    expect(mail.html).toMatch(
+      /white-space:pre-wrap;">Position papers are due Friday.(\r?\n){2}See you in Evanston!</,
+    );
+    expect(mail.headers["List-Unsubscribe-Post"]).toEqual([
+      "List-Unsubscribe=One-Click",
+    ]);
+    unsubscribeUrl = /href="([^"]+)"[^>]*>Unsubscribe from announcements/
+      .exec(mail.html)![1]
+      .replace(/&amp;/g, "&");
+    expect(mail.headers["List-Unsubscribe"]).toEqual([`<${unsubscribeUrl}>`]);
+  });
+
+  await step("the link asks before unsubscribing", async () => {
+    await page.goto(unsubscribeUrl);
+    await expect(
+      page.getByRole("heading", {
+        name: "Unsubscribe from NUMUN announcements?",
+      }),
+    ).toBeVisible();
+    await expect(page.getByText(advisor.email!)).toBeVisible();
+  });
+
+  await step("confirming unsubscribes them", async () => {
+    await page.getByRole("button", { name: "Unsubscribe" }).click();
+    await expect(
+      page.getByRole("heading", { name: "You've been unsubscribed" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open your profile" }),
+    ).toHaveAttribute("href", "http://localhost:4173/profile");
+  });
+
+  await signInAs(advisor);
+  await step("their profile shows announcements off", async () => {
+    await page.goto("/profile");
+    await expect(
+      page.getByLabel(/Email me NUMUN announcements/),
+    ).not.toBeChecked();
   });
 });
