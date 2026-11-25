@@ -32,7 +32,7 @@ import { AwardService } from "@/gen/numun/v1/awards_pb";
 
 const baseUrl = import.meta.env.VITE_API_BASE_URL ?? "http://localhost:3000";
 
-function readCookie(name: string): string {
+export function readCookie(name: string): string {
   if (typeof document === "undefined") return "";
   const prefix = name + "=";
   for (const part of document.cookie.split("; ")) {

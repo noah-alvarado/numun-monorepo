@@ -108,6 +108,11 @@ export default function SignIn() {
         }
       >
         <form class="mt-6 space-y-4" onSubmit={onSubmit}>
+          <Show when={params.ended && !error()}>
+            <p class="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+              Your session ended. Sign in again to continue.
+            </p>
+          </Show>
           <Show when={params.reset && !error()}>
             <p class="rounded border border-green-300 bg-green-50 p-2 text-sm text-green-900">
               Password changed. Sign in with your new password.

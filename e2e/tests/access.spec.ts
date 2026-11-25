@@ -141,7 +141,10 @@ test("an invalid session sends the user to sign-in", async ({
     );
     await context.addCookies([{ ...session, value: "revoked-session-id" }]);
     await page.goto("/delegation");
-    await expect(page).toHaveURL(/\/sign-in$/);
+    await expect(page).toHaveURL(/\/sign-in\?ended=1$/);
+    await expect(
+      page.getByText("Your session ended. Sign in again to continue."),
+    ).toBeVisible();
     const cookies = await context.cookies();
     expect(cookies.find((c) => c.name === "numun_session")).toBeUndefined();
   });

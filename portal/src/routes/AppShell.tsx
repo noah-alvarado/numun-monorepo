@@ -7,6 +7,7 @@
 import { onMount, Show, type JSX } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 
+import { readCookie } from "@/lib/api";
 import {
   activeConferenceLoadedSignal,
   loadActiveConference,
@@ -22,10 +23,16 @@ export default function AppShell(props: { children?: JSX.Element }) {
   const navigate = useNavigate();
 
   onMount(async () => {
+    // The CSRF cookie lives exactly as long as the session; if it's present
+    // but GetMe is refused, the session ended (expired or revoked) rather
+    // than never existing.
+    const hadSession = !!readCookie("csrf_token");
     try {
       const u = await loadCurrentUser();
       if (!u) {
-        navigate("/sign-in", { replace: true });
+        navigate(hadSession ? "/sign-in?ended=1" : "/sign-in", {
+          replace: true,
+        });
         return;
       }
       // Best-effort: cache the active conference for downstream screens.

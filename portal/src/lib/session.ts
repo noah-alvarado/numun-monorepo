@@ -3,6 +3,7 @@
 // only caches the User profile returned by UserService.GetMe so the app can
 // reactively render.
 
+import { Code, ConnectError } from "@connectrpc/connect";
 import { createSignal, type Signal } from "solid-js";
 import { userClient, authClient, publicClient } from "./api";
 import type { User } from "@/gen/numun/v1/users_pb";
@@ -38,8 +39,7 @@ export async function loadCurrentUser(): Promise<User | null> {
     setCurrentUser(resp.user ?? null);
     return resp.user ?? null;
   } catch (err) {
-    const e = err as { code?: string };
-    if (e?.code === "unauthenticated") {
+    if (err instanceof ConnectError && err.code === Code.Unauthenticated) {
       setCurrentUser(null);
       return null;
     }
