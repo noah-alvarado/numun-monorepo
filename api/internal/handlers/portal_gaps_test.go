@@ -27,6 +27,13 @@ func wantCode(t *testing.T, err error, code connect.Code) {
 	}
 }
 
+// uniqueEmail avoids full UUIDs, which the e2e suite (sharing the local
+// table) treats as raw ids leaking onto the page.
+func uniqueEmail(t *testing.T, prefix string) string {
+	id := newUUID(t)
+	return prefix + "-" + id[len(id)-12:] + "@example.org"
+}
+
 func seedUser(t *testing.T, st *store.Client, role domain.Role, email string) domain.User {
 	t.Helper()
 	u, err := st.CreateUser(context.Background(), domain.User{ID: newUUID(t), Role: role, Email: email, Name: "Test " + string(role)})
@@ -175,9 +182,9 @@ func TestAdvisorsAddCoAdvisorsByEmail(t *testing.T) {
 	svc := &handlers.DelegationService{Store: st, Scoper: auth.NewScoper(st)}
 	lead := seedUser(t, st, domain.RoleAdvisor, "")
 	del := seedDelegation(t, st, newUUID(t), lead.ID)
-	secondary := seedUser(t, st, domain.RoleAdvisor, "second-"+newUUID(t)+"@example.org")
-	third := seedUser(t, st, domain.RoleAdvisor, "third-"+newUUID(t)+"@example.org")
-	staffer := seedUser(t, st, domain.RoleStaffStaffer, "staff-"+newUUID(t)+"@example.org")
+	secondary := seedUser(t, st, domain.RoleAdvisor, uniqueEmail(t, "second"))
+	third := seedUser(t, st, domain.RoleAdvisor, uniqueEmail(t, "third"))
+	staffer := seedUser(t, st, domain.RoleStaffStaffer, uniqueEmail(t, "staff"))
 
 	leadCtx := as(lead.ID, domain.RoleAdvisor)
 	added, err := svc.AddAdvisor(leadCtx, connect.NewRequest(&v1.AddAdvisorRequest{DelegationId: del.ID, Email: secondary.Email}))
@@ -190,7 +197,7 @@ func TestAdvisorsAddCoAdvisorsByEmail(t *testing.T) {
 
 	_, err = svc.AddAdvisor(leadCtx, connect.NewRequest(&v1.AddAdvisorRequest{DelegationId: del.ID, Email: staffer.Email}))
 	wantCode(t, err, connect.CodeNotFound)
-	_, err = svc.AddAdvisor(leadCtx, connect.NewRequest(&v1.AddAdvisorRequest{DelegationId: del.ID, Email: "nobody-" + newUUID(t) + "@example.org"}))
+	_, err = svc.AddAdvisor(leadCtx, connect.NewRequest(&v1.AddAdvisorRequest{DelegationId: del.ID, Email: uniqueEmail(t, "nobody")}))
 	wantCode(t, err, connect.CodeNotFound)
 
 	secCtx := as(secondary.ID, domain.RoleAdvisor)

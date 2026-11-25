@@ -85,7 +85,10 @@ func TestUserLookupsUseIndex(t *testing.T) {
 	ctx := context.Background()
 	c := testClient(t)
 
-	email := "Mixed.Case-" + newID(t) + "@Example.com"
+	// No full UUID: the e2e suite shares the local table and flags UUIDs on
+	// screen.
+	id := newID(t)
+	email := "Mixed.Case-" + id[len(id)-12:] + "@Example.com"
 	u, err := c.CreateUser(ctx, domain.User{ID: newID(t), Role: domain.RoleStaffAdmin, Email: email})
 	if err != nil {
 		t.Fatalf("create user: %v", err)
