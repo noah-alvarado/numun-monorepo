@@ -54,14 +54,14 @@ Parameters:
       can't resolve SecureString into CloudFront config. See SECURITY.md §3.6.
   EnforceOriginVerify:
     Type: String
-    Default: "false"
+    Default: "true"
     AllowedValues: ["true", "false"]
     Description: >
       "true" → the Lambdalith 403s requests lacking a valid X-Origin-Verify
       (i.e. that bypassed CloudFront). "false" → report-only: log
-      "origin verify failed" and serve. Ships "false" for the DNS cutover
-      from the API Gateway custom domain; flip the default to "true" once
-      logs show no misses. Also an emergency off-switch.
+      "origin verify failed" and serve. Use "false" as an emergency
+      off-switch or for a deploy that rotates the origin secret
+      (SECURITY.md §3.6).
   HostedZoneId:
     Type: String
     Description: Route 53 zone id for RootDomain.
