@@ -11,6 +11,11 @@ import (
 	"strings"
 )
 
+var (
+	errNotASheetLink  = fmt.Errorf("%w: that isn't a Google Sheets link — copy it from the sheet's address bar (https://docs.google.com/spreadsheets/d/…)", ErrInvalidArgument)
+	errSheetNotShared = fmt.Errorf("%w: we can't open that sheet — in Google Sheets, click Share and set General access to \"Anyone with the link\", then try again", ErrInvalidArgument)
+)
+
 // sheetIDRe extracts the sheet id from URL paths of the form
 // /spreadsheets/d/<id>/...
 var sheetIDRe = regexp.MustCompile(`^/spreadsheets/d/([A-Za-z0-9_\-]+)(/.*)?$`)
@@ -63,17 +68,17 @@ func parseSheet(rawURL, tabName string, client *http.Client) (ParseResult, error
 func extractSheetCoords(rawURL string) (string, string, error) {
 	u, err := url.Parse(rawURL)
 	if err != nil {
-		return "", "", fmt.Errorf("%w: malformed sheets url", ErrInvalidArgument)
+		return "", "", errNotASheetLink
 	}
 	if u.Scheme != "https" && u.Scheme != "http" {
-		return "", "", fmt.Errorf("%w: sheets url must use https", ErrInvalidArgument)
+		return "", "", errNotASheetLink
 	}
 	if !strings.EqualFold(u.Host, "docs.google.com") {
-		return "", "", fmt.Errorf("%w: sheets url must be on docs.google.com", ErrInvalidArgument)
+		return "", "", errNotASheetLink
 	}
 	m := sheetIDRe.FindStringSubmatch(u.Path)
 	if m == nil {
-		return "", "", fmt.Errorf("%w: sheets url path must be /spreadsheets/d/<id>/...", ErrInvalidArgument)
+		return "", "", errNotASheetLink
 	}
 	sheetID := m[1]
 
@@ -102,7 +107,7 @@ func fetchSheet(exportURL string, client *http.Client) ([]byte, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("%w: sheet is not publicly viewable — set sharing to 'Anyone with the link can view'", ErrInvalidArgument)
+		return nil, errSheetNotShared
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, fmt.Errorf("%w: sheets export returned status %d", ErrInvalidArgument, resp.StatusCode)
@@ -149,7 +154,7 @@ func listSheetTabs(sheetID string, client *http.Client) ([]sheetTab, error) {
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode == http.StatusForbidden || resp.StatusCode == http.StatusNotFound {
-		return nil, fmt.Errorf("%w: sheet is not publicly viewable — set sharing to 'Anyone with the link can view'", ErrInvalidArgument)
+		return nil, errSheetNotShared
 	}
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 		return nil, nil

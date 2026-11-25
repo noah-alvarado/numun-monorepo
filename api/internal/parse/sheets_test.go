@@ -165,8 +165,8 @@ func TestParseSheet_NotPubliclyViewable(t *testing.T) {
 	if !errors.Is(err, ErrInvalidArgument) {
 		t.Errorf("want ErrInvalidArgument, got %v", err)
 	}
-	if !strings.Contains(err.Error(), "publicly viewable") {
-		t.Errorf("want 'publicly viewable' hint in error, got %v", err)
+	if !strings.Contains(err.Error(), "Anyone with the link") {
+		t.Errorf("want a sharing hint in the error, got %v", err)
 	}
 }
 

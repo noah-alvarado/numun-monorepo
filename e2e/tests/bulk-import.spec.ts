@@ -5,6 +5,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
 import { createDelegate, createDelegation, uniqueSchool } from "../support/api";
+import { publishSheet } from "../support/fakes";
 
 function csv(rows: string[][]): {
   name: string;
@@ -263,6 +264,103 @@ test("advisor imports an XLSX roster from a chosen tab", async ({
   await step("confirm import", async () => {
     await page.getByRole("button", { name: "Confirm import" }).click();
     await expect(page.getByText("Imported 2 delegates")).toBeVisible();
+  });
+});
+
+// Google Sheets come from the fake in e2e/fakes/server.ts, which mimics the
+// endpoints the API reads (BULK_IMPORT.md §7.2).
+test("advisor imports a roster from a Google Sheet tab", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportSheet"),
+  );
+  const sheetUrl = await publishSheet(`sheet-${Date.now()}`, [
+    {
+      name: "Advisors",
+      gid: "0",
+      csv: "Name,Email\r\nPat Lee,pat@example.com\r\n",
+    },
+    {
+      name: "Delegates",
+      gid: "512",
+      csv:
+        "First Name,Last Name,Email,Experience\r\n" +
+        "Alan,Turing,alan@example.com,advanced\r\n" +
+        "Barbara,Liskov,barbara@example.com,novice\r\n",
+    },
+  ]);
+  await signInAs(newAdvisor);
+
+  await step("paste the sheet link", async () => {
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page.getByLabel("Paste Google Sheets URL").check();
+    await page
+      .getByRole("textbox", { name: "Google Sheets URL" })
+      .fill(sheetUrl);
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Choose a tab" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Advisors", exact: true }),
+    ).toBeVisible();
+  });
+
+  await step("pick the delegates tab", async () => {
+    await page.getByRole("button", { name: "Delegates", exact: true }).click();
+    await expect(
+      page.getByRole("heading", { name: "Review import" }),
+    ).toBeVisible();
+    await expect(stat(page, "Parsed")).toContainText("2");
+    await expect(previewRow(page, 1).getByRole("textbox").nth(0)).toHaveValue(
+      "Alan",
+    );
+  });
+
+  await step("confirm import", async () => {
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await expect(page.getByText("Imported 2 delegates")).toBeVisible();
+  });
+});
+
+test("unreadable Google Sheet links are explained", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportSheetBad"),
+  );
+  await signInAs(newAdvisor);
+  await page.goto(`/delegations/${delegation.id}/delegates/import`);
+  await page.getByLabel("Paste Google Sheets URL").check();
+
+  await step("a private sheet asks for link sharing", async () => {
+    await page
+      .getByRole("textbox", { name: "Google Sheets URL" })
+      .fill("https://docs.google.com/spreadsheets/d/not-shared/edit");
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(
+      page.getByText(/General access to "Anyone with the link"/),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Review import" }),
+    ).toBeHidden();
+  });
+
+  await step("a non-Google link is refused", async () => {
+    await page
+      .getByRole("textbox", { name: "Google Sheets URL" })
+      .fill("https://example.com/spreadsheets/d/abc/edit");
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(page.getByText(/docs\.google\.com/).last()).toBeVisible();
   });
 });
 
