@@ -89,12 +89,14 @@ stack frames into links to `noah-alvarado/numun-monorepo` on `main`:
 | Project          | Stack trace prefix            | Repository prefix |
 | ---------------- | ----------------------------- | ----------------- |
 | `numun-backend`  | `github.com/numun/numun/api/` | `api/`            |
-| `numun-frontend` | `src/`                        | `portal/src/`     |
+| `numun-frontend` | `../../`                      | `portal/`         |
 
 The backend prefix is the Go module path, which shows up in stack frames
 because `api/Makefile` builds with `-trimpath`. Frontend frames come from
-the uploaded source maps. If an event shows them as `./src/...`, use
-`./src/` as the prefix.
+the uploaded source maps, whose paths are relative to `portal/dist/assets/`
+(e.g. `../../src/lib/sentry.ts`). Sentry generated the frontend mapping
+automatically from the first source-mapped event; a manual `src/` or
+`../../src/` prefix didn't match.
 
 ## 3. Verify
 
@@ -112,9 +114,9 @@ After the next deploy:
    `setTimeout(() => { throw new Error("Sentry test error " + Date.now()) })`.
    A bare `throw` typed into the console is not an app error and isn't
    reported. Expect an issue in `numun-frontend` tagged `environment=<env>`.
-   Real app errors should show frames under `src/...` (source maps applied)
-   with working "Open in GitHub" links. The console-thrown test error has
-   no app frames.
+   Real app errors should show frames under `../../src/...` (source maps
+   applied) with working "Open in GitHub" links. The console-thrown test
+   error has no app frames.
 
 If errors don't show up, check:
 
