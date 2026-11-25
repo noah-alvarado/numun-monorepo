@@ -243,18 +243,21 @@ export default function Awards() {
           <Show when={isAdmin() && conferenceId()}>
             <a
               href={exportUrls.assignmentsCsv(conferenceId())}
+              download=""
               class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
             >
               Export assignments.csv
             </a>
             <a
               href={exportUrls.delegatesCsv(conferenceId())}
+              download=""
               class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
             >
               Export delegates.csv
             </a>
             <a
               href={exportUrls.paymentsCsv(conferenceId())}
+              download=""
               class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
             >
               Export payments.csv
