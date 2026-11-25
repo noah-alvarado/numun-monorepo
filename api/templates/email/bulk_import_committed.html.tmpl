@@ -5,7 +5,8 @@
 <ul style="line-height:1.7;">
   <li>{{index .Vars "createCount"}} delegates created</li>
   <li>{{index .Vars "updateCount"}} delegates updated</li>
+  <li>{{index .Vars "unchangedCount"}} delegates unchanged</li>
   <li>{{index .Vars "softDeleteCount"}} delegates removed</li>
 </ul>
-<p>Open <a href="{{.PortalBaseURL}}/delegation">My Delegation</a> in the portal to review the roster.</p>
+<p><a href="{{.PortalBaseURL}}/delegations/{{index .Vars "delegationId"}}?tab=delegates">Review the roster</a> in the portal.</p>
 {{end}}

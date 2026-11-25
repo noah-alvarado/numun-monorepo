@@ -482,7 +482,7 @@ func (s *DelegateService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 
 // notifyBulkImportCommitted sends T4 to the advisor who committed the import.
 // Best-effort.
-func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisorUserID, delegationID string, mode domain.UpsertMode, creates, updates, softDeletes int) {
+func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisorUserID, delegationID string, mode domain.UpsertMode, creates, updates, unchanged, softDeletes int) {
 	if s.Email == nil {
 		return
 	}
@@ -500,14 +500,23 @@ func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisor
 		Kind: domain.EmailKindBulkImportCommitted,
 		Vars: map[string]any{
 			"delegationName":  delegationName,
+			"delegationId":    delegationID,
 			"createCount":     creates,
 			"updateCount":     updates,
+			"unchangedCount":  unchanged,
 			"softDeleteCount": softDeletes,
-			"mode":            string(mode),
+			"mode":            importModeLabel(mode),
 		},
 	}); err != nil {
 		s.log().Warn("bulk import notify: send", "err", err)
 	}
+}
+
+func importModeLabel(m domain.UpsertMode) string {
+	if m == domain.UpsertModeFullSync {
+		return "full sync"
+	}
+	return "additive"
 }
 
 func (s *DelegateService) log() *slog.Logger {
