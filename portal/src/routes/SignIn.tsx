@@ -1,7 +1,13 @@
 import { createSignal, Show } from "solid-js";
-import { A, useNavigate } from "@solidjs/router";
+import { A, useNavigate, useSearchParams } from "@solidjs/router";
 
-import { completeNewPasswordChallenge, devBypass, signIn } from "@/lib/cognito";
+import {
+  cognitoErrorCode,
+  cognitoMessage,
+  completeNewPasswordChallenge,
+  devBypass,
+  signIn,
+} from "@/lib/cognito";
 import { exchange } from "@/lib/session";
 import type { CognitoUser } from "amazon-cognito-identity-js";
 
@@ -16,6 +22,7 @@ export default function SignIn() {
   );
   const [newPassword, setNewPassword] = createSignal("");
   const navigate = useNavigate();
+  const [params] = useSearchParams();
 
   async function onSubmit(e: SubmitEvent) {
     e.preventDefault();
@@ -30,7 +37,13 @@ export default function SignIn() {
       await exchange({ ...result.tokens, rememberMe: remember() });
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError((err as Error).message || "Sign-in failed");
+      if (cognitoErrorCode(err) === "UserNotConfirmedException") {
+        navigate(
+          `/sign-up/verify?email=${encodeURIComponent(email().trim())}&unverified=1`,
+        );
+        return;
+      }
+      setError(cognitoMessage(err, "Sign-in failed"));
     } finally {
       setPending(false);
     }
@@ -48,7 +61,7 @@ export default function SignIn() {
       await exchange({ ...tokens, rememberMe: remember() });
       navigate("/dashboard", { replace: true });
     } catch (err) {
-      setError((err as Error).message || "Failed to set new password");
+      setError(cognitoMessage(err, "Failed to set new password"));
     } finally {
       setPending(false);
     }
@@ -66,7 +79,12 @@ export default function SignIn() {
               Set a new password to finish signing in.
             </p>
             <label class="block">
-              <span class="text-sm">New password</span>
+              <span class="text-sm">
+                New password{" "}
+                <span class="text-xs text-nu-purple-700">
+                  (12+ characters, lowercase and digits)
+                </span>
+              </span>
               <input
                 type="password"
                 required
@@ -90,6 +108,11 @@ export default function SignIn() {
         }
       >
         <form class="mt-6 space-y-4" onSubmit={onSubmit}>
+          <Show when={params.reset && !error()}>
+            <p class="rounded border border-green-300 bg-green-50 p-2 text-sm text-green-900">
+              Password changed. Sign in with your new password.
+            </p>
+          </Show>
           <label class="block">
             <span class="text-sm">Email</span>
             <input

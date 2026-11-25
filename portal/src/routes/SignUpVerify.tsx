@@ -1,7 +1,7 @@
 import { createSignal, Show } from "solid-js";
-import { A, useNavigate, useSearchParams } from "@solidjs/router";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 
-import { confirmSignUp } from "@/lib/cognito";
+import { cognitoMessage, confirmSignUp, resendSignUpCode } from "@/lib/cognito";
 
 export default function SignUpVerify() {
   const [params] = useSearchParams();
@@ -12,6 +12,7 @@ export default function SignUpVerify() {
   const [pending, setPending] = createSignal(false);
   const [error, setError] = createSignal<string | null>(null);
   const [verified, setVerified] = createSignal(false);
+  const [resent, setResent] = createSignal(false);
   const navigate = useNavigate();
 
   async function onSubmit(e: SubmitEvent) {
@@ -23,9 +24,24 @@ export default function SignUpVerify() {
       setVerified(true);
       setTimeout(() => navigate("/sign-in"), 1200);
     } catch (err) {
-      setError((err as Error).message || "Verification failed");
+      setError(cognitoMessage(err, "Verification failed"));
     } finally {
       setPending(false);
+    }
+  }
+
+  async function onResend() {
+    setError(null);
+    setResent(false);
+    if (!email().trim()) {
+      setError("Enter your email first.");
+      return;
+    }
+    try {
+      await resendSignUpCode(email().trim());
+      setResent(true);
+    } catch (err) {
+      setError(cognitoMessage(err, "Could not send a new code"));
     }
   }
 
@@ -42,6 +58,12 @@ export default function SignUpVerify() {
         }
       >
         <form class="mt-6 space-y-4" onSubmit={onSubmit}>
+          <Show when={params.unverified}>
+            <p class="rounded border border-amber-300 bg-amber-50 p-2 text-sm text-amber-900">
+              Verify your email before signing in. Enter the code we emailed
+              you, or send a new one.
+            </p>
+          </Show>
           <label class="block">
             <span class="text-sm">Email</span>
             <input
@@ -73,11 +95,20 @@ export default function SignUpVerify() {
           <Show when={error()}>
             <p class="text-sm text-red-700">{error()}</p>
           </Show>
+          <Show when={resent()}>
+            <p class="text-sm text-green-800">
+              We sent a new code to {email().trim()}.
+            </p>
+          </Show>
           <p class="text-sm">
             Didn't get a code?{" "}
-            <A href="/sign-up" class="text-nu-purple-700 underline">
-              Start over
-            </A>
+            <button
+              type="button"
+              onClick={onResend}
+              class="text-nu-purple-700 underline"
+            >
+              Send a new code
+            </button>
           </p>
         </form>
       </Show>
