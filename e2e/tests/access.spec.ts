@@ -4,7 +4,7 @@ import { seedUsers } from "../support/seed";
 
 const dashboardCards = [
   "My Delegation",
-  "Pending Delegations",
+  "Delegations",
   "Committees",
   "Assignment Studio",
   "Day-of Check-In",
@@ -41,7 +41,12 @@ test("dashboard shows each role its own tools", async ({
   await signInAs("staffer");
   await step("staffer dashboard", async () => {
     await expect(page.getByText("Staffer", { exact: true })).toBeVisible();
-    await expectCards(page, ["Day-of Check-In", "Awards", "Exports"]);
+    await expectCards(page, [
+      "Delegations",
+      "Day-of Check-In",
+      "Awards",
+      "Exports",
+    ]);
   });
 
   await signInAs("admin");
@@ -50,7 +55,7 @@ test("dashboard shows each role its own tools", async ({
       page.getByText("Administrator", { exact: true }),
     ).toBeVisible();
     await expectCards(page, [
-      "Pending Delegations",
+      "Delegations",
       "Committees",
       "Assignment Studio",
       "Day-of Check-In",
@@ -84,7 +89,7 @@ test("dashboard shows each role its own tools", async ({
   });
 });
 
-test("advisor cannot use the admin pending list", async ({
+test("advisor cannot use the staff delegations list", async ({
   page,
   signInAs,
   step,
@@ -92,7 +97,7 @@ test("advisor cannot use the admin pending list", async ({
   await signInAs("advisor");
   await step("open admin page as advisor", async () => {
     await page.goto("/admin/delegations");
-    await expect(page.getByText("Admin only.")).toBeVisible();
+    await expect(page.getByText("Staff only.")).toBeVisible();
     await expect(page.getByRole("button", { name: "Approve" })).toHaveCount(0);
     await expect(page.getByRole("button", { name: "Reload" })).toHaveCount(0);
   });
