@@ -366,6 +366,7 @@ CORS for `PublicService` allows any origin (`Access-Control-Allow-Origin: *`), u
 | RPC | Purpose |
 |---|---|
 | `ListDelegates` / `ListAllDelegates` | Within a delegation. |
+| `ListConferenceDelegates` | Every delegate in the conference's delegations the caller can see (admin: all; staffer: overseen; advisor: own). One call instead of one per delegation. |
 | `SearchDelegates` | Across delegations in a conference. Filter by name prefix (uses GSI2). |
 | `GetDelegate` | By id. |
 | `CreateDelegate` | Single-row create (rare — bulk is the primary path). |

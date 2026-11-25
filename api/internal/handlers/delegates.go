@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"connectrpc.com/connect"
 
@@ -88,6 +89,52 @@ func (s *DelegateService) ListAllDelegates(ctx context.Context, req *connect.Req
 	out := &v1.ListAllDelegatesResponse{Items: make([]*v1.Delegate, 0, len(rows))}
 	for _, d := range rows {
 		out.Items = append(out.Items, delegateToProto(d))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (s *DelegateService) ListConferenceDelegates(ctx context.Context, req *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error) {
+	caller, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	confID := strings.TrimSpace(req.Msg.GetConferenceId())
+	if confID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, confID); err != nil {
+		return nil, mapScopeErr(err)
+	}
+	delegations, err := scopedDelegations(ctx, s.Store, caller, confID)
+	if err != nil {
+		s.log().Error("ListConferenceDelegates: delegations", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+
+	// One query per delegation; run a few at a time.
+	rosters := make([][]domain.Delegate, len(delegations))
+	errs := make([]error, len(delegations))
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for i, d := range delegations {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			rosters[i], errs[i] = s.Store.ListAllDelegatesByDelegation(ctx, d.ID)
+		}()
+	}
+	wg.Wait()
+
+	out := &v1.ListConferenceDelegatesResponse{}
+	for i, rows := range rosters {
+		if errs[i] != nil {
+			s.log().Error("ListConferenceDelegates: delegates", "delegationId", delegations[i].ID, "err", errs[i])
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		for _, d := range rows {
+			out.Items = append(out.Items, delegateToProto(d))
+		}
 	}
 	return connect.NewResponse(out), nil
 }

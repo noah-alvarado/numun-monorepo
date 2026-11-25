@@ -136,6 +136,10 @@ message CommitSummary {
 service DelegateService {
   rpc ListDelegates(ListDelegatesRequest) returns (ListDelegatesResponse) {}
   rpc ListAllDelegates(ListAllDelegatesRequest) returns (ListAllDelegatesResponse) {}
+  // Every delegate in the conference's delegations the caller can see (all
+  // for admins, overseen ones for staffers, their own for advisors), in one
+  // call instead of one ListAllDelegates per delegation.
+  rpc ListConferenceDelegates(ListConferenceDelegatesRequest) returns (ListConferenceDelegatesResponse) {}
   rpc GetDelegate(GetDelegateRequest) returns (GetDelegateResponse) {}
   rpc CreateDelegate(CreateDelegateRequest) returns (CreateDelegateResponse) {}
   rpc UpdateDelegate(UpdateDelegateRequest) returns (UpdateDelegateResponse) {}
@@ -178,6 +182,13 @@ message ListAllDelegatesRequest {
   bool include_deleted = 2;
 }
 message ListAllDelegatesResponse {
+  repeated Delegate items = 1;
+}
+
+message ListConferenceDelegatesRequest {
+  string conference_id = 1 [(buf.validate.field).string.min_len = 1];
+}
+message ListConferenceDelegatesResponse {
   repeated Delegate items = 1;
 }
 

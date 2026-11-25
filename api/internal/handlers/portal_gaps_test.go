@@ -278,3 +278,39 @@ func TestOnlyOneConferenceCanBeActive(t *testing.T) {
 		t.Fatalf("closing a draft is fine: %v", err)
 	}
 }
+
+func TestListConferenceDelegatesIsScoped(t *testing.T) {
+	st := testStore(t)
+	ctx := context.Background()
+	svc := &handlers.DelegateService{Store: st, Scoper: auth.NewScoper(st)}
+	confID := newUUID(t)
+	mine := seedUser(t, st, domain.RoleAdvisor, "")
+	other := seedUser(t, st, domain.RoleAdvisor, "")
+	var ids []string
+	for _, lead := range []domain.User{mine, other} {
+		del := seedDelegation(t, st, confID, lead.ID)
+		d, err := st.CreateDelegate(ctx, domain.Delegate{ConferenceID: confID, DelegationID: del.ID, FirstName: "Ada", LastName: "Lovelace", ExperienceLevel: domain.ExperienceLevelNovice})
+		if err != nil {
+			t.Fatalf("create delegate: %v", err)
+		}
+		ids = append(ids, d.ID)
+	}
+	list := func(c context.Context) []string {
+		t.Helper()
+		resp, err := svc.ListConferenceDelegates(c, connect.NewRequest(&v1.ListConferenceDelegatesRequest{ConferenceId: confID}))
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		var got []string
+		for _, d := range resp.Msg.Items {
+			got = append(got, d.Id)
+		}
+		return got
+	}
+	if got := list(as("admin", domain.RoleStaffAdmin)); len(got) != 2 {
+		t.Fatalf("admin sees %v, want both delegates", got)
+	}
+	if got := list(as(mine.ID, domain.RoleAdvisor)); len(got) != 1 || got[0] != ids[0] {
+		t.Fatalf("advisor sees %v, want only %s", got, ids[0])
+	}
+}

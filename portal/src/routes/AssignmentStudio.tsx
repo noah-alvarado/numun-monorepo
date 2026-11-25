@@ -69,14 +69,10 @@ export default function AssignmentStudio() {
     async () => {
       const cs = committees();
       if (!cs) return [] as Position[];
-      const all: Position[] = [];
-      for (const c of cs) {
-        const resp = await positionClient.listPositions({
-          committeeId: c.id,
-        });
-        all.push(...resp.items);
-      }
-      return all;
+      const lists = await Promise.all(
+        cs.map((c) => positionClient.listPositions({ committeeId: c.id })),
+      );
+      return lists.flatMap((l) => l.items);
     },
   );
 
@@ -87,26 +83,12 @@ export default function AssignmentStudio() {
     return resp.items;
   });
 
-  const [delegates] = createResource(
-    () =>
-      delegations()
-        ? delegations()!
-            .map((d) => d.id)
-            .join(",")
-        : "",
-    async () => {
-      const ds = delegations();
-      if (!ds) return [] as Delegate[];
-      const all: Delegate[] = [];
-      for (const d of ds) {
-        const resp = await delegateClient.listAllDelegates({
-          delegationId: d.id,
-        });
-        all.push(...resp.items);
-      }
-      return all;
-    },
-  );
+  const [delegates] = createResource(conferenceId, async (id) => {
+    const resp = await delegateClient.listConferenceDelegates({
+      conferenceId: id,
+    });
+    return resp.items;
+  });
 
   // Current run — fetched once on mount; user can refresh manually.
   const [currentRun, { refetch: refetchCurrentRun }] = createResource(

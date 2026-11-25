@@ -65,7 +65,7 @@ func (e *ExportRoutes) handlePaymentsCSV(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Resolve the set of delegations the caller is allowed to see.
-	delegations, err := e.scopedDelegations(ctx, caller, conferenceID)
+	delegations, err := scopedDelegations(ctx, e.Store, caller, conferenceID)
 	if err != nil {
 		e.log().Error("exports.payments: scope delegations", "err", err)
 		http.Error(w, "store unavailable", http.StatusServiceUnavailable)
@@ -124,8 +124,8 @@ func (e *ExportRoutes) handlePaymentsCSV(w http.ResponseWriter, r *http.Request)
 
 // scopedDelegations returns the delegations the caller may see in this
 // conference, matching API.md §9.2 + §12.2.
-func (e *ExportRoutes) scopedDelegations(ctx context.Context, caller auth.Caller, conferenceID string) ([]domain.Delegation, error) {
-	all, _, err := e.Store.ListDelegationsByConference(ctx, conferenceID, "", 1000)
+func scopedDelegations(ctx context.Context, st *store.Client, caller auth.Caller, conferenceID string) ([]domain.Delegation, error) {
+	all, _, err := st.ListDelegationsByConference(ctx, conferenceID, "", 1000)
 	if err != nil {
 		return nil, err
 	}
@@ -135,7 +135,7 @@ func (e *ExportRoutes) scopedDelegations(ctx context.Context, caller auth.Caller
 	case domain.RoleAdvisor:
 		out := make([]domain.Delegation, 0, len(all))
 		for _, d := range all {
-			if _, err := e.Store.GetAdvisor(ctx, d.ID, caller.UserID); err == nil {
+			if _, err := st.GetAdvisor(ctx, d.ID, caller.UserID); err == nil {
 				out = append(out, d)
 			} else if !errors.Is(err, store.ErrNotFound) {
 				return nil, err
@@ -145,7 +145,7 @@ func (e *ExportRoutes) scopedDelegations(ctx context.Context, caller auth.Caller
 	case domain.RoleStaffStaffer:
 		out := make([]domain.Delegation, 0, len(all))
 		for _, d := range all {
-			if _, err := e.Store.GetStaffDelegationAssignment(ctx, d.ID, caller.UserID); err == nil {
+			if _, err := st.GetStaffDelegationAssignment(ctx, d.ID, caller.UserID); err == nil {
 				out = append(out, d)
 			} else if !errors.Is(err, store.ErrNotFound) {
 				return nil, err
@@ -178,7 +178,7 @@ func (e *ExportRoutes) handleAssignmentsCSV(w http.ResponseWriter, r *http.Reque
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	delegations, err := e.scopedDelegations(ctx, caller, conferenceID)
+	delegations, err := scopedDelegations(ctx, e.Store, caller, conferenceID)
 	if err != nil {
 		e.log().Error("exports.assignments: scope delegations", "err", err)
 		http.Error(w, "store unavailable", http.StatusServiceUnavailable)
@@ -298,7 +298,7 @@ func (e *ExportRoutes) handleDelegatesCSV(w http.ResponseWriter, r *http.Request
 		http.Error(w, "not found", http.StatusNotFound)
 		return
 	}
-	delegations, err := e.scopedDelegations(ctx, caller, conferenceID)
+	delegations, err := scopedDelegations(ctx, e.Store, caller, conferenceID)
 	if err != nil {
 		e.log().Error("exports.delegates: scope delegations", "err", err)
 		http.Error(w, "store unavailable", http.StatusServiceUnavailable)
