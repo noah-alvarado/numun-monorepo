@@ -4,7 +4,7 @@
 
 import { randomUUID } from "node:crypto";
 
-import { seedConferenceId } from "./seed";
+import { seedConferenceId, seedUsers } from "./seed";
 
 export const API_BASE_URL = "http://localhost:4173";
 
@@ -113,4 +113,58 @@ export function uniqueSurname(): string {
   return `Zed${randomUUID()
     .replace(/[^a-f]/g, "")
     .slice(0, 8)}`;
+}
+
+const admin = seedUsers.admin.id;
+
+export async function approveDelegation(d: Delegation): Promise<void> {
+  await rpc(admin, "DelegationService/Approve", {
+    delegationId: d.id,
+    expectedVersion: d.version,
+  });
+}
+
+// A draft conference never becomes the active one, so tests can run the
+// assignment algorithm over exactly the data they create.
+export async function createDraftConference(label: string): Promise<string> {
+  const now = Date.now();
+  const { conference } = await rpc<{ conference: { id: string } }>(
+    admin,
+    "ConferenceService/CreateConference",
+    {
+      name: `E2E ${label} ${randomUUID().slice(0, 8)}`,
+      editionNumber: 99,
+      year: new Date(now).getUTCFullYear(),
+      startsAt: new Date(now + 30 * 86_400_000).toISOString(),
+      endsAt: new Date(now + 33 * 86_400_000).toISOString(),
+      status: "STATUS_DRAFT",
+    },
+  );
+  return conference.id;
+}
+
+export async function createCommittee(
+  conferenceId: string,
+  name: string,
+  type: "CRISIS" | "NON_CRISIS",
+  positions: string[],
+): Promise<string> {
+  const { committee } = await rpc<{ committee: { id: string } }>(
+    admin,
+    "CommitteeService/CreateCommittee",
+    {
+      conferenceId,
+      name,
+      type: `COMMITTEE_TYPE_${type}`,
+      size: "COMMITTEE_SIZE_SMALL",
+    },
+  );
+  for (const position of positions) {
+    await rpc(admin, "PositionService/CreatePosition", {
+      committeeId: committee.id,
+      name: position,
+      maxDelegates: 1,
+    });
+  }
+  return committee.id;
 }
