@@ -47,6 +47,7 @@ test("advisor imports a CSV roster", async ({
 
   await step("open import from the delegation", async () => {
     await page.goto("/delegation");
+    await page.getByRole("button", { name: "Delegates", exact: true }).click();
     await page.getByRole("link", { name: "Bulk import delegates" }).click();
     await expect(page).toHaveURL(
       `/delegations/${delegation.id}/delegates/import`,

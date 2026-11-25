@@ -48,7 +48,7 @@ async function arrange(advisorId: string, delegates: number) {
     await createDelegate(advisorId, delegation.id, first, surname);
     names.push(`${first} ${surname}`);
   }
-  return { conferenceId, names };
+  return { conferenceId, delegationId: delegation.id, names };
 }
 
 test("admin proposes, approves and re-runs assignments", async ({
@@ -57,7 +57,7 @@ test("admin proposes, approves and re-runs assignments", async ({
   newAdvisor,
   step,
 }) => {
-  const { conferenceId, names } = await arrange(newAdvisor.id, 3);
+  const { conferenceId, delegationId, names } = await arrange(newAdvisor.id, 3);
   await signInAs("admin");
 
   await step("open an empty studio", async () => {
@@ -135,6 +135,36 @@ test("admin proposes, approves and re-runs assignments", async ({
       page.getByRole("button", { name: "Approve all" }),
     ).toBeEnabled();
   });
+
+  const rosterRow = (name: string) =>
+    page.getByRole("row").filter({ hasText: name });
+
+  await step("the roster shows staff the proposal too", async () => {
+    await page.goto(`/delegations/${delegationId}?tab=delegates`);
+    // The delegation's own (draft) conference, not the active one.
+    await expect(
+      page.getByText(/^E2E Assignments \w{8} \(\d{4}\)$/),
+    ).toBeVisible();
+    await expect(rosterRow(names[0])).toContainText(
+      /(Security Council|General Assembly) · \w+/,
+    );
+    await expect(rosterRow(names[2])).toContainText("proposed");
+  });
+
+  await signInAs(newAdvisor);
+  await step(
+    "the advisor's roster shows approved assignments only",
+    async () => {
+      await page.goto(`/delegations/${delegationId}?tab=delegates`);
+      for (const name of names.slice(0, 2)) {
+        await expect(rosterRow(name)).toContainText(
+          /(Security Council|General Assembly) · \w+/,
+        );
+      }
+      await expect(rosterRow(names[2])).not.toContainText(" · ");
+      await expect(rosterRow(names[2])).not.toContainText("proposed");
+    },
+  );
 });
 
 test("infeasible inputs fail with a diagnostic and save nothing", async ({

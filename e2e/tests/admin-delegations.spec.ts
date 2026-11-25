@@ -26,8 +26,9 @@ test("admin opens a pending delegation from the list", async ({
     await item.getByRole("link", { name: "Open" }).click();
     await expect(page).toHaveURL(/\/delegations\/[0-9a-f-]+$/);
     await expect(
-      page.getByRole("heading", { name: "Delegation", exact: true }),
+      page.getByRole("heading", { name: e2eSchool, exact: true }),
     ).toBeVisible();
+    await expect(page.getByText(/NUMUN XXIV \(Seed\) \(\d{4}\)/)).toBeVisible();
     await expect(page.getByLabel("School name")).toHaveValue(e2eSchool);
     await expect(page.getByText("Pending review")).toBeVisible();
     await expect(page.locator("div.bg-red-50")).toBeHidden();

@@ -97,7 +97,12 @@ export function uniqueSchool(label: string): string {
   return `E2E ${label} ${randomUUID().slice(0, 8)}`;
 }
 
-export type Delegate = { id: string; firstName: string; lastName: string };
+export type Delegate = {
+  id: string;
+  firstName: string;
+  lastName: string;
+  version: number;
+};
 
 export async function createDelegate(
   advisorId: string,

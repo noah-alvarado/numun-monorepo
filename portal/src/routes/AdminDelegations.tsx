@@ -14,6 +14,7 @@ import {
 } from "@/gen/numun/v1/delegations_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import { listScopedDelegations } from "@/lib/delegations";
+import RejectDelegationDialog from "@/components/RejectDelegationDialog";
 import { connectMessage } from "@/lib/errors";
 
 export default function AdminDelegations() {
@@ -67,16 +68,15 @@ export default function AdminDelegations() {
 
   // Rejection can't be undone, so it goes through a confirm dialog.
   const [rejectTarget, setRejectTarget] = createSignal<Delegation | null>(null);
-  const [rejectReason, setRejectReason] = createSignal("");
 
-  async function reject(d: Delegation) {
+  async function reject(d: Delegation, reason: string) {
     setBusy(d.id);
     setError(null);
     try {
       await delegationClient.reject({
         delegationId: d.id,
         expectedVersion: d.version,
-        reason: rejectReason().trim(),
+        reason,
       });
       setItems(items().filter((it) => it.id !== d.id));
     } catch (err) {
@@ -84,7 +84,6 @@ export default function AdminDelegations() {
     } finally {
       setBusy(null);
       setRejectTarget(null);
-      setRejectReason("");
     }
   }
 
@@ -217,56 +216,12 @@ export default function AdminDelegations() {
 
       <Show when={rejectTarget()}>
         {(d) => (
-          <div
-            class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
-            onClick={() => setRejectTarget(null)}
-          >
-            <div
-              role="dialog"
-              aria-labelledby="reject-title"
-              class="w-full max-w-md rounded border border-nu-purple-200 bg-white p-4 shadow-lg"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <h2
-                id="reject-title"
-                class="text-base font-semibold text-nu-purple"
-              >
-                Reject {d().school}?
-              </h2>
-              <p class="mt-2 text-sm text-nu-purple-700">
-                The advisor will see their registration as rejected. This can't
-                be undone.
-              </p>
-              <label class="mt-3 block text-sm">
-                <span class="text-xs font-semibold uppercase tracking-wide text-nu-purple-700">
-                  Reason (optional, kept in the audit log)
-                </span>
-                <textarea
-                  value={rejectReason()}
-                  onInput={(e) => setRejectReason(e.currentTarget.value)}
-                  rows={3}
-                  class="mt-1 w-full rounded border border-nu-purple-300 px-2 py-1"
-                />
-              </label>
-              <div class="mt-4 flex justify-end gap-2 text-sm">
-                <button
-                  type="button"
-                  onClick={() => setRejectTarget(null)}
-                  class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  disabled={busy() === d().id}
-                  onClick={() => reject(d())}
-                  class="rounded bg-red-700 px-3 py-1 text-white disabled:opacity-50"
-                >
-                  {busy() === d().id ? "Rejecting…" : "Reject"}
-                </button>
-              </div>
-            </div>
-          </div>
+          <RejectDelegationDialog
+            school={d().school}
+            busy={busy() === d().id}
+            onCancel={() => setRejectTarget(null)}
+            onReject={(reason) => reject(d(), reason)}
+          />
         )}
       </Show>
     </main>
