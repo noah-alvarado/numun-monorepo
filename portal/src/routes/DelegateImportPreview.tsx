@@ -1,7 +1,7 @@
 // Bulk import preview — paginated editable table of parsed rows. Confirm
 // disables when any row has errors. See BULK_IMPORT.md §5.
 
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Index, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
 import { ConnectError } from "@connectrpc/connect";
 
@@ -90,8 +90,21 @@ export default function DelegateImportPreview() {
   const hasErrors = createMemo(() => rows().some((r) => r.errors.length > 0));
 
   function updateRow(rowNumber: number, patch: Partial<EditableRow>) {
+    // Editing a field clears its preview errors so the advisor can fix rows
+    // inline; the commit re-validates server-side (BULK_IMPORT.md §4).
+    const edited = Object.keys(patch);
     setRows(
-      rows().map((r) => (r.rowNumber === rowNumber ? { ...r, ...patch } : r)),
+      rows().map((r) =>
+        r.rowNumber === rowNumber
+          ? {
+              ...r,
+              ...patch,
+              errors: r.errors.filter(
+                (e) => !edited.some((f) => e.field.startsWith(f)),
+              ),
+            }
+          : r,
+      ),
     );
   }
 
@@ -223,20 +236,22 @@ export default function DelegateImportPreview() {
             </tr>
           </thead>
           <tbody>
-            <For each={visible()}>
+            {/* Index, not For: edits replace the row object, and For would
+                re-mount the row (losing input focus) on every keystroke. */}
+            <Index each={visible()}>
               {(row) => (
                 <RowView
-                  row={row}
-                  expanded={expanded() === row.rowNumber}
+                  row={row()}
+                  expanded={expanded() === row().rowNumber}
                   onToggleExpand={() =>
                     setExpanded(
-                      expanded() === row.rowNumber ? null : row.rowNumber,
+                      expanded() === row().rowNumber ? null : row().rowNumber,
                     )
                   }
-                  onChange={(patch) => updateRow(row.rowNumber, patch)}
+                  onChange={(patch) => updateRow(row().rowNumber, patch)}
                 />
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
       </section>
