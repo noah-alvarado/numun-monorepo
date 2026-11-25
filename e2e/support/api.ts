@@ -191,3 +191,17 @@ export async function createDelegationAward(
   );
   return award;
 }
+
+export async function recordCharge(
+  delegationId: string,
+  units: number,
+  reference: string,
+): Promise<void> {
+  await rpc(admin, "PaymentService/RecordPayment", {
+    delegationId,
+    amount: { currency: "USD", units: String(units), cents: 0 },
+    kind: "PAYMENT_KIND_CHARGE",
+    method: "PAYMENT_METHOD_OTHER",
+    reference,
+  });
+}
