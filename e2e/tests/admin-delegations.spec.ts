@@ -31,6 +31,10 @@ test("admin opens a pending delegation from the list", async ({
     await expect(page.getByText(/NUMUN XXIV \(Seed\) \(\d{4}\)/)).toBeVisible();
     await expect(page.getByLabel("School name")).toHaveValue(e2eSchool);
     await expect(page.getByText("Pending review")).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Assigned staff" }),
+    ).toBeVisible();
+    await expect(page.getByText("Loading…")).toHaveCount(0);
     await expect(page.locator("div.bg-red-50")).toBeHidden();
   });
 });

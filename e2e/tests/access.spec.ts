@@ -79,6 +79,7 @@ test("dashboard shows each role its own tools", async ({
       await expect(
         page.getByRole("heading", { level: 1, name: heading }),
       ).toBeVisible();
+      await expect(page.getByText(/^Loading/)).toHaveCount(0);
     }
   });
 });

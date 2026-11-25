@@ -284,7 +284,7 @@ Roles from DATA_MODEL.md §2.2: `advisor`, `staff-admin`, `staff-staffer`. Staff
 | `CommitteeService` / `PositionService` writes | ❌ | ❌ | ✅ |
 | `AssignmentService.Propose` | ❌ | ❌ | ✅ |
 | `AssignmentService.Approve`/`Unapprove`/`Update` | ❌ | ✅ scoped (c) | ✅ |
-| `AssignmentService.List*` | own delegation only | scoped | all |
+| `AssignmentService.List*` | own delegation only, approved rows only | scoped | all |
 | `AssignmentRunService` reads | ❌ | ✅ scoped | ✅ |
 | `PaymentService` reads | own delegation | scoped (a) | all |
 | `PaymentService` writes | ❌ | ❌ | ✅ |
