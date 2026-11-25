@@ -116,7 +116,7 @@ test("admin invites a staffer, who signs in with the emailed password", async ({
   });
 });
 
-test("an advisor opts in to announcements and an admin sends one", async ({
+test("an admin sends an announcement and an advisor unsubscribes", async ({
   page,
   signInAs,
   step,
@@ -137,9 +137,9 @@ test("an advisor opts in to announcements and an admin sends one", async ({
     await expect(page.locator("#phone-error")).toBeVisible();
   });
 
-  await step("save a phone and opt in", async () => {
+  await step("save a phone; announcements are on by default", async () => {
     await page.getByLabel("Phone").fill("847 246 2882");
-    await page.getByLabel(/Email me NUMUN announcements/).check();
+    await expect(page.getByLabel(/Email me NUMUN announcements/)).toBeChecked();
     await page.getByRole("button", { name: "Save profile" }).click();
     await expect(page.getByText("Profile saved.")).toBeVisible();
     await page.reload();

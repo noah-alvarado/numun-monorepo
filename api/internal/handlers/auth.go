@@ -93,6 +93,8 @@ func (s *AuthService) Exchange(ctx context.Context, req *connect.Request[authv1.
 			Role:  role,
 			Email: claims.Email,
 			Name:  claims.Name,
+			// DATA_MODEL.md: announcements are opt-out.
+			AnnouncementsOptIn: true,
 		})
 		if cerr != nil && !errors.Is(cerr, store.ErrAlreadyExists) {
 			s.logger().Error("Exchange: lazy user create", "err", cerr)
