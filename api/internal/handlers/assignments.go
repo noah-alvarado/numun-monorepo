@@ -963,7 +963,7 @@ func (s *AssignmentService) loadAlgorithmInputs(ctx context.Context, conferenceI
 	in := assignment.Inputs{Conference: assignment.Conference{ID: conferenceID}}
 
 	// Delegations (approved only).
-	dels, _, err := s.Store.ListDelegationsByStatus(ctx, conferenceID, domain.DelegationStatusApproved, "", 1000)
+	dels, err := s.Store.ListAllDelegationsInConference(ctx, conferenceID, domain.DelegationStatusApproved)
 	if err != nil {
 		return in, connect.NewError(connect.CodeUnavailable, errors.New("load delegations failed"))
 	}
