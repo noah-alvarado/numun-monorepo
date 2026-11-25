@@ -25,6 +25,7 @@ import AssignmentStudio from "@/routes/AssignmentStudio";
 import AdminEmailHealth from "@/routes/AdminEmailHealth";
 import AdminCheckIn from "@/routes/AdminCheckIn";
 import Awards from "@/routes/Awards";
+import NotFound from "@/routes/NotFound";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -141,6 +142,14 @@ render(
       <Route path="/sign-in/reset" component={ResetPassword} />
       <Route path="/sign-up" component={SignUp} />
       <Route path="/sign-up/verify" component={SignUpVerify} />
+      <Route
+        path="*404"
+        component={() => (
+          <AppShell>
+            <NotFound />
+          </AppShell>
+        )}
+      />
     </Router>
   ),
   root,

@@ -112,6 +112,19 @@ test("admin manages committees and positions", async ({
     await expect(committeeRow(page, renamed)).toBeVisible();
   });
 
+  await step("edit a position's seats", async () => {
+    await positionRow(page, "France")
+      .getByRole("button", { name: "Edit" })
+      .click();
+    await expect(
+      modal(page).getByRole("heading", { name: "Edit position" }),
+    ).toBeVisible();
+    await modal(page).getByLabel("Max delegates").fill("3");
+    await modal(page).getByRole("button", { name: "Save" }).click();
+    await expect(modal(page)).toBeHidden();
+    await expect(positionRow(page, "France")).toContainText("3No");
+  });
+
   await step("delete a position", async () => {
     await positionRow(page, "France")
       .getByRole("button", { name: "Delete" })
