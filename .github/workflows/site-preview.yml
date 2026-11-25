@@ -50,7 +50,7 @@ jobs:
           if [ "$FORK" = "true" ]; then
             echo "Fork PRs get no AWS credentials; skipping the preview."
             echo "run=false" >> "$GITHUB_OUTPUT"
-          elif git diff --name-only "$BASE"...HEAD | grep -Eq '^(site/|content/|packages/tailwind-tokens/|pnpm-lock\.yaml$|\.nvmrc$|scripts/gh-api-retry\.sh$|\.github/workflows/site-preview\.yml$)'; then
+          elif git diff --name-only "$BASE"...HEAD | grep -Eq '^(site/|content/|packages/tailwind-tokens/|e2e/site/|e2e/fixtures\.ts$|e2e/playwright\.deployed\.config\.ts$|e2e/package\.json$|pnpm-lock\.yaml$|\.nvmrc$|scripts/gh-api-retry\.sh$|\.github/workflows/site-preview\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
             echo "No site changes; skipping the preview."
@@ -105,16 +105,30 @@ jobs:
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - name: build site
+        # Canonicals use the preview's own URL; links to the portal/API use
+        # test's, exactly like a test build.
         env:
           SITE_BASE: ${{ env.PREVIEW_URL }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
           PUBLIC_VERSION: ${{ env.PR }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.DEPLOY_ROLE_PREVIEW_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      # Same object metadata as site.yml (notably the HTML charset), except
+      # no-cache so every push shows up immediately.
       - name: upload preview
-        run: aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" --delete --cache-control "no-cache"
+        run: |
+          aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" \
+            --delete \
+            --cache-control "no-cache" \
+            --exclude "*.html"
+          aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" \
+            --delete \
+            --cache-control "no-cache" \
+            --content-type "text/html; charset=utf-8" \
+            --exclude "*" --include "*.html"
       - name: mark preview ready
         id: ready
         env:
@@ -138,6 +152,24 @@ jobs:
           else
             scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
           fi
+      # The preview must behave exactly like test: the same smoke tests site.yml
+      # runs after each test deploy.
+      - name: Install Chromium
+        run: pnpm --filter @numun/e2e exec playwright install --with-deps chromium
+      - name: smoke-test the preview
+        env:
+          DEPLOYED_SITE_URL: ${{ env.PREVIEW_URL }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
+        run: pnpm --filter @numun/e2e exec playwright test -c playwright.deployed.config.ts
+      - name: upload smoke report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-smoke-report
+          path: |
+            e2e/playwright-report-deployed/
+            e2e/test-results-deployed/
+          retention-days: 7
       # Only when the preview itself didn't go up: if just the comment
       # failed, the preview is live and Decap's link to it must keep working.
       - name: mark preview failed

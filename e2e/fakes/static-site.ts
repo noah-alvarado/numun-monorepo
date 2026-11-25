@@ -1,6 +1,7 @@
 // Serves site/dist the way the site's CloudFront distribution does: directory
-// paths map to index.html (WwwRedirectFunction), unknown paths get /404.html
-// with a 404. Also serves the Decap CMS bundle under /cms/ with config.yml
+// paths map to index.html and /portal redirects to the portal
+// (WwwRedirectFunction), unknown paths get /404.html with a 404, and every
+// response carries SecurityHeadersPolicy's headers. Also serves the Decap CMS bundle under /cms/ with config.yml
 // substituted the way .github/workflows/cms.yml does at deploy, pointed at
 // the local API.
 
@@ -16,6 +17,16 @@ const UPLOAD_STUBS = new URL("../files/site-uploads/", import.meta.url)
   .pathname;
 const API_ORIGIN = process.env.CMS_API_ORIGIN ?? "http://localhost:3000";
 const PORT = Number(process.env.SITE_PORT ?? 4322);
+// The site's build-time apex (SITE_APEX, defaulting to SITE_BASE's host).
+const APEX = process.env.SITE_APEX ?? "localhost";
+
+// infra/base-cdn/template.yaml SecurityHeadersPolicy.
+const SECURITY_HEADERS = {
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+};
 
 const TYPES: Record<string, string> = {
   ".html": "text/html; charset=utf-8",
@@ -67,6 +78,14 @@ function isFile(f: string): boolean {
 createServer((req, res) => {
   const path = (req.url ?? "/").split("?")[0];
   if (path === "/cms" || path.startsWith("/cms/")) return serveCms(path, res);
+  for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
+  if (path === "/portal" || path.startsWith("/portal/")) {
+    res.writeHead(301, {
+      Location: `https://portal.${APEX}${(req.url ?? "").slice(7)}`,
+    });
+    res.end();
+    return;
+  }
   let file = resolve(req.url ?? "/");
   if (!isFile(file) && path.startsWith("/uploads/")) {
     const stub = normalize(

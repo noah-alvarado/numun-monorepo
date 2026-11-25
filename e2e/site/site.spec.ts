@@ -2,15 +2,26 @@ import { readFile } from "node:fs/promises";
 
 import { expect, test } from "../fixtures";
 
-// Smoke tests for the static landing site (site/dist served like CloudFront
-// serves it; see fakes/static-site.ts). Built with SITE_BASE=localhost:4321,
-// so absolute URLs in the sitemap use that origin.
+// Smoke tests for the static landing site. Locally they run against site/dist
+// served like CloudFront serves it (fakes/static-site.ts), built with
+// SITE_BASE=localhost:4321. With DEPLOYED_SITE_URL set
+// (playwright.deployed.config.ts) the same tests run against a deployed site:
+// test after every site deploy, and every PR preview, so previews are held
+// to exactly what test does.
+
+const deployed = process.env.DEPLOYED_SITE_URL?.replace(/\/$/, "");
+// The origin the build put in canonicals, the sitemap and the feed.
+const builtOrigin = deployed ?? "http://localhost:4321";
+// The environment whose portal the site links to (SITE_APEX).
+const apex = process.env.SITE_APEX ?? "localhost";
 
 async function sitemapPaths(): Promise<string[]> {
-  const xml = await readFile(
-    new URL("../../site/dist/sitemap-0.xml", import.meta.url),
-    "utf8",
-  );
+  const xml = deployed
+    ? await (await fetch(`${deployed}/sitemap-0.xml`)).text()
+    : await readFile(
+        new URL("../../site/dist/sitemap-0.xml", import.meta.url),
+        "utf8",
+      );
   return [...xml.matchAll(/<loc>([^<]+)<\/loc>/g)].map(
     (m) => new URL(m[1]).pathname,
   );
@@ -33,7 +44,7 @@ test("every page in the sitemap renders", async ({ page, step }) => {
     const canonical = await page
       .locator('link[rel="canonical"]')
       .getAttribute("href");
-    expect(canonical, path).toBe(`http://localhost:4321${path}`);
+    expect(canonical, path).toBe(`${builtOrigin}${path}`);
   }
   expect(errors).toEqual([]);
 
@@ -80,10 +91,10 @@ test("visitors find their way around", async ({ page, step }) => {
     await expect(page).toHaveURL(/\/$/);
   });
 
-  await step("Register points at portal sign-up", async () => {
+  await step("Register points at the environment's portal", async () => {
     await expect(
       page.getByRole("link", { name: "Register" }).first(),
-    ).toHaveAttribute("href", /\/sign-up$/);
+    ).toHaveAttribute("href", `https://portal.${apex}/sign-up`);
   });
 
   await step("committees list links to each committee", async () => {
@@ -100,7 +111,7 @@ test("visitors find their way around", async ({ page, step }) => {
     expect(resp.status()).toBe(200);
     const xml = await resp.text();
     expect(xml).toContain("<rss");
-    expect(xml).toMatch(/<item>[\s\S]*<link>http:\/\/localhost:4321\/news\//);
+    expect(xml).toContain(`<link>${builtOrigin}/news/`);
     await page.goto("/news");
   });
 
@@ -116,4 +127,34 @@ test("visitors find their way around", async ({ page, step }) => {
     await page.getByRole("link", { name: "Committees" }).last().click();
     await expect(page).toHaveURL(/\/committees\/?$/);
   });
+});
+
+test("responses carry the site's headers, types and redirects", async ({
+  request,
+}) => {
+  const home = await request.get("/");
+  expect(home.headers()["content-type"]).toBe("text/html; charset=utf-8");
+  expect(home.headers()["strict-transport-security"]).toBe(
+    "max-age=31536000; includeSubDomains; preload",
+  );
+  expect(home.headers()["x-content-type-options"]).toBe("nosniff");
+  expect(home.headers()["x-frame-options"]).toBe("DENY");
+  expect(home.headers()["referrer-policy"]).toBe(
+    "strict-origin-when-cross-origin",
+  );
+
+  const missing = await request.get("/no-such-page");
+  expect(missing.status()).toBe(404);
+  expect(missing.headers()["content-type"]).toBe("text/html; charset=utf-8");
+  expect(missing.headers()["x-frame-options"]).toBe("DENY");
+
+  const pdf = await request.get("/uploads/documents/DelegateGuide.pdf");
+  expect(pdf.status()).toBe(200);
+  expect(pdf.headers()["content-type"]).toBe("application/pdf");
+
+  const portal = await request.get("/portal/delegation", { maxRedirects: 0 });
+  expect(portal.status()).toBe(301);
+  expect(portal.headers()["location"]).toBe(
+    `https://portal.${apex}/delegation`,
+  );
 });
