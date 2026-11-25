@@ -180,9 +180,17 @@ func (s *AnnouncementService) GetAnnouncement(ctx context.Context, req *connect.
 // resolveAudience returns all advisor users on delegations of the given status
 // in the conference, less suppressed addresses and announcements opt-outs.
 func (s *AnnouncementService) resolveAudience(ctx context.Context, conferenceID string, status domain.DelegationStatus) ([]domain.User, error) {
-	dels, _, err := s.Store.ListDelegationsByStatus(ctx, conferenceID, status, "", 500)
-	if err != nil {
-		return nil, err
+	var dels []domain.Delegation
+	for cursor := ""; ; {
+		page, next, err := s.Store.ListDelegationsByStatus(ctx, conferenceID, status, cursor, 500)
+		if err != nil {
+			return nil, err
+		}
+		dels = append(dels, page...)
+		if next == "" {
+			break
+		}
+		cursor = next
 	}
 	seen := map[string]bool{}
 	out := make([]domain.User, 0, len(dels))
@@ -200,7 +208,7 @@ func (s *AnnouncementService) resolveAudience(ctx context.Context, conferenceID 
 			if err != nil {
 				continue
 			}
-			if u.EmailStatus != "" && u.EmailStatus != domain.EmailStatusOK {
+			if u.Email == "" || (u.EmailStatus != "" && u.EmailStatus != domain.EmailStatusOK) {
 				continue
 			}
 			if !u.AnnouncementsOptIn {
