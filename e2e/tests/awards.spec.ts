@@ -333,6 +333,7 @@ test("awards reach the public site, and outages are explained", async ({
   }
 
   await step("a new award is committed to the site's content", async () => {
+    await expect(row()).toBeVisible();
     expect(await committedFile(file)).toContain(`awardName: "${name}"`);
     expect(await committedFile(file)).toContain(
       `displayName: "${delegation.school}"`,
