@@ -330,7 +330,7 @@ function SummaryBar(props: {
 }) {
   const s = props.summary;
   return (
-    <section class="mt-4 grid grid-cols-2 gap-2 rounded border border-nu-purple-200 bg-white p-4 text-sm md:grid-cols-4">
+    <section class="mt-4 grid grid-cols-2 gap-2 rounded border border-nu-purple-200 bg-white p-4 text-sm md:grid-cols-5">
       <Stat label="Parsed" value={s.parsedCount} />
       <Stat label="Valid" value={props.validCount} />
       <Stat
@@ -340,6 +340,7 @@ function SummaryBar(props: {
       />
       <Stat label="Create" value={s.createCount} />
       <Stat label="Update" value={s.updateCount} />
+      <Stat label="Unchanged" value={s.unchangedCount} />
       <Stat label="Matched by email" value={s.matchByEmail} />
       <Stat label="Matched by name" value={s.matchByName} />
       {/* Additive imports never delete; the count is what Full sync would. */}
@@ -481,6 +482,16 @@ function MatchChip(props: {
     return (
       <span class="inline-block rounded bg-nu-green/20 px-2 py-0.5 text-xs font-semibold text-nu-green-dark">
         new
+      </span>
+    );
+  }
+  if (
+    props.match.case === "update" &&
+    Object.keys(props.match.value.diff).length === 0
+  ) {
+    return (
+      <span class="inline-block rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
+        unchanged
       </span>
     );
   }

@@ -119,7 +119,8 @@ export default function DelegateImportResult() {
 
 function SuccessBlock(props: { summary: CommitSummary; delegationId: string }) {
   const navigate = useNavigate();
-  // Soft-deletes are reported separately; they weren't imported.
+  // Soft-deletes and unchanged rows are reported separately; they weren't
+  // imported.
   const total = props.summary.createCount + props.summary.updateCount;
   return (
     <section class="mt-6 rounded border border-nu-green-dark/40 bg-nu-green/10 p-4 text-sm">
@@ -132,19 +133,24 @@ function SuccessBlock(props: { summary: CommitSummary; delegationId: string }) {
         </span>
         <div>
           <div class="font-semibold text-nu-black-800">
-            Imported {total} delegate{total === 1 ? "" : "s"}
+            {total === 0 && props.summary.softDeleteCount === 0
+              ? "No changes — the roster already matches the file"
+              : `Imported ${total} delegate${total === 1 ? "" : "s"}`}
           </div>
           <p class="mt-1 text-nu-black-700">
             {props.summary.createCount} created · {props.summary.updateCount}{" "}
-            updated · {props.summary.softDeleteCount} soft-deleted
+            updated · {props.summary.unchangedCount} unchanged ·{" "}
+            {props.summary.softDeleteCount} soft-deleted
           </p>
           <div class="mt-3">
             <button
               type="button"
-              onClick={() => navigate("/delegation")}
+              onClick={() =>
+                navigate(`/delegations/${props.delegationId}?tab=delegates`)
+              }
               class="rounded bg-nu-purple px-3 py-1 text-white"
             >
-              Back to delegation
+              View roster
             </button>
           </div>
         </div>

@@ -95,8 +95,39 @@ test("advisor imports a CSV roster", async ({
     ).toBeVisible();
     await expect(page.getByText("Imported 3 delegates")).toBeVisible();
     await expect(
-      page.getByText("3 created · 0 updated · 0 soft-deleted"),
+      page.getByText("3 created · 0 updated · 0 unchanged · 0 soft-deleted"),
     ).toBeVisible();
+  });
+
+  await step("re-importing the same file changes nothing", async () => {
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page.getByLabel("File").setInputFiles(
+      csv([
+        ["First Name", "Last Name", "Email", "Experience", "T-Shirt"],
+        ["Ada", "Lovelace", "ada@example.com", "advanced", "M"],
+        ["Grace", "Hopper", "grace@example.com", "", "S"],
+        ["Mary Jane", "Smith", "", "novice", "L"],
+      ]),
+    );
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(stat(page, "Unchanged")).toContainText("3");
+    await expect(stat(page, "Update")).toContainText("0");
+    await expect(page.getByText("unchanged", { exact: true })).toHaveCount(3);
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await expect(
+      page.getByText("No changes — the roster already matches the file"),
+    ).toBeVisible();
+    await expect(
+      page.getByText("0 created · 0 updated · 3 unchanged · 0 soft-deleted"),
+    ).toBeVisible();
+  });
+
+  await step("view the imported roster", async () => {
+    await page.getByRole("button", { name: "View roster" }).click();
+    await expect(page).toHaveURL(`/delegations/${delegation.id}?tab=delegates`);
+    await expect(page.getByRole("heading", { name: /Delegates/ })).toHaveText(
+      "Delegates (3)",
+    );
   });
 
   await step("re-importing updates instead of duplicating", async () => {
@@ -459,7 +490,9 @@ test("full sync soft-deletes delegates missing from the file", async ({
   await step("confirm reports the soft-delete", async () => {
     await page.getByRole("button", { name: "Confirm import" }).click();
     await expect(
-      page.getByText(/1 created · \d+ updated · 1 soft-deleted/),
+      page.getByText(
+        /1 created · \d+ updated · \d+ unchanged · 1 soft-deleted/,
+      ),
     ).toBeVisible();
     // Soft-deletes aren't counted as imported.
     await expect(page.getByText(/^Imported \d+ delegates?$/)).toBeVisible();
