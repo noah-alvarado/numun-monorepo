@@ -4,10 +4,36 @@
 import { defineConfig } from "vitest/config";
 import solid from "vite-plugin-solid";
 import tailwindcss from "@tailwindcss/vite";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { fileURLToPath, URL } from "node:url";
 
+// Set only by the deploy workflow (portal.yml). Without it, builds keep plain
+// public source maps and never talk to Sentry. See docs/runbooks/sentry-setup.md.
+const uploadSourceMaps = !!process.env.SENTRY_AUTH_TOKEN;
+
 export default defineConfig({
-  plugins: [solid(), tailwindcss()],
+  plugins: [
+    solid(),
+    tailwindcss(),
+    // Must stay last so it sees the final bundle.
+    uploadSourceMaps &&
+      sentryVitePlugin({
+        org: "numun",
+        project: "numun-frontend",
+        authToken: process.env.SENTRY_AUTH_TOKEN,
+        release: {
+          name: process.env.VITE_RELEASE_VERSION,
+          // Shallow CI checkout; suspect commits come from the GitHub code mapping.
+          setCommits: false,
+        },
+        // Maps go to Sentry only, not to the public bucket.
+        sourcemaps: { filesToDeleteAfterUpload: ["./dist/**/*.map"] },
+        telemetry: false,
+        // A Sentry outage shouldn't block a deploy; it only costs symbolication.
+        errorHandler: (err) =>
+          console.warn("::warning::Sentry source map upload failed:", err),
+      }),
+  ],
   // amazon-cognito-identity-js pulls in buffer@4, which reads Node's `global` at module init.
   define: {
     global: "globalThis",
@@ -33,7 +59,8 @@ export default defineConfig({
   },
   build: {
     target: "es2022",
-    sourcemap: true,
+    // "hidden" omits the sourceMappingURL comment for maps deleted after upload.
+    sourcemap: uploadSourceMaps ? "hidden" : true,
   },
   test: {
     // No DOM tests in v1 — keep the environment "node" so vitest doesn't

@@ -25,6 +25,7 @@
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@numun/tailwind-tokens": "workspace:*",
+    "@sentry/vite-plugin": "^11.17.0",
     "@tailwindcss/vite": "^4.3.5",
     "@types/node": "^24.13.1",
     "eslint": "^10.5.0",
