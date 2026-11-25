@@ -12,6 +12,10 @@ import { defineConfig, devices } from "@playwright/test";
 const isCI = !!process.env.CI;
 const PORTAL_URL = "http://localhost:4173";
 const API_URL = "http://localhost:3000";
+// Fake Google Sheets + Cognito (fakes/server.ts).
+export const FAKES_URL = "http://127.0.0.1:4599";
+const COGNITO_POOL_ID = "us-east-2_e2eFake";
+const COGNITO_CLIENT_ID = "e2efakeclient";
 
 const apiEnv = {
   LOCAL_HTTP: "true",
@@ -34,11 +38,20 @@ const apiEnv = {
   EMAIL_UNSUBSCRIBE_SECRET: "dev-unsubscribe-secret-not-for-prod",
   PORTAL_BASE_URL: PORTAL_URL,
   ASSETS_BASE_URL: "http://localhost:4566/numun-test-assets",
+  DEV_SHEETS_ORIGIN: FAKES_URL,
+  AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER: FAKES_URL,
+  COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
+  COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
 };
 
+// The portal talks to the fake Cognito like it would to the real one; the
+// API's dev-bypass Exchange accepts the fake's unsigned tokens.
 const portalEnv = {
-  VITE_DEV_BYPASS: "true",
+  VITE_DEV_BYPASS: "false",
   VITE_API_BASE_URL: PORTAL_URL,
+  VITE_COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
+  VITE_COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
+  VITE_COGNITO_ENDPOINT: FAKES_URL,
 };
 
 export default defineConfig({
@@ -64,6 +77,15 @@ export default defineConfig({
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: [
     {
+      name: "fakes",
+      command: "node fakes/server.ts",
+      url: `${FAKES_URL}/__control/health`,
+      reuseExistingServer: !isCI,
+      timeout: 30_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
       name: "api",
       command: "go run ./cmd/api",
       cwd: "../api",
@@ -76,7 +98,7 @@ export default defineConfig({
     },
     {
       name: "portal",
-      // A separate outDir keeps the dev-bypass build away from portal/dist.
+      // A separate outDir keeps the e2e build away from portal/dist.
       command:
         "pnpm exec vite build --outDir dist-e2e --emptyOutDir --logLevel error && pnpm exec vite preview --outDir dist-e2e",
       cwd: "../portal",
