@@ -85,6 +85,22 @@ jobs:
             echo "::add-mask::$DSN"
           fi
           echo "VITE_SENTRY_DSN=$DSN" >> "$GITHUB_ENV"
+      - name: load Sentry auth token from SSM
+        # Org auth token for source map upload (@sentry/vite-plugin in
+        # portal/vite.config.ts). When unset, the build skips the upload and
+        # ships public source maps as before.
+        run: |
+          TOKEN=$(aws ssm get-parameter \
+            --name "/numun/$ENV_NAME/sentry/auth_token" \
+            --with-decryption \
+            --query 'Parameter.Value' \
+            --output text 2>/dev/null || echo "")
+          if [ -n "$TOKEN" ]; then
+            echo "::add-mask::$TOKEN"
+            echo "SENTRY_AUTH_TOKEN=$TOKEN" >> "$GITHUB_ENV"
+          else
+            echo "::warning::/numun/$ENV_NAME/sentry/auth_token not set; skipping Sentry source map upload"
+          fi
       - name: build portal
         env:
           VITE_API_BASE_URL: https://api.${{ env.APEX_DOMAIN }}
