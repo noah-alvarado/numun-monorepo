@@ -1,9 +1,10 @@
 // Package cms implements the inline write-back from AwardService mutations
 // to the static CMS content tree living in git. The Lambdalith authenticates
 // to GitHub as a GitHub App with `contents: write` on the monorepo, generates
-// an installation access token on demand, and PUT/DELETEs files via the
-// Contents API. A site rebuild kicks off automatically when the resulting
-// commit touches /content/**.
+// an installation access token on demand, and commits file changes via the
+// GraphQL createCommitOnBranch mutation, which GitHub signs (the Contents API
+// leaves DELETE commits unsigned, and `main` requires signed commits). A site
+// rebuild kicks off automatically when the resulting commit touches /content/**.
 //
 // scope-check: skip — this package has no Connect handlers; authorization
 // happens upstream in /api/internal/handlers/awards.go.
@@ -25,6 +26,7 @@ import (
 	mrand "math/rand"
 	"net/http"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -144,33 +146,9 @@ func (c *Client) UpsertFile(ctx context.Context, path string, content []byte, co
 	if c.stub {
 		return "", nil
 	}
-	existingSHA, err := c.fileSHA(ctx, path)
-	if err != nil {
-		return "", err
-	}
-	body := contentsWriteBody{
-		Message: commitMessage,
-		Branch:  c.cfg.Branch,
-		Content: base64.StdEncoding.EncodeToString(content),
-		SHA:     existingSHA,
-	}
-	raw, err := json.Marshal(body)
-	if err != nil {
-		return "", err
-	}
-	resp, err := c.do(ctx, http.MethodPut, contentsURL(c.cfg, path), raw)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("github upsert %s: %s", path, readErr(resp))
-	}
-	var parsed contentsWriteResponse
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return "", fmt.Errorf("decode upsert response: %w", err)
-	}
-	return parsed.Commit.SHA, nil
+	return c.commitOnBranch(ctx, commitMessage, fileChanges{
+		Additions: []fileAddition{{Path: path, Contents: base64.StdEncoding.EncodeToString(content)}},
+	})
 }
 
 // DeleteFile removes the file at path. A missing file is treated as success
@@ -186,23 +164,10 @@ func (c *Client) DeleteFile(ctx context.Context, path, commitMessage string) err
 	if existingSHA == "" {
 		return nil // already gone
 	}
-	body, err := json.Marshal(contentsWriteBody{
-		Message: commitMessage,
-		Branch:  c.cfg.Branch,
-		SHA:     existingSHA,
+	_, err = c.commitOnBranch(ctx, commitMessage, fileChanges{
+		Deletions: []fileDeletion{{Path: path}},
 	})
-	if err != nil {
-		return err
-	}
-	resp, err := c.do(ctx, http.MethodDelete, contentsURL(c.cfg, path), body)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return fmt.Errorf("github delete %s: %s", path, readErr(resp))
-	}
-	return nil
+	return err
 }
 
 // WithRetry runs fn up to 3 times with exponential backoff (200ms, 800ms,
@@ -268,22 +233,109 @@ func contentsURL(cfg Config, path string) string {
 	return cfg.APIBaseURL + "/repos/" + cfg.Repo + "/contents/" + path
 }
 
+const createCommitMutation = `mutation($input: CreateCommitOnBranchInput!) {
+  createCommitOnBranch(input: $input) { commit { oid } }
+}`
+
+type fileAddition struct {
+	Path     string `json:"path"`
+	Contents string `json:"contents"`
+}
+
+type fileDeletion struct {
+	Path string `json:"path"`
+}
+
+type fileChanges struct {
+	Additions []fileAddition `json:"additions,omitempty"`
+	Deletions []fileDeletion `json:"deletions,omitempty"`
+}
+
+// commitOnBranch commits changes on top of the branch head and returns the new
+// commit SHA. If the head moves in between, the mutation fails and WithRetry
+// re-reads the head on the next attempt.
+func (c *Client) commitOnBranch(ctx context.Context, message string, changes fileChanges) (string, error) {
+	head, err := c.branchHead(ctx)
+	if err != nil {
+		return "", err
+	}
+	headline, body, _ := strings.Cut(message, "\n")
+	payload, err := json.Marshal(map[string]any{
+		"query": createCommitMutation,
+		"variables": map[string]any{"input": map[string]any{
+			"branch": map[string]string{
+				"repositoryNameWithOwner": c.cfg.Repo,
+				"branchName":              c.cfg.Branch,
+			},
+			"message":         map[string]string{"headline": headline, "body": strings.TrimSpace(body)},
+			"expectedHeadOid": head,
+			"fileChanges":     changes,
+		}},
+	})
+	if err != nil {
+		return "", err
+	}
+	resp, err := c.do(ctx, http.MethodPost, c.cfg.APIBaseURL+"/graphql", payload)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("github commit: %s", readErr(resp))
+	}
+	var parsed struct {
+		Data struct {
+			CreateCommitOnBranch struct {
+				Commit struct {
+					OID string `json:"oid"`
+				} `json:"commit"`
+			} `json:"createCommitOnBranch"`
+		} `json:"data"`
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return "", fmt.Errorf("decode commit response: %w", err)
+	}
+	if len(parsed.Errors) > 0 {
+		msgs := make([]string, len(parsed.Errors))
+		for i, e := range parsed.Errors {
+			msgs[i] = e.Message
+		}
+		return "", fmt.Errorf("github commit: %s", strings.Join(msgs, "; "))
+	}
+	oid := parsed.Data.CreateCommitOnBranch.Commit.OID
+	if oid == "" {
+		return "", errors.New("github commit: empty commit oid")
+	}
+	return oid, nil
+}
+
+// branchHead returns the commit SHA the configured branch points at.
+func (c *Client) branchHead(ctx context.Context) (string, error) {
+	resp, err := c.do(ctx, http.MethodGet, c.cfg.APIBaseURL+"/repos/"+c.cfg.Repo+"/git/ref/heads/"+c.cfg.Branch, nil)
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+		return "", fmt.Errorf("github branch head: %s", readErr(resp))
+	}
+	var parsed struct {
+		Object struct {
+			SHA string `json:"sha"`
+		} `json:"object"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return "", fmt.Errorf("decode branch head: %w", err)
+	}
+	return parsed.Object.SHA, nil
+}
+
 func readErr(resp *http.Response) string {
 	b, _ := io.ReadAll(resp.Body)
 	return strconv.Itoa(resp.StatusCode) + " " + string(b)
-}
-
-type contentsWriteBody struct {
-	Message string `json:"message"`
-	Branch  string `json:"branch,omitempty"`
-	Content string `json:"content,omitempty"`
-	SHA     string `json:"sha,omitempty"`
-}
-
-type contentsWriteResponse struct {
-	Commit struct {
-		SHA string `json:"sha"`
-	} `json:"commit"`
 }
 
 func (c *Client) do(ctx context.Context, method, url string, body []byte) (*http.Response, error) {
