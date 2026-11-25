@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -45,7 +46,34 @@ func main() {
 		os.Exit(1)
 	}
 	h := &handler{store: st, logger: logger}
+	if len(os.Args) > 1 && os.Args[1] == "-local" {
+		os.Exit(runLocal(ctx, h, os.Stdin))
+	}
 	lambda.Start(h.Handle)
+}
+
+// runLocal processes one SES notification (the JSON SNS would carry as the
+// Message) read from r, so local dev and e2e can exercise the handler
+// without SNS:
+//
+//	echo '{"notificationType":"Bounce",...}' | go run ./cmd/email-feedback -local
+//
+// Only allowed with DEV_MODE=true.
+func runLocal(ctx context.Context, h *handler, r io.Reader) int {
+	if os.Getenv("DEV_MODE") != "true" {
+		h.logger.Error("-local requires DEV_MODE=true")
+		return 2
+	}
+	raw, err := io.ReadAll(r)
+	if err != nil {
+		h.logger.Error("read stdin", "err", err)
+		return 1
+	}
+	if err := h.processOne(ctx, string(raw)); err != nil {
+		h.logger.Error("process notification", "err", err)
+		return 1
+	}
+	return 0
 }
 
 type handler struct {

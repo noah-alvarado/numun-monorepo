@@ -30,30 +30,35 @@ export async function rpc<T = Record<string, unknown>>(
   return JSON.parse(text) as T;
 }
 
-export type TestUser = { id: string; name: string };
+export type TestUser = { id: string; name: string; email?: string };
 
-// Dev-bypass Exchange lazily creates an advisor for an unknown id, which
-// gives each test its own advisor (and so its own delegation) without
-// touching the seed users.
-export async function createAdvisor(label: string): Promise<TestUser> {
+// Dev-bypass Exchange lazily creates a user for an unknown id from the id
+// token's claims, which gives each test its own advisor (and so its own
+// delegation) without touching the seed users. Pass withEmail for flows that
+// look users up by email.
+export async function createAdvisor(
+  label: string,
+  opts: { withEmail?: boolean } = {},
+): Promise<TestUser> {
   const id = randomUUID();
+  const name = `E2E ${label} ${id.slice(0, 8)}`;
+  const email = opts.withEmail
+    ? `e2e.${label.toLowerCase()}.${id.slice(0, 8)}@example.com`
+    : undefined;
   await rpc(null, "AuthService/Exchange", {
-    idToken: "dev-token",
+    idToken: devIdToken({ sub: id, name, email }),
     accessToken: `dev-${id}`,
     refreshToken: "dev-rt",
     expiresIn: 3600,
   });
-  const name = `E2E ${label} ${id.slice(0, 8)}`;
-  const { user } = await rpc<{ user: { version: number } }>(
-    id,
-    "UserService/GetMe",
-  );
-  await rpc(id, "UserService/UpdateUser", {
-    userId: id,
-    name,
-    expectedVersion: user.version,
-  });
-  return { id, name };
+  return { id, name, email };
+}
+
+// An unsigned id token in the shape the API's dev-bypass Exchange reads.
+function devIdToken(claims: Record<string, unknown>): string {
+  const part = (v: unknown) =>
+    Buffer.from(JSON.stringify(v)).toString("base64url");
+  return `dev-${part({ alg: "none" })}.${part(claims)}.fake`;
 }
 
 export type Delegation = {
@@ -215,34 +220,4 @@ export async function assignStaffer(
     delegationId,
     userId: stafferId,
   });
-}
-
-const DDB_LOCAL_URL = "http://localhost:8000";
-
-// Stands in for the SES feedback Lambda (cmd/email-feedback), which only runs
-// behind SNS: writes User.emailStatus straight into DynamoDB Local. DDB Local
-// accepts any well-formed SigV4 header, so no signing is needed.
-export async function setEmailStatus(
-  userId: string,
-  status: "bounced" | "complained",
-): Promise<void> {
-  const resp = await fetch(DDB_LOCAL_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/x-amz-json-1.0",
-      "X-Amz-Target": "DynamoDB_20120810.UpdateItem",
-      Authorization:
-        "AWS4-HMAC-SHA256 Credential=local/20260101/us-east-2/dynamodb/aws4_request, SignedHeaders=host, Signature=0",
-    },
-    body: JSON.stringify({
-      TableName: "numun-test",
-      Key: { PK: { S: `USER#${userId}` }, SK: { S: "PROFILE" } },
-      UpdateExpression: "SET emailStatus = :s",
-      ConditionExpression: "attribute_exists(PK)",
-      ExpressionAttributeValues: { ":s": { S: status } },
-    }),
-  });
-  if (!resp.ok) {
-    throw new Error(`setEmailStatus: HTTP ${resp.status} ${await resp.text()}`);
-  }
 }
