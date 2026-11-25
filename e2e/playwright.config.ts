@@ -49,6 +49,10 @@ const apiEnv = {
   // through its API (support/mail.ts).
   DEV_SMTP_ADDR: "localhost:1025",
   DEV_REGISTRATION_SUMMARY_DELAY: "1s",
+  // A bulk-import batch creating a "Zfail…" delegate fails once (Resume).
+  DEV_BULK_IMPORT_FAIL_SURNAME: "Zfail",
+  // Award syncs commit to the fake's in-memory GitHub repo.
+  DEV_CMS_GITHUB_API_URL: `${FAKES_URL}/github`,
   // Lets /cms-oauth/auth hand off to GitHub (the CMS test stops there).
   CMS_OAUTH_CLIENT_ID: "e2e-cms-client",
   CMS_OAUTH_CLIENT_SECRET: "e2e-cms-secret",

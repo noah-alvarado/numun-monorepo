@@ -6,8 +6,12 @@
 //                  (the API's DEV_SHEETS_ORIGIN proxy sends them here)
 //   Cognito        POST / with X-Amz-Target: AWSCognitoIdentityProviderService.<Op>
 //                  (portal VITE_COGNITO_ENDPOINT, API AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER)
+//   GitHub         /github/* — the App token, branch head, contents and
+//                  createCommitOnBranch calls the API's award CMS sync makes
+//                  (DEV_CMS_GITHUB_API_URL); commits land in memory
 //   Control        /__control/* — tests register sheets and users, read
-//                  emailed codes, and queue errors (see e2e/support/fakes.ts)
+//                  emailed codes and committed files, and queue errors (see
+//                  e2e/support/fakes.ts)
 //
 // Tokens are real RS256 JWTs; the API verifies ID tokens against this
 // server's JWKS (COGNITO_ISSUER_URL), exactly as it does Cognito's.
@@ -59,6 +63,12 @@ const refreshTokens = new Map<string, string>();
 const refreshCalls = new Map<string, number>();
 // Errors queued per operation; the next call to that operation fails.
 const queuedErrors = new Map<string, { type: string; message: string }[]>();
+
+// The content repo as the CMS sync has committed it: path → file contents.
+const repoFiles = new Map<string, string>();
+let repoHead = "0".repeat(40);
+// GitHub calls left to fail with a 502 (each sync retries up to 3 times).
+let githubFailures = 0;
 
 class CognitoError extends Error {
   type: string;
@@ -499,6 +509,20 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
     return send(res, 200, { token });
   }
 
+  // GET /github/files?path= — a file the CMS sync committed.
+  if (path === "/github/files") {
+    const f = repoFiles.get(url.searchParams.get("path") ?? "");
+    return f === undefined
+      ? send(res, 404, { error: "no such file" })
+      : send(res, 200, { content: f });
+  }
+
+  // POST /github/fail { count } — the next <count> GitHub calls fail.
+  if (path === "/github/fail" && req.method === "POST") {
+    githubFailures = body.count;
+    return send(res, 200, {});
+  }
+
   // POST /errors { op, type, message } — the next <op> call fails.
   // DELETE /errors clears the queue.
   if (path === "/errors" && req.method === "POST") {
@@ -513,6 +537,43 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
   }
 
   send(res, 404, { error: `unknown control path ${path}` });
+}
+
+// The slice of GitHub's REST + GraphQL API that api/internal/cms/git.go uses.
+async function github(req: IncomingMessage, res: ServerResponse, url: URL) {
+  const path = url.pathname.replace(/^\/github/, "");
+  if (githubFailures > 0) {
+    githubFailures -= 1;
+    return send(res, 502, { message: "Server Error (fake)" });
+  }
+  if (/^\/app\/installations\/[^/]+\/access_tokens$/.test(path)) {
+    const expires = new Date(Date.now() + 3600_000).toISOString();
+    return send(res, 201, { token: "ghs_fake", expires_at: expires });
+  }
+  if (/^\/repos\/[^/]+\/[^/]+\/git\/ref\/heads\/[^/]+$/.test(path)) {
+    return send(res, 200, { object: { sha: repoHead } });
+  }
+  const contents = path.match(/^\/repos\/[^/]+\/[^/]+\/contents\/(.+)$/);
+  if (contents && req.method === "GET") {
+    return repoFiles.has(contents[1])
+      ? send(res, 200, { sha: `blob-${contents[1]}` })
+      : send(res, 404, { message: "Not Found" });
+  }
+  if (path === "/graphql" && req.method === "POST") {
+    const { input } = (await readJSON(req)).variables;
+    if (input.expectedHeadOid !== repoHead) {
+      return send(res, 200, { errors: [{ message: "head moved" }] });
+    }
+    for (const a of input.fileChanges.additions ?? []) {
+      repoFiles.set(a.path, Buffer.from(a.contents, "base64").toString("utf8"));
+    }
+    for (const d of input.fileChanges.deletions ?? []) repoFiles.delete(d.path);
+    repoHead = randomUUID().replaceAll("-", "").padEnd(40, "0");
+    return send(res, 200, {
+      data: { createCommitOnBranch: { commit: { oid: repoHead } } },
+    });
+  }
+  send(res, 404, { message: "Not Found" });
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse) {
@@ -541,6 +602,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (!tab) return send(res, 400, "Bad gid", "text/html");
     return send(res, 200, tab.csv, "text/csv");
   }
+
+  if (url.pathname.startsWith("/github/")) return github(req, res, url);
 
   const target = String(req.headers["x-amz-target"] ?? "");
   if (

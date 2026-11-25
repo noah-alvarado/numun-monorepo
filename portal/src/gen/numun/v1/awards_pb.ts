@@ -370,6 +370,9 @@ export const DeleteAwardRequestSchema: GenMessage<DeleteAwardRequest> = /*@__PUR
  */
 export type DeleteAwardResponse = Message<"numun.v1.DeleteAwardResponse"> & {
   /**
+   * The award is removed from the public site before it is deleted. When
+   * cms_sync.ok is false nothing was deleted and the call can be retried.
+   *
    * @generated from field: numun.v1.CmsSyncStatus cms_sync = 1;
    */
   cmsSync?: CmsSyncStatus | undefined;

@@ -829,8 +829,10 @@ func (x *DeleteAwardRequest) GetExpectedVersion() int32 {
 }
 
 type DeleteAwardResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	CmsSync       *CmsSyncStatus         `protobuf:"bytes,1,opt,name=cms_sync,json=cmsSync,proto3" json:"cms_sync,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The award is removed from the public site before it is deleted. When
+	// cms_sync.ok is false nothing was deleted and the call can be retried.
+	CmsSync       *CmsSyncStatus `protobuf:"bytes,1,opt,name=cms_sync,json=cmsSync,proto3" json:"cms_sync,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

@@ -1,4 +1,4 @@
-// Drives fakes/server.ts (fake Google Sheets + Cognito) from tests.
+// Drives fakes/server.ts (fake Google Sheets, Cognito and GitHub) from tests.
 
 import { FAKES_URL } from "../playwright.config";
 
@@ -102,4 +102,18 @@ export async function idToken(
     variant,
   });
   return token;
+}
+
+// A file the API's award sync committed to the (fake) content repo, or null.
+export async function committedFile(path: string): Promise<string | null> {
+  const resp = await fetch(
+    `${FAKES_URL}/__control/github/files?path=${encodeURIComponent(path)}`,
+  );
+  if (resp.status === 404) return null;
+  return ((await resp.json()) as { content: string }).content;
+}
+
+// Makes the next <count> GitHub calls fail, as during a GitHub outage.
+export async function failGitHub(count: number): Promise<void> {
+  await control("POST", "/github/fail", { count });
 }

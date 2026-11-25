@@ -227,6 +227,17 @@ func (s *AwardService) DeleteAward(ctx context.Context, req *connect.Request[v1.
 	if err := s.assertWriteScope(ctx, caller, existing.ConferenceID, existing.Recipients); err != nil {
 		return nil, err
 	}
+	if existing.Version != int(req.Msg.GetExpectedVersion()) {
+		return nil, connect.NewError(connect.CodeAborted, errors.New("version mismatch"))
+	}
+
+	// Take the award off the public site first. If that fails the award
+	// stays, so the admin can retry the delete; deleting it here first would
+	// leave it on the site with nothing in the portal to retry from.
+	status := s.syncToCMS(ctx, existing.ConferenceID, existing, true)
+	if !status.OK {
+		return connect.NewResponse(&v1.DeleteAwardResponse{CmsSync: statusToProto(status)}), nil
+	}
 	if err := s.Store.SoftDeleteAward(ctx, existing.ConferenceID, id, int(req.Msg.GetExpectedVersion()), caller.UserID); err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):
@@ -237,8 +248,6 @@ func (s *AwardService) DeleteAward(ctx context.Context, req *connect.Request[v1.
 		s.log().Error("DeleteAward: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-
-	status := s.syncToCMS(ctx, existing.ConferenceID, existing, true)
 	s.audit(ctx, caller, domain.AuthEventAwardDeleted, id, existing.ConferenceID, status.OK)
 
 	return connect.NewResponse(&v1.DeleteAwardResponse{CmsSync: statusToProto(status)}), nil
@@ -374,16 +383,22 @@ func (s *AwardService) syncToCMS(ctx context.Context, conferenceID string, a dom
 		return cms.Status{OK: true, Attempts: 0}
 	}
 	path := cms.AwardMarkdownPath(a.ID)
+	var status cms.Status
 	if isDelete {
-		return s.CMS.WithRetry(ctx, func(c context.Context) (string, error) {
+		status = s.CMS.WithRetry(ctx, func(c context.Context) (string, error) {
 			return "", s.CMS.DeleteFile(c, path, fmt.Sprintf("award: delete %s", a.ID))
 		})
+	} else {
+		year := s.resolveConferenceYear(ctx, conferenceID)
+		content := cms.RenderAwardMarkdown(a, year)
+		status = s.CMS.WithRetry(ctx, func(c context.Context) (string, error) {
+			return s.CMS.UpsertFile(c, path, content, fmt.Sprintf("award: upsert %s (%s)", a.ID, a.Name))
+		})
 	}
-	year := s.resolveConferenceYear(ctx, conferenceID)
-	content := cms.RenderAwardMarkdown(a, year)
-	return s.CMS.WithRetry(ctx, func(c context.Context) (string, error) {
-		return s.CMS.UpsertFile(c, path, content, fmt.Sprintf("award: upsert %s (%s)", a.ID, a.Name))
-	})
+	if !status.OK {
+		s.log().Error("award CMS sync failed", "awardId", a.ID, "delete", isDelete, "attempts", status.Attempts, "err", status.FinalError)
+	}
+	return status
 }
 
 func (s *AwardService) resolveConferenceYear(ctx context.Context, conferenceID string) int {

@@ -9,11 +9,15 @@ import {
   uniqueSchool,
   uniqueSurname,
 } from "../support/api";
+import { committedFile, failGitHub } from "../support/fakes";
 import {
   seedConferenceId,
   seedConferenceName,
   seedUsers,
 } from "../support/seed";
+
+// A GitHub outage queued by a failed test mustn't leak into the next one.
+test.afterEach(() => failGitHub(0));
 
 test("admin creates and deletes an award", async ({
   page,
@@ -289,5 +293,101 @@ test("staffer awards only within their delegations", async ({
     const row = page.getByRole("row").filter({ hasText: stafferAward });
     await expect(row).toContainText(mine.school);
     await expect(row.getByRole("button", { name: "Edit" })).toBeVisible();
+  });
+});
+
+test("awards reach the public site, and outages are explained", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("AwardSync"),
+  );
+  const name = `E2E Synced Award ${Date.now()}`;
+  const award = await createDelegationAward(name, delegation);
+  const file = `content/awards-archive/${award.id}.md`;
+  const row = () => page.getByRole("row", { name: new RegExp(name) });
+
+  await signInAs("admin");
+  await page.goto("/awards");
+
+  async function rename(category: string) {
+    await row().getByRole("button", { name: "Edit" }).click();
+    await page.getByLabel("Category").fill(category);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(
+      page.getByRole("heading", { name: "Edit award" }),
+    ).toBeHidden();
+  }
+
+  async function remove() {
+    await row().getByRole("button", { name: "Delete" }).click();
+    await page
+      .getByText(`This will delete "${name}"`)
+      .locator("..")
+      .getByRole("button", { name: "Delete", exact: true })
+      .click();
+  }
+
+  await step("a new award is committed to the site's content", async () => {
+    expect(await committedFile(file)).toContain(`awardName: "${name}"`);
+    expect(await committedFile(file)).toContain(
+      `displayName: "${delegation.school}"`,
+    );
+  });
+
+  await step(
+    "an edit during a GitHub outage is saved but not published",
+    async () => {
+      await failGitHub(100);
+      await rename("Outstanding Delegation");
+      await expect(
+        page.getByText(
+          "Saved, but the public site wasn't updated. Save the award again to retry.",
+        ),
+      ).toBeVisible();
+      await expect(
+        page.getByText("GitHub returned an error on all 3 tries."),
+      ).toBeVisible();
+      await expect(row()).toContainText("Outstanding Delegation");
+      expect(await committedFile(file)).not.toContain("Outstanding Delegation");
+    },
+  );
+
+  await step("saving again once GitHub is back publishes it", async () => {
+    await failGitHub(0);
+    await rename("Outstanding Delegation");
+    await expect(
+      page.getByText("Saved and synced to the public site."),
+    ).toBeVisible();
+    expect(await committedFile(file)).toContain(
+      'category: "Outstanding Delegation"',
+    );
+  });
+
+  await step(
+    "a delete during an outage leaves the award to retry",
+    async () => {
+      await failGitHub(100);
+      await remove();
+      await expect(
+        page.getByText(/Not deleted: the award couldn't be taken off/),
+      ).toBeVisible();
+      await expect(row()).toBeVisible();
+      expect(await committedFile(file)).not.toBeNull();
+    },
+  );
+
+  await step("deleting again takes it off the site", async () => {
+    await failGitHub(0);
+    await remove();
+    await expect(
+      page.getByText("Deleted and synced to the public site."),
+    ).toBeVisible();
+    await expect(row()).toHaveCount(0);
+    expect(await committedFile(file)).toBeNull();
   });
 });

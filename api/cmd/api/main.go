@@ -109,6 +109,14 @@ func main() {
 // without GitHub App credentials. See IMPLEMENTATION_PLAN.md M11.
 func buildCMSClient(ctx context.Context, logger *slog.Logger) *cms.Client {
 	devMode := os.Getenv("DEV_MODE") == "true"
+	if url := os.Getenv("DEV_CMS_GITHUB_API_URL"); devMode && url != "" {
+		client, err := cms.NewDev(url, logger)
+		if err != nil {
+			logger.Warn("cms: dev client init failed — using stub", "err", err)
+			return cms.NewStub(logger)
+		}
+		return client
+	}
 	cfg, err := cms.LoadConfigFromSSM(ctx, logger)
 	if err != nil {
 		if !devMode {
