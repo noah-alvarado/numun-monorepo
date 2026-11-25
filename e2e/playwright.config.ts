@@ -11,6 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
 const PORTAL_URL = "http://localhost:4173";
+const SITE_URL = "http://127.0.0.1:4322";
 const API_URL = "http://localhost:3000";
 // Fake Google Sheets + Cognito (fakes/server.ts).
 export const FAKES_URL = "http://127.0.0.1:4599";
@@ -48,6 +49,10 @@ const apiEnv = {
   // through its API (support/mail.ts).
   DEV_SMTP_ADDR: "localhost:1025",
   DEV_REGISTRATION_SUMMARY_DELAY: "1s",
+  // Lets /cms-oauth/auth hand off to GitHub (the CMS test stops there).
+  CMS_OAUTH_CLIENT_ID: "e2e-cms-client",
+  CMS_OAUTH_CLIENT_SECRET: "e2e-cms-secret",
+  CMS_OAUTH_STATE_SECRET: "e2e-cms-state-secret",
 };
 
 // The portal talks to the fake Cognito like it would to the real one, and
@@ -80,7 +85,16 @@ export default defineConfig({
     video: "off",
     viewport: { width: 1280, height: 900 },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // The static landing site and the CMS bundle (site/), served like
+    // CloudFront serves them.
+    {
+      name: "site",
+      testDir: "./site",
+      use: { ...devices["Desktop Chrome"], baseURL: SITE_URL },
+    },
+  ],
   webServer: [
     {
       name: "fakes",
@@ -116,6 +130,17 @@ export default defineConfig({
       command: "go run ./cmd/email-worker -local",
       cwd: "../api",
       env: apiEnv,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      name: "site",
+      command:
+        "pnpm --filter @numun/site build >/dev/null && node e2e/fakes/static-site.ts",
+      cwd: "..",
+      url: SITE_URL,
+      reuseExistingServer: !isCI,
+      timeout: 180_000,
       stdout: "ignore",
       stderr: "pipe",
     },
