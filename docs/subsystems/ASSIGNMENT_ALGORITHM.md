@@ -232,7 +232,7 @@ The algorithm has **two distinct endpoints**:
 | Endpoint | Effect |
 |---|---|
 | `POST /v1/conferences/{id}/assignments/propose?dryRun=true` | Runs the algorithm. Returns the proposal as JSON. **Writes nothing.** |
-| `POST /v1/conferences/{id}/assignments/propose` (no flag) | Runs the algorithm. Writes a new `AssignmentRun` record + Assignment items with `status = proposed`. Discards prior proposed items in a `TransactWriteItems` batch. |
+| `POST /v1/conferences/{id}/assignments/propose` (no flag) | Runs the algorithm. Writes a new `AssignmentRun` record + Assignment items with `status = proposed`, replacing prior proposed items (see §9 "Failure handling" for how the swap stays all-or-nothing). |
 
 Both endpoints accept a `seed` parameter for shuffle mode (§6).
 
@@ -249,7 +249,7 @@ Approval is a separate operation: `POST /v1/conferences/{id}/assignments/{assign
 | Runtime budget | 20-second soft cap (5s headroom under API Gateway's 29s hard limit). Phase C exits early at 15s. |
 | Lambda memory / timeout | Bump Lambda memory to **2048 MB** for the assignment route to give Go's GC headroom; this is purely for this code path. SAM template sets per-route memory via a separate function if it becomes a problem; otherwise Lambdalith default of 2048 MB. |
 | Concurrency | Only one in-flight run per conference. Enforced via a DDB conditional write: an `AssignmentRun` item with `status = running` blocks others; on completion it flips to `done` or `failed`. |
-| Failure handling | Any internal error returns HTTP 5xx with a structured `diagnostic` field naming the failed phase + constraint. No partial writes (Phase D validates before any persistence). |
+| Failure handling | Any internal error returns HTTP 5xx with a structured `diagnostic` field naming the failed phase + constraint. No partial writes (Phase D validates before any persistence). A full proposal exceeds one `TransactWriteItems` (100 ops), so persistence writes the new rows first in 25-op transactions (overwriting prior proposed rows or tombstones at the same key, never approved rows), then deletes the prior proposed rows it didn't overwrite. If either step fails, the store restores every prior proposed row and removes the new ones, and the run is marked `failed`; the previous proposal stays in place. |
 | Observability | Each phase logs `slog` records with duration, item counts, and final objective `O`. Sentry captures any panic. |
 | Re-runs | Idempotent given seed + inputs. Re-running with the same seed produces an identical proposal. |
 

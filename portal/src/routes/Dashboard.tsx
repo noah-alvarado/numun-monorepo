@@ -1,9 +1,8 @@
 // Dashboard — role-aware landing after sign-in.
 //
-//   - Advisors get a CTA to their delegation.
-//   - Staff-admins get the admin nav (pending delegations for M4; more in
-//     later milestones).
-//   - Staff-staffers see a placeholder until M7 lands committee scope.
+//   - Advisors get their delegation and the conference awards.
+//   - Staff-admins get every admin tool.
+//   - Staff-staffers get day-of check-in and awards.
 
 import { useNavigate } from "@solidjs/router";
 import { Show } from "solid-js";
@@ -67,6 +66,7 @@ export default function Dashboard() {
                   description="Register your school, edit details, and track approval status."
                   onClick={() => navigate("/delegation")}
                 />
+                <AwardsCard onClick={() => navigate("/awards")} />
               </section>
             </Show>
 
@@ -101,18 +101,46 @@ export default function Dashboard() {
                     </>
                   )}
                 </Show>
+                <CheckInCard onClick={() => navigate("/admin/check-in")} />
+                <AwardsCard onClick={() => navigate("/awards")} />
+                <NavCard
+                  title="Email Health"
+                  description="Review bounced or complaining recipients and unsuppress them."
+                  onClick={() => navigate("/admin/email-health")}
+                />
               </section>
             </Show>
 
             <Show when={u().role === User_Role.STAFF_STAFFER}>
-              <p class="mt-6 text-sm text-nu-purple-700">
-                Staffer-scoped views land in a later milestone.
-              </p>
+              <section class="mt-6 grid gap-3">
+                <CheckInCard onClick={() => navigate("/admin/check-in")} />
+                <AwardsCard onClick={() => navigate("/awards")} />
+              </section>
             </Show>
           </>
         )}
       </Show>
     </main>
+  );
+}
+
+function CheckInCard(props: { onClick: () => void }) {
+  return (
+    <NavCard
+      title="Day-of Check-In"
+      description="Find delegates by name and check them in."
+      onClick={props.onClick}
+    />
+  );
+}
+
+function AwardsCard(props: { onClick: () => void }) {
+  return (
+    <NavCard
+      title="Awards"
+      description="See this conference's awards."
+      onClick={props.onClick}
+    />
   );
 }
 

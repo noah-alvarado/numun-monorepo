@@ -6,7 +6,7 @@
 import { createMemo, createResource, createSignal, For, Show } from "solid-js";
 import { ConnectError, Code } from "@connectrpc/connect";
 
-import { paymentClient } from "@/lib/api";
+import { paymentClient, userClient } from "@/lib/api";
 import { userSignal } from "@/lib/session";
 import { formatMoney, moneyToCents, parseAmountInput } from "@/lib/money";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
@@ -16,6 +16,7 @@ import {
   type PaymentRecord,
 } from "@/gen/numun/v1/payments_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
+import { connectMessage } from "@/lib/errors";
 
 type LedgerRow = {
   payment: PaymentRecord;
@@ -23,7 +24,12 @@ type LedgerRow = {
   currency: string;
 };
 
-export default function DelegationPayments(props: { delegation: Delegation }) {
+export default function DelegationPayments(props: {
+  delegation: Delegation;
+  // Balance + paidInFull live on the parent's Delegation; ledger writes must
+  // refetch it or the header goes stale.
+  onLedgerChanged?: () => Promise<void>;
+}) {
   const [user] = userSignal;
   const isAdmin = () => user()?.role === User_Role.STAFF_ADMIN;
 
@@ -41,6 +47,25 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
     return computeLedger(items);
   });
 
+  // "Recorded by" is staff-only; resolve the staff user ids to names.
+  const [recorderNames] = createResource(
+    () => (isAdmin() ? payments() : undefined),
+    async (items) => {
+      const ids = [...new Set(items.map((p) => p.recordedBy))];
+      const names = await Promise.all(
+        ids.map(async (userId) => {
+          try {
+            const { user } = await userClient.getUser({ userId });
+            return user?.name || user?.email || "Unknown user";
+          } catch {
+            return "Unknown user";
+          }
+        }),
+      );
+      return new Map(ids.map((id, i) => [id, names[i]]));
+    },
+  );
+
   const [recordOpen, setRecordOpen] = createSignal(false);
   const [editTarget, setEditTarget] = createSignal<PaymentRecord | null>(null);
   const [deleteTarget, setDeleteTarget] = createSignal<PaymentRecord | null>(
@@ -49,7 +74,7 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
   const [banner, setBanner] = createSignal<string | null>(null);
 
   async function reload() {
-    await refetch();
+    await Promise.all([refetch(), props.onLedgerChanged?.()]);
   }
 
   return (
@@ -71,7 +96,11 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
                   : "ml-2 rounded bg-nu-purple-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-nu-purple-700"
               }
             >
-              {props.delegation.paidInFull ? "Paid in full" : "Outstanding"}
+              {props.delegation.paidInFull
+                ? "Paid in full"
+                : moneyToCents(props.delegation.balanceDue) === 0n
+                  ? "Nothing due"
+                  : "Outstanding"}
             </span>
           </div>
         </div>
@@ -125,7 +154,9 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
                   <th class="px-3 py-2 text-right font-semibold">Amount</th>
                   <th class="px-3 py-2 font-semibold">Reference</th>
                   <th class="px-3 py-2 font-semibold">Notes</th>
-                  <th class="px-3 py-2 font-semibold">Recorded by</th>
+                  <Show when={isAdmin()}>
+                    <th class="px-3 py-2 font-semibold">Recorded by</th>
+                  </Show>
                   <th class="px-3 py-2 text-right font-semibold">
                     Running balance
                   </th>
@@ -162,12 +193,11 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
                       >
                         {truncate(row.payment.notes, 40)}
                       </td>
-                      <td
-                        class="max-w-[10rem] truncate px-3 py-2 font-mono text-xs text-nu-purple-700"
-                        title={row.payment.recordedBy}
-                      >
-                        {row.payment.recordedBy}
-                      </td>
+                      <Show when={isAdmin()}>
+                        <td class="max-w-[10rem] truncate px-3 py-2 text-nu-purple-700">
+                          {recorderNames()?.get(row.payment.recordedBy) ?? "…"}
+                        </td>
+                      </Show>
                       <td class="px-3 py-2 text-right font-mono">
                         {formatCents(row.runningBalance, row.currency)}
                       </td>
@@ -745,10 +775,4 @@ function DeleteModal(props: {
       </div>
     </ModalShell>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

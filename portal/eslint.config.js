@@ -5,7 +5,7 @@ export default tseslint.config(
   // Ignore generated code (per APPLICATION.md §2: committed but not
   // hand-edited or hand-linted).
   {
-    ignores: ["src/gen/**", "dist/**", "node_modules/**"],
+    ignores: ["src/gen/**", "dist/**", "dist-e2e/**", "node_modules/**"],
   },
   // Baseline (per APPLICATION.md §9: ESLint defaults, no custom rules).
   js.configs.recommended,

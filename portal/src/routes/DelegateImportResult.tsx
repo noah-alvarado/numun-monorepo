@@ -3,10 +3,10 @@
 
 import { createSignal, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { delegateClient } from "@/lib/api";
 import type { CommitSummary } from "@/gen/numun/v1/delegates_pb";
+import { connectMessage } from "@/lib/errors";
 
 type ResultState = {
   summary?: CommitSummary;
@@ -56,9 +56,20 @@ export default function DelegateImportResult() {
       <Show
         when={summary()}
         fallback={
-          <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
-            No result to show. Start an import first.
-          </p>
+          <>
+            <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
+              No result to show. Start an import first.
+            </p>
+            <button
+              type="button"
+              onClick={() =>
+                navigate(`/delegations/${params.delegationId}/delegates/import`)
+              }
+              class="mt-4 rounded bg-nu-purple px-3 py-1 text-sm text-white"
+            >
+              Go to import
+            </button>
+          </>
         }
       >
         {(s) => (
@@ -108,10 +119,8 @@ export default function DelegateImportResult() {
 
 function SuccessBlock(props: { summary: CommitSummary; delegationId: string }) {
   const navigate = useNavigate();
-  const total =
-    props.summary.createCount +
-    props.summary.updateCount +
-    props.summary.softDeleteCount;
+  // Soft-deletes are reported separately; they weren't imported.
+  const total = props.summary.createCount + props.summary.updateCount;
   return (
     <section class="mt-6 rounded border border-nu-green-dark/40 bg-nu-green/10 p-4 text-sm">
       <div class="flex items-start gap-3">
@@ -142,10 +151,4 @@ function SuccessBlock(props: { summary: CommitSummary; delegationId: string }) {
       </div>
     </section>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

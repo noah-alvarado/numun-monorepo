@@ -39,7 +39,7 @@ var fixtures = map[string]map[string]any{
 		"conferenceName":  "NUMUN 2026",
 		"assignmentCount": 84,
 		"objective":       "1247.5",
-		"runLink":         "https://portal.numun.org/admin/assignments",
+		"runLink":         "https://portal.numun.org/conferences/conf-1/assignments",
 	},
 	"scope_role_changed": {
 		"actorName":     "Maya Park",

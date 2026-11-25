@@ -10,6 +10,7 @@ package store_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"testing"
 	"time"
@@ -179,5 +180,26 @@ func TestRecordAuthEvent(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("record audit event: %v", err)
+	}
+}
+
+// A page of more than 100 delegations needs more than one BatchGetItem.
+func TestListDelegationsByStatusBeyondBatchGetLimit(t *testing.T) {
+	ctx := context.Background()
+	c := testClient(t)
+	conferenceID := newID(t)
+	const n = 120
+	for i := range n {
+		if _, err := c.CreateDelegation(ctx, domain.Delegation{ConferenceID: conferenceID, School: fmt.Sprintf("School %03d", i)}); err != nil {
+			t.Fatalf("create delegation %d: %v", i, err)
+		}
+	}
+
+	got, next, err := c.ListDelegationsByStatus(ctx, conferenceID, domain.DelegationStatusPending, "", 500)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != n || next != "" {
+		t.Fatalf("got %d delegations (next %q), want all %d on one page", len(got), next, n)
 	}
 }

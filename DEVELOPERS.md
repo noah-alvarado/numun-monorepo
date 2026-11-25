@@ -204,7 +204,29 @@ Integration tests in `/api/internal/.../*_integration_test.go` use the running L
 make integration-tests
 ```
 
-### 5.3 Linting & typecheck
+### 5.3 End-to-end tests (Playwright)
+
+`/e2e` drives the built portal in Chromium against the local stack: DDB Local + LocalStack (docker compose), the Go API as a plain HTTP server (`LOCAL_HTTP=true`, `:3000`), and the portal built in dev-bypass mode and served by `vite preview` (`:4173`, which proxies API paths to `:3000` so no CORS is needed). Tests sign in as the [seed users](./docs/seed-users.md) through the dev-bypass branch of `AuthService.Exchange`, so they get a real session cookie + CSRF token with no Cognito and no secrets.
+
+```bash
+make e2e                                   # compose up (keeps data) + seed + run
+make e2e ARGS="tests/awards.spec.ts"       # one spec
+pnpm --filter @numun/e2e run e2e:report    # open the HTML report
+```
+
+Playwright starts the API and portal itself (and reuses them if already running locally). Global setup gives the seed advisor a pending delegation if it has none. Wrap each user-visible action in the `step` fixture: it attaches a full-page screenshot per step to the report and writes it to `e2e/test-results/<test>/NN-<step>.png`, and fails the step if a raw UUID is visible on the page (users should only ever see names). Traces are kept on failure. The `E2E` workflow's `Playwright e2e` job is a required check on `main`: it runs on every PR, does the full run when the PR touches `portal/`, `api/`, `e2e/` or the local-stack/tooling files (passing immediately otherwise), and uploads the report + screenshots as an artifact.
+
+Tests share one table, so keep them independent of each other and of leftover local data:
+
+- Use the `newAdvisor` fixture for anything that creates or changes a delegation; dev-bypass `Exchange` lazily creates a fresh advisor per test. The seed users are for read-mostly flows.
+- Arrange data through `e2e/support/api.ts` (Connect calls with `X-Dev-User-Id`), then drive the behavior under test through the UI.
+- Give created rows unique names (`uniqueSchool`, `uniqueSurname`) and locate them by name.
+- State only a Lambda outside the API can produce (e.g. a bounced email from the SES feedback handler) is written straight to DynamoDB Local by helpers like `setEmailStatus`.
+- Assignment-algorithm tests create their own draft conference (`createDraftConference`); drafts never become the active conference, so the algorithm sees only that test's data.
+
+There are no pixel-diff (`toHaveScreenshot`) assertions yet; their baselines would need generating on CI's Linux runners to avoid font-rendering diffs.
+
+### 5.4 Linting & typecheck
 
 ```bash
 # Go
@@ -222,7 +244,7 @@ buf breaking api/proto --against ".git#branch=main"
 
 All of the above run in CI and **block merge** on failure.
 
-### 5.4 Email template tests
+### 5.5 Email template tests
 
 Each template under `/api/templates/email/` has a test that renders it against a representative `Vars` map and asserts the output contains expected strings + no `<no value>` markers. See [EMAIL.md §3.4](./docs/subsystems/EMAIL.md).
 

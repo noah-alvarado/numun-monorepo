@@ -43,15 +43,15 @@ export default function AssignmentStudioRunControls(props: {
         setBannerKind("info");
         setBanner(
           mode === "dry"
-            ? `Dry run complete — objective ${r?.objective.toFixed(2) ?? "—"}, ${resp.assignments.length} assignments.`
-            : `Proposed ${resp.assignments.length} assignments.`,
+            ? `Dry run complete — objective ${r?.objective.toFixed(2) ?? "—"}, ${countLabel(resp.assignments.length)}.`
+            : `Proposed ${countLabel(resp.assignments.length)}.`,
         );
       }
       props.onComplete(resp, mode);
     } catch (err) {
       setBannerKind("error");
       if (err instanceof ConnectError) {
-        const msg = err.message.toLowerCase();
+        const msg = err.rawMessage.toLowerCase();
         if (
           msg.includes("deadline") ||
           msg.includes("timeout") ||
@@ -59,7 +59,7 @@ export default function AssignmentStudioRunControls(props: {
         ) {
           setBanner("Run timed out — try again.");
         } else {
-          setBanner(err.message);
+          setBanner(err.rawMessage);
         }
       } else if (err instanceof Error) {
         setBanner(err.message);
@@ -131,4 +131,8 @@ function randomSeed(): bigint {
   const buf = new Uint32Array(2);
   crypto.getRandomValues(buf);
   return (BigInt(buf[0]) << 32n) | BigInt(buf[1]);
+}
+
+export function countLabel(n: number): string {
+  return `${n} ${n === 1 ? "assignment" : "assignments"}`;
 }

@@ -4,5 +4,5 @@
 <p>A {{index .Vars "kind"}} of <strong>{{index .Vars "amountFormatted"}}</strong> has been recorded for <strong>{{index .Vars "delegationName"}}</strong>.</p>
 <p>New balance due: <strong>{{index .Vars "newBalanceFormatted"}}</strong></p>
 {{with index .Vars "notes"}}<p style="background:#fafafa;padding:12px 16px;border-left:3px solid {{$.BrandColor}};margin:16px 0;"><em>Note:</em> {{.}}</p>{{end}}
-<p>View the full ledger in the portal: <a href="{{.PortalBaseURL}}/delegation">{{.PortalBaseURL}}/delegation</a></p>
+<p>View the full ledger in the portal: <a href="{{.PortalBaseURL}}/delegation?tab=payments">{{.PortalBaseURL}}/delegation?tab=payments</a></p>
 {{end}}

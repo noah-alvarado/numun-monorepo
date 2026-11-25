@@ -9,6 +9,7 @@ import { emailHealthClient, userClient } from "@/lib/api";
 import { userSignal } from "@/lib/session";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import type { SuppressedUser } from "@/gen/numun/v1/email_health_pb";
+import { connectMessage } from "@/lib/errors";
 
 export default function AdminEmailHealth() {
   const [user] = userSignal;
@@ -69,13 +70,15 @@ export default function AdminEmailHealth() {
           >
             Back
           </button>
-          <button
-            type="button"
-            onClick={load}
-            class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-          >
-            Reload
-          </button>
+          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+            <button
+              type="button"
+              onClick={load}
+              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
+            >
+              Reload
+            </button>
+          </Show>
         </div>
       </header>
 
@@ -96,6 +99,10 @@ export default function AdminEmailHealth() {
           {(e) => (
             <p class="mt-4 rounded bg-red-50 p-3 text-sm text-red-900">{e()}</p>
           )}
+        </Show>
+
+        <Show when={!loaded()}>
+          <p class="mt-6 text-sm text-nu-purple-700">Loading…</p>
         </Show>
 
         <Show when={loaded()}>
@@ -143,10 +150,4 @@ export default function AdminEmailHealth() {
       </Show>
     </main>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

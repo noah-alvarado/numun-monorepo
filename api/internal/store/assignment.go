@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -516,6 +517,69 @@ func (c *Client) SoftDeleteAssignment(ctx context.Context, positionID, delegateI
 	return nil
 }
 
+// MoveAssignments atomically soft-deletes each `from` row (conditioned on its
+// version) and creates each `to` row. Manual edits and swaps change a row's
+// PK/SK, so they are a delete plus a create; doing both in one transaction
+// means a failure leaves every row as it was. A `to` row may reuse the key of
+// a soft-deleted tombstone (e.g. swapping back), but never a live row.
+//
+// Returns ErrVersionMismatch if a `from` row changed or is gone, and
+// ErrAlreadyExists if a `to` key holds a live assignment.
+func (c *Client) MoveAssignments(ctx context.Context, from, to []domain.Assignment, actorUserID string) ([]domain.Assignment, error) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	items := make([]ddbtypes.TransactWriteItem, 0, len(from)+len(to))
+	for _, a := range from {
+		items = append(items, ddbtypes.TransactWriteItem{Update: &ddbtypes.Update{
+			TableName:           aws.String(c.Table),
+			Key:                 assignmentKeyAV(a.PositionID, a.DelegateID),
+			UpdateExpression:    aws.String("SET isDeleted = :true, version = :nv, updatedAt = :now, updatedBy = :actor"),
+			ConditionExpression: aws.String("version = :ev AND isDeleted = :false"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":true":  &ddbtypes.AttributeValueMemberBOOL{Value: true},
+				":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+				":ev":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(a.Version)},
+				":nv":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(a.Version + 1)},
+				":now":   &ddbtypes.AttributeValueMemberS{Value: now},
+				":actor": &ddbtypes.AttributeValueMemberS{Value: actorUserID},
+			},
+		}})
+	}
+	created := make([]domain.Assignment, 0, len(to))
+	for _, a := range to {
+		a = prepareNewAssignment(a)
+		created = append(created, a)
+		av, err := attributevalue.MarshalMap(assignmentToItem(a))
+		if err != nil {
+			return nil, fmt.Errorf("marshal assignment: %w", err)
+		}
+		items = append(items, ddbtypes.TransactWriteItem{Put: &ddbtypes.Put{
+			TableName:           aws.String(c.Table),
+			Item:                av,
+			ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":true": &ddbtypes.AttributeValueMemberBOOL{Value: true},
+			},
+		}})
+	}
+	_, err := c.DDB.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+	if err != nil {
+		var txnErr *ddbtypes.TransactionCanceledException
+		if errors.As(err, &txnErr) {
+			for i, r := range txnErr.CancellationReasons {
+				if r.Code == nil || *r.Code != "ConditionalCheckFailed" {
+					continue
+				}
+				if i < len(from) {
+					return nil, ErrVersionMismatch
+				}
+				return nil, ErrAlreadyExists
+			}
+		}
+		return nil, fmt.Errorf("move assignments: %w", err)
+	}
+	return created, nil
+}
+
 // WriteAssignmentBatch lands a single TransactWriteItems containing up to 25
 // creates + 25 deletes (DDB hard cap is 100, but the runtime keeps it conservative).
 // Callers chunk larger batches. Used by the algorithm integration handler to
@@ -573,41 +637,187 @@ func (c *Client) WriteAssignmentBatch(ctx context.Context, runID string, toCreat
 	return nil
 }
 
-// DeleteAllProposedAssignmentsForConference discards prior non-approved
-// assignments before a new run lands new proposals — see
-// ASSIGNMENT_ALGORITHM.md §7.2. Uses BatchWriteItem chunked by 25.
-func (c *Client) DeleteAllProposedAssignmentsForConference(ctx context.Context, conferenceID string) error {
-	rows, err := c.ListAllAssignmentsByConference(ctx, conferenceID, "", "", domain.AssignmentStatusProposed)
+// ErrProposalRollbackIncomplete wraps a ReplaceProposedAssignments failure
+// whose rollback could not restore every prior proposed row.
+var ErrProposalRollbackIncomplete = errors.New("proposal rollback incomplete")
+
+// proposalTxnSize keeps each TransactWriteItems well under DDB's 100-op cap.
+const proposalTxnSize = 25
+
+const proposalRollbackWorkers = 8
+
+// proposalRollbackBudget bounds the rollback, which runs detached from the
+// request context so a cancelled or timed-out request still restores state.
+// Sized so algorithm soft cap (20s) + writes + rollback fit the 29s Lambda.
+const proposalRollbackBudget = 6 * time.Second
+
+// ReplaceProposedAssignments swaps a conference's proposed assignments for
+// rows (one algorithm run's output) without ever committing a partial set —
+// ASSIGNMENT_ALGORITHM.md §1 "no partial output", §7.2.
+//
+// The set is too large for one DDB transaction, so it goes in two phases:
+//  1. Write rows in chunked transactions. A row may overwrite a prior proposed
+//     row or a soft-deleted tombstone at the same key, never an approved one.
+//  2. Delete prior proposed rows the new set didn't overwrite, conditioned on
+//     them still being proposed (an approval made mid-run aborts the swap).
+//
+// If either phase fails, every prior proposed row is restored and every new
+// row at a key that had no prior proposal is removed. If that rollback fails
+// too, the returned error wraps ErrProposalRollbackIncomplete.
+func (c *Client) ReplaceProposedAssignments(ctx context.Context, conferenceID, runID string, rows []domain.Assignment) error {
+	prior, err := c.ListAllAssignmentsByConference(ctx, conferenceID, "", "", domain.AssignmentStatusProposed)
 	if err != nil {
 		return err
 	}
-	if len(rows) == 0 {
-		return nil
-	}
-	for i := 0; i < len(rows); i += 25 {
-		end := i + 25
-		if end > len(rows) {
-			end = len(rows)
-		}
-		writes := make([]ddbtypes.WriteRequest, 0, end-i)
-		for _, a := range rows[i:end] {
-			writes = append(writes, ddbtypes.WriteRequest{
-				DeleteRequest: &ddbtypes.DeleteRequest{
-					Key: map[string]ddbtypes.AttributeValue{
-						"PK": &ddbtypes.AttributeValueMemberS{Value: assignmentPK(a.PositionID)},
-						"SK": &ddbtypes.AttributeValueMemberS{Value: assignmentSK(a.DelegateID)},
-					},
-				},
-			})
-		}
-		_, err := c.DDB.BatchWriteItem(ctx, &dynamodb.BatchWriteItemInput{
-			RequestItems: map[string][]ddbtypes.WriteRequest{
-				c.Table: writes,
-			},
-		})
+	priorItems := make(map[string]map[string]ddbtypes.AttributeValue, len(prior))
+	for _, a := range prior {
+		av, err := attributevalue.MarshalMap(assignmentToItem(a))
 		if err != nil {
-			return fmt.Errorf("batch delete proposed assignments: %w", err)
+			return fmt.Errorf("marshal prior assignment: %w", err)
+		}
+		priorItems[assignmentKey(a)] = av
+	}
+
+	newKeys := make(map[string]bool, len(rows))
+	puts := make([]ddbtypes.TransactWriteItem, 0, len(rows))
+	for _, a := range rows {
+		a = prepareNewAssignment(a)
+		a.RunID = runID
+		newKeys[assignmentKey(a)] = true
+		av, err := attributevalue.MarshalMap(assignmentToItem(a))
+		if err != nil {
+			return fmt.Errorf("marshal assignment: %w", err)
+		}
+		puts = append(puts, ddbtypes.TransactWriteItem{Put: &ddbtypes.Put{
+			TableName:           aws.String(c.Table),
+			Item:                av,
+			ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true OR #st = :proposed"),
+			ExpressionAttributeNames: map[string]string{
+				"#st": "status",
+			},
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":true":     &ddbtypes.AttributeValueMemberBOOL{Value: true},
+				":proposed": &ddbtypes.AttributeValueMemberS{Value: string(domain.AssignmentStatusProposed)},
+			},
+		}})
+	}
+
+	var deletes []ddbtypes.TransactWriteItem
+	for _, a := range prior {
+		if newKeys[assignmentKey(a)] {
+			continue
+		}
+		deletes = append(deletes, ddbtypes.TransactWriteItem{Delete: &ddbtypes.Delete{
+			TableName:           aws.String(c.Table),
+			Key:                 assignmentKeyAV(a.PositionID, a.DelegateID),
+			ConditionExpression: aws.String("#st = :proposed AND isDeleted = :false"),
+			ExpressionAttributeNames: map[string]string{
+				"#st": "status",
+			},
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":false":    &ddbtypes.AttributeValueMemberBOOL{Value: false},
+				":proposed": &ddbtypes.AttributeValueMemberS{Value: string(domain.AssignmentStatusProposed)},
+			},
+		}})
+	}
+
+	if err := c.transactInChunks(ctx, puts); err != nil {
+		return c.rollbackProposal(ctx, runID, rows, priorItems, fmt.Errorf("write proposed assignments: %w", err))
+	}
+	if err := c.transactInChunks(ctx, deletes); err != nil {
+		return c.rollbackProposal(ctx, runID, rows, priorItems, fmt.Errorf("discard prior proposed assignments: %w", err))
+	}
+	return nil
+}
+
+func (c *Client) transactInChunks(ctx context.Context, ops []ddbtypes.TransactWriteItem) error {
+	for i := 0; i < len(ops); i += proposalTxnSize {
+		end := min(i+proposalTxnSize, len(ops))
+		if _, err := c.DDB.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{
+			TransactItems: ops[i:end],
+		}); err != nil {
+			return fmt.Errorf("ops %d–%d: %w", i, end-1, err)
 		}
 	}
 	return nil
+}
+
+// rollbackProposal undoes a partially applied ReplaceProposedAssignments.
+// Each op is conditional so it only touches rows this run changed: prior rows
+// are restored only where they are now missing or carry runID, and new rows
+// are deleted only where they carry runID.
+func (c *Client) rollbackProposal(ctx context.Context, runID string, rows []domain.Assignment, priorItems map[string]map[string]ddbtypes.AttributeValue, cause error) error {
+	ctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), proposalRollbackBudget)
+	defer cancel()
+
+	ownedByRun := map[string]ddbtypes.AttributeValue{
+		":run": &ddbtypes.AttributeValueMemberS{Value: runID},
+	}
+	var ops []func() error
+	for _, item := range priorItems {
+		ops = append(ops, func() error {
+			_, err := c.DDB.PutItem(ctx, &dynamodb.PutItemInput{
+				TableName:                 aws.String(c.Table),
+				Item:                      item,
+				ConditionExpression:       aws.String("attribute_not_exists(PK) OR runId = :run"),
+				ExpressionAttributeValues: ownedByRun,
+			})
+			return err
+		})
+	}
+	for _, a := range rows {
+		if _, ok := priorItems[assignmentKey(a)]; ok {
+			continue
+		}
+		ops = append(ops, func() error {
+			_, err := c.DDB.DeleteItem(ctx, &dynamodb.DeleteItemInput{
+				TableName:                 aws.String(c.Table),
+				Key:                       assignmentKeyAV(a.PositionID, a.DelegateID),
+				ConditionExpression:       aws.String("runId = :run"),
+				ExpressionAttributeValues: ownedByRun,
+			})
+			return err
+		})
+	}
+
+	var (
+		mu     sync.Mutex
+		failed []error
+		wg     sync.WaitGroup
+	)
+	work := make(chan func() error)
+	for range proposalRollbackWorkers {
+		wg.Go(func() {
+			for op := range work {
+				err := op()
+				var ccf *ddbtypes.ConditionalCheckFailedException
+				if err != nil && !errors.As(err, &ccf) {
+					mu.Lock()
+					failed = append(failed, err)
+					mu.Unlock()
+				}
+			}
+		})
+	}
+	for _, op := range ops {
+		work <- op
+	}
+	close(work)
+	wg.Wait()
+
+	if len(failed) > 0 {
+		return fmt.Errorf("%w (%d of %d ops failed, first: %v): %w", ErrProposalRollbackIncomplete, len(failed), len(ops), failed[0], cause)
+	}
+	return cause
+}
+
+func assignmentKey(a domain.Assignment) string {
+	return assignmentPK(a.PositionID) + "|" + assignmentSK(a.DelegateID)
+}
+
+func assignmentKeyAV(positionID, delegateID string) map[string]ddbtypes.AttributeValue {
+	return map[string]ddbtypes.AttributeValue{
+		"PK": &ddbtypes.AttributeValueMemberS{Value: assignmentPK(positionID)},
+		"SK": &ddbtypes.AttributeValueMemberS{Value: assignmentSK(delegateID)},
+	}
 }

@@ -10,6 +10,7 @@ Monorepo holding four deployable surfaces plus shared infra and content:
 - `/cms` — Decap CMS static bundle (`cms.numun.org`) committing into `/content`
 - `/content` — CMS-managed Markdown / JSON / images consumed by `/site`
 - `/docs` — design docs (`PROJECT`, `INFRASTRUCTURE`, `APPLICATION`, `DATA_MODEL`, `API`, `AUTH`, `SECURITY`) plus `runbooks/` and `subsystems/`
+- `/e2e` — Playwright suite driving the built portal against the local stack (see `DEVELOPERS.md` §5.3)
 - `/infra` — five SAM template groups: `bootstrap` (OIDC roles), `base-data` (DDB + Cognito), `base-cdn` (S3 + CloudFront + DNS), `api` (Lambda + API GW), `billing-alarm`
 - `/portal` — SolidJS + Vite SPA (`portal.numun.org`); calls the API via generated Connect clients
 - `/site` — Astro + Tailwind static site (`numun.org`)
@@ -20,23 +21,24 @@ Monorepo holding four deployable surfaces plus shared infra and content:
 
 All routine work goes through the root `Makefile`. From the repo root:
 
-| Task                                                        | Command                                             |
-| ----------------------------------------------------------- | --------------------------------------------------- |
-| Bring up local prod-mirror (DDB Local, LocalStack, Mailpit) | `make dev`                                          |
-| Tear it down                                                | `make dev-down`                                     |
-| Run SAM Local API GW + Go Lambdalith on `:3000`             | `make dev-api`                                      |
-| Run Vite (portal) on `:5173`                                | `make dev-portal`                                   |
-| Run Astro (site) on `:4321`                                 | `make dev-site`                                     |
-| Restart SAM after editing `/api` (no auto-reload)           | `make api-restart`                                  |
-| Seed DDB Local                                              | `make seed`                                         |
-| Reset DDB Local + LocalStack volumes                        | `make reset`                                        |
-| Codegen Go + TS from protos                                 | `make proto`                                        |
-| Lint everything                                             | `make lint` (or `lint-go`, `lint-js`, `lint-proto`) |
-| Typecheck everything                                        | `make typecheck`                                    |
-| Unit tests across workspaces                                | `make test`                                         |
-| Integration tests (requires `make dev`)                     | `make integration-tests`                            |
-| Validate all SAM templates                                  | `make sam-validate`                                 |
-| Verify tool versions                                        | `make doctor`                                       |
+| Task                                                        | Command                                                  |
+| ----------------------------------------------------------- | -------------------------------------------------------- |
+| Bring up local prod-mirror (DDB Local, LocalStack, Mailpit) | `make dev`                                               |
+| Tear it down                                                | `make dev-down`                                          |
+| Run SAM Local API GW + Go Lambdalith on `:3000`             | `make dev-api`                                           |
+| Run Vite (portal) on `:5173`                                | `make dev-portal`                                        |
+| Run Astro (site) on `:4321`                                 | `make dev-site`                                          |
+| Restart SAM after editing `/api` (no auto-reload)           | `make api-restart`                                       |
+| Seed DDB Local                                              | `make seed`                                              |
+| Reset DDB Local + LocalStack volumes                        | `make reset`                                             |
+| Codegen Go + TS from protos                                 | `make proto`                                             |
+| Lint everything                                             | `make lint` (or `lint-go`, `lint-js`, `lint-proto`)      |
+| Typecheck everything                                        | `make typecheck`                                         |
+| Unit tests across workspaces                                | `make test`                                              |
+| Integration tests (requires `make dev`)                     | `make integration-tests`                                 |
+| Playwright e2e (starts API + portal preview itself)         | `make e2e` (one spec: `make e2e ARGS="tests/x.spec.ts"`) |
+| Validate all SAM templates                                  | `make sam-validate`                                      |
+| Verify tool versions                                        | `make doctor`                                            |
 
 Targeted equivalents:
 
@@ -62,7 +64,7 @@ Node is pinned to **24.16.0** (`.nvmrc`); Go to the version in `api/go.mod`. Use
 
 **Multi-env via parameterized SAM.** Templates accept `Env`, `RootDomain`, `EnvSubdomain` and compose the effective apex via a `HasSubdomain` condition. Every named resource, Export, cookie domain, CORS origin, CloudFront alias, and API GW domain derives from these. Current deployed env is `test` at `test.numun.org`; the same templates stand up `prod` in a different AWS account. Do not hardcode `numun-prod-*` or `numun.org` — thread `Env` and the composed apex through instead. See `docs/runbooks/fresh-environment-deploy.md`.
 
-**Trunk-based, prod-only deploys.** Every merge to `main` deploys via path-filtered workflows (`api.yml`, `site.yml`, `portal.yml`, `cms.yml`). No staging gate. Ship behind flags or in small PRs. `ci.yml` blocks merge on lint/typecheck/tests/`buf lint`/`buf breaking`. A ruleset on `main` requires a PR; `.github/CODEOWNERS` leaves `/content/` unowned, so Decap content PRs merge without review while anything else needs the maintainer. PRs touching `site/` or `content/` get a preview at `pr-<n>.preview.test.numun.org` (`site-preview.yml`).
+**Trunk-based, prod-only deploys.** Every merge to `main` deploys via path-filtered workflows (`api.yml`, `site.yml`, `portal.yml`, `cms.yml`). No staging gate. Ship behind flags or in small PRs. `ci.yml` blocks merge on lint/typecheck/tests/`buf lint`/`buf breaking`, and `e2e.yml` (Playwright) is also a required check. A ruleset on `main` requires a PR; `.github/CODEOWNERS` leaves `/content/` unowned, so Decap content PRs merge without review while anything else needs the maintainer. PRs touching `site/` or `content/` get a preview at `pr-<n>.preview.test.numun.org` (`site-preview.yml`).
 
 **Cost ceiling is real.** Target under $100/yr AWS spend; billing alarm at $10/mo. Prefer serverless/on-demand; avoid always-on resources. If a design choice would push past the ceiling, flag it.
 

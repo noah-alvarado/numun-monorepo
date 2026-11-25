@@ -5,7 +5,6 @@
 
 import { createSignal, Show } from "solid-js";
 import { useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { delegateClient, uploadClient } from "@/lib/api";
 import {
@@ -14,6 +13,9 @@ import {
 } from "@/gen/numun/v1/delegates_pb";
 import { UploadPurpose } from "@/gen/numun/v1/uploads_pb";
 import DelegateImportTabPicker from "@/routes/DelegateImportTabPicker";
+import csvTemplateUrl from "@/assets/templates/delegate-import-template.csv?url&no-inline";
+import xlsxTemplateUrl from "@/assets/templates/delegate-import-template.xlsx?url&no-inline";
+import { connectMessage } from "@/lib/errors";
 
 type Mode = "file" | "sheet";
 
@@ -269,7 +271,7 @@ export default function DelegateImport() {
                       const list = e.currentTarget.files;
                       setFile(list && list[0] ? list[0] : null);
                     }}
-                    class="mt-1 block w-full text-sm"
+                    class="mt-1 block w-full text-sm text-nu-purple-700 file:mr-3 file:rounded file:border file:border-nu-purple-300 file:bg-white file:px-3 file:py-1 file:text-sm file:text-nu-purple-700 hover:file:bg-nu-purple-50"
                   />
                 </label>
                 <p class="mt-2 text-xs text-nu-purple-700">
@@ -305,7 +307,8 @@ export default function DelegateImport() {
             <ul class="mt-2 list-disc pl-5">
               <li>
                 <a
-                  href="/templates/delegate-import-template.csv"
+                  href={csvTemplateUrl}
+                  download="delegate-import-template.csv"
                   class="underline"
                 >
                   delegate-import-template.csv
@@ -313,7 +316,8 @@ export default function DelegateImport() {
               </li>
               <li>
                 <a
-                  href="/templates/delegate-import-template.xlsx"
+                  href={xlsxTemplateUrl}
+                  download="delegate-import-template.xlsx"
                   class="underline"
                 >
                   delegate-import-template.xlsx
@@ -342,10 +346,4 @@ export default function DelegateImport() {
       </Show>
     </main>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

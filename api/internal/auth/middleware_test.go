@@ -191,4 +191,13 @@ func TestSessionHappyPath(t *testing.T) {
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("CSRF mismatch: want 403, got %d", rec.Code)
 	}
+
+	// GET export download (a browser navigation can't send X-CSRF-Token).
+	req = httptest.NewRequest("GET", "/v1/exports/payments.csv?conference_id=c", nil)
+	req.AddCookie(&http.Cookie{Name: auth.SessionCookieName, Value: sessID})
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 204 {
+		t.Fatalf("GET export: want 204, got %d body=%q", rec.Code, rec.Body.String())
+	}
 }

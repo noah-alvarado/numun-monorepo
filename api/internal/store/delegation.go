@@ -540,26 +540,53 @@ func (c *Client) ListDelegationsByStatus(ctx context.Context, conferenceID strin
 	return dels, next, nil
 }
 
+// batchGetDelegations reads delegations by base-table key, in key order,
+// skipping missing and soft-deleted rows. BatchGetItem caps at 100 keys and
+// may return some keys unprocessed, so this chunks and retries.
 func (c *Client) batchGetDelegations(ctx context.Context, keys []map[string]ddbtypes.AttributeValue) ([]domain.Delegation, error) {
 	if len(keys) == 0 {
 		return nil, nil
 	}
-	out, err := c.DDB.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
-		RequestItems: map[string]ddbtypes.KeysAndAttributes{
-			c.Table: {Keys: keys},
-		},
-	})
-	if err != nil {
-		return nil, fmt.Errorf("batch get delegations: %w", err)
-	}
-	rows := out.Responses[c.Table]
-	dels := make([]domain.Delegation, 0, len(rows))
-	for _, raw := range rows {
-		var it delegationItem
-		if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
-			return nil, fmt.Errorf("unmarshal delegation: %w", err)
+	keyOf := func(item map[string]ddbtypes.AttributeValue) string {
+		pk, _ := item["PK"].(*ddbtypes.AttributeValueMemberS)
+		sk, _ := item["SK"].(*ddbtypes.AttributeValueMemberS)
+		if pk == nil || sk == nil {
+			return ""
 		}
-		if it.IsDeleted {
+		return pk.Value + "|" + sk.Value
+	}
+	byKey := make(map[string]delegationItem, len(keys))
+	for start := 0; start < len(keys); start += batchGetLimit {
+		pending := keys[start:min(start+batchGetLimit, len(keys))]
+		for attempt := 0; len(pending) > 0; attempt++ {
+			if attempt > 0 {
+				if attempt > maxBatchGetRetries {
+					return nil, fmt.Errorf("batch get delegations: %d keys still unprocessed", len(pending))
+				}
+				time.Sleep(time.Duration(attempt*attempt) * 25 * time.Millisecond)
+			}
+			out, err := c.DDB.BatchGetItem(ctx, &dynamodb.BatchGetItemInput{
+				RequestItems: map[string]ddbtypes.KeysAndAttributes{
+					c.Table: {Keys: pending},
+				},
+			})
+			if err != nil {
+				return nil, fmt.Errorf("batch get delegations: %w", err)
+			}
+			for _, raw := range out.Responses[c.Table] {
+				var it delegationItem
+				if err := attributevalue.UnmarshalMap(raw, &it); err != nil {
+					return nil, fmt.Errorf("unmarshal delegation: %w", err)
+				}
+				byKey[keyOf(raw)] = it
+			}
+			pending = out.UnprocessedKeys[c.Table].Keys
+		}
+	}
+	dels := make([]domain.Delegation, 0, len(byKey))
+	for _, k := range keys {
+		it, ok := byKey[keyOf(k)]
+		if !ok || it.IsDeleted {
 			continue
 		}
 		dels = append(dels, delegationFromItem(it))

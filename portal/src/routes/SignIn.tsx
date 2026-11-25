@@ -93,7 +93,7 @@ export default function SignIn() {
           <label class="block">
             <span class="text-sm">Email</span>
             <input
-              type="email"
+              type={devBypass ? "text" : "email"}
               required
               autocomplete="email"
               value={email()}

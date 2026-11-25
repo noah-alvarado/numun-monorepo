@@ -1,7 +1,15 @@
 // AssignmentStudio — staff-admin view for proposing, reviewing, and approving
 // algorithm-generated delegate→position assignments.
 
-import { createMemo, createResource, createSignal, For, Show } from "solid-js";
+import {
+  createMemo,
+  createResource,
+  createSignal,
+  For,
+  Match,
+  Show,
+  Switch,
+} from "solid-js";
 import { useNavigate, useParams, useSearchParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
@@ -13,6 +21,7 @@ import {
   delegationClient,
   positionClient,
 } from "@/lib/api";
+import { conferenceLabel } from "@/lib/conference";
 import { userSignal } from "@/lib/session";
 import {
   AssignmentRunStatus,
@@ -25,7 +34,10 @@ import type { Delegate } from "@/gen/numun/v1/delegates_pb";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
 
-import AssignmentStudioRunControls from "./AssignmentStudioRunControls";
+import AssignmentStudioRunControls, {
+  countLabel,
+} from "./AssignmentStudioRunControls";
+import { connectMessage } from "@/lib/errors";
 
 type StatusFilter = "all" | "proposed" | "approved";
 
@@ -36,6 +48,7 @@ export default function AssignmentStudio() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const conferenceId = () => params.conferenceId;
+  const conference = conferenceLabel(conferenceId);
 
   // Reference data: committees, positions, delegates, delegations.
   const [committees, { refetch: refetchCommittees }] = createResource(
@@ -153,6 +166,7 @@ export default function AssignmentStudio() {
   const [busyAction, setBusyAction] = createSignal<string | null>(null);
   const [approveAllOpen, setApproveAllOpen] = createSignal(false);
   const [editTarget, setEditTarget] = createSignal<Assignment | null>(null);
+  const [editError, setEditError] = createSignal<string | null>(null);
   const [historyOpen, setHistoryOpen] = createSignal(false);
   // Row-selection state for the bulk-approve / unapprove / swap actions.
   const [selected, setSelected] = createSignal<Set<string>>(new Set());
@@ -318,18 +332,18 @@ export default function AssignmentStudio() {
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">Assignment Studio</h1>
-          <p class="mt-1 text-sm text-nu-purple-700">
-            Conference {conferenceId()}
-          </p>
+          <p class="mt-1 text-sm text-nu-purple-700">{conference()}</p>
         </div>
         <div class="flex items-center gap-3 text-sm">
-          <RunStatusBadge
-            run={currentRun()}
-            onRefresh={() => {
-              refetchCurrentRun();
-              refetchRuns();
-            }}
-          />
+          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+            <RunStatusBadge
+              run={currentRun() ?? runs()?.[0]}
+              onRefresh={() => {
+                refetchCurrentRun();
+                refetchRuns();
+              }}
+            />
+          </Show>
           <button
             type="button"
             onClick={() => navigate("/dashboard")}
@@ -366,7 +380,7 @@ export default function AssignmentStudio() {
 
             <div class="mt-3 flex items-center justify-between">
               <p class="text-xs text-nu-purple-700">
-                {(assignments() ?? []).length} assignments
+                {countLabel((assignments() ?? []).length)}
               </p>
               <div class="flex gap-2">
                 <button
@@ -482,17 +496,23 @@ export default function AssignmentStudio() {
                             colspan={7}
                             class="px-2 py-4 text-center text-nu-purple-700"
                           >
-                            No assignments yet. Use Propose to generate.
+                            {committeeFilter() ||
+                            delegationFilter() ||
+                            statusFilter() !== "all"
+                              ? "No assignments match these filters."
+                              : "No assignments yet. Use Propose to generate."}
                           </td>
                         </tr>
                       }
                     >
                       <For each={assignments() ?? []}>
                         {(a) => {
-                          const d = delegateById(a.delegateId);
-                          const del = delegationById(a.delegationId);
-                          const p = positionById(a.positionId);
-                          const c = committeeById(a.committeeId);
+                          // Reference data may land after the rows, so look
+                          // names up reactively rather than once per row.
+                          const d = () => delegateById(a.delegateId);
+                          const del = () => delegationById(a.delegationId);
+                          const p = () => positionById(a.positionId);
+                          const c = () => committeeById(a.committeeId);
                           return (
                             <tr class="border-t border-nu-purple-100 align-top">
                               <td class="px-2 py-2">
@@ -505,20 +525,20 @@ export default function AssignmentStudio() {
                               </td>
                               <td class="px-2 py-2">
                                 <div class="font-semibold">
-                                  {d
-                                    ? `${d.firstName} ${d.lastName}`
-                                    : a.delegateId}
+                                  {d()
+                                    ? `${d()!.firstName} ${d()!.lastName}`
+                                    : "…"}
                                 </div>
                                 <div class="text-xs text-nu-purple-700">
-                                  {del?.school ?? a.delegationId}
+                                  {del()?.school ?? "…"}
                                 </div>
                               </td>
                               <td class="px-2 py-2">
                                 <div class="font-semibold">
-                                  {c?.name ?? a.committeeId}
+                                  {c()?.name ?? "…"}
                                 </div>
                                 <div class="text-xs text-nu-purple-700">
-                                  {p?.name ?? a.positionId}
+                                  {p()?.name ?? "…"}
                                 </div>
                               </td>
                               <td class="px-2 py-2">
@@ -641,9 +661,13 @@ export default function AssignmentStudio() {
             assignment={target()}
             positions={positions() ?? []}
             committees={committees() ?? []}
-            onClose={() => setEditTarget(null)}
+            error={editError()}
+            onClose={() => {
+              setEditTarget(null);
+              setEditError(null);
+            }}
             onSubmit={async (newPositionId) => {
-              setError(null);
+              setEditError(null);
               try {
                 await assignmentClient.updateAssignment({
                   assignmentId: target().id,
@@ -653,7 +677,7 @@ export default function AssignmentStudio() {
                 setEditTarget(null);
                 await refetchAssignments();
               } catch (err) {
-                setError(handleMutationError(err));
+                setEditError(handleMutationError(err));
               }
             }}
           />
@@ -686,7 +710,11 @@ function Filters(props: {
         >
           <option value="">All</option>
           <For each={props.committees}>
-            {(c) => <option value={c.id}>{c.name}</option>}
+            {(c) => (
+              <option value={c.id} selected={c.id === props.committeeId}>
+                {c.name}
+              </option>
+            )}
           </For>
         </select>
       </label>
@@ -703,7 +731,11 @@ function Filters(props: {
         >
           <option value="">All</option>
           <For each={props.delegations}>
-            {(d) => <option value={d.id}>{d.school}</option>}
+            {(d) => (
+              <option value={d.id} selected={d.id === props.delegationId}>
+                {d.school}
+              </option>
+            )}
           </For>
         </select>
       </label>
@@ -736,45 +768,36 @@ function RunStatusBadge(props: {
   run: AssignmentRun | null | undefined;
   onRefresh: () => void;
 }) {
-  const r = props.run;
-  if (!r) {
-    return (
-      <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
-        No active run
-      </span>
-    );
-  }
-  if (r.status === AssignmentRunStatus.RUNNING) {
-    return (
-      <span class="flex items-center gap-2 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-900">
-        <Spinner /> Run in progress
-        <button type="button" onClick={props.onRefresh} class="underline">
-          Refresh
-        </button>
-      </span>
-    );
-  }
-  if (r.status === AssignmentRunStatus.DONE) {
-    return (
-      <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
-        Last run: done · obj {r.objective.toFixed(2)}
-      </span>
-    );
-  }
-  if (r.status === AssignmentRunStatus.FAILED) {
-    return (
-      <span
-        class="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-900"
-        title={r.diagnostics}
-      >
-        Last run: failed
-      </span>
-    );
-  }
   return (
-    <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
-      —
-    </span>
+    <Switch
+      fallback={
+        <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
+          No runs yet
+        </span>
+      }
+    >
+      <Match when={props.run?.status === AssignmentRunStatus.RUNNING}>
+        <span class="flex items-center gap-2 rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-900">
+          <Spinner /> Run in progress
+          <button type="button" onClick={props.onRefresh} class="underline">
+            Refresh
+          </button>
+        </span>
+      </Match>
+      <Match when={props.run?.status === AssignmentRunStatus.DONE}>
+        <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs text-nu-purple-700">
+          Last run: done · obj {props.run?.objective.toFixed(2)}
+        </span>
+      </Match>
+      <Match when={props.run?.status === AssignmentRunStatus.FAILED}>
+        <span
+          class="rounded bg-amber-50 px-2 py-0.5 text-xs text-amber-900"
+          title={props.run?.diagnostics}
+        >
+          Last run: failed
+        </span>
+      </Match>
+    </Switch>
   );
 }
 
@@ -862,6 +885,7 @@ function EditAssignmentModal(props: {
   assignment: Assignment;
   positions: Position[];
   committees: Committee[];
+  error: string | null;
   onClose: () => void;
   onSubmit: (positionId: string) => Promise<void>;
 }) {
@@ -907,9 +931,17 @@ function EditAssignmentModal(props: {
           </select>
         </label>
         <p class="text-xs text-nu-purple-700">
-          The handler will validate hard constraints (capacity, dual-delegation
-          pairing, reserved-tier rules) before committing.
+          Saving checks that the position has a free seat.
+          <Show when={props.assignment.status === AssignmentStatus.APPROVED}>
+            {" "}
+            This assignment is approved; moving it returns it to Proposed.
+          </Show>
         </p>
+        <Show when={props.error}>
+          {(e) => (
+            <p class="rounded bg-red-50 p-2 text-xs text-red-900">{e()}</p>
+          )}
+        </Show>
         <div class="flex justify-end gap-2 pt-2">
           <button
             type="button"
@@ -992,18 +1024,12 @@ function formatTs(ts: { seconds: bigint; nanos: number } | undefined): string {
   return new Date(ms).toLocaleString();
 }
 
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
-}
-
 function handleMutationError(err: unknown): string {
   if (err instanceof ConnectError && err.code === Code.Aborted) {
     return "Another change happened first. Reload to fetch the latest state.";
   }
   if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
-    return err.message;
+    return err.rawMessage;
   }
   return connectMessage(err) ?? "Operation failed.";
 }

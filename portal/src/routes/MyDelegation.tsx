@@ -35,6 +35,7 @@ import {
   formToEstimated,
   formToPrefs,
 } from "@/lib/delegation-mappers";
+import { connectMessage } from "@/lib/errors";
 
 type TabKey = "overview" | "delegates" | "payments";
 
@@ -80,7 +81,11 @@ export default function MyDelegation() {
       const resp = await delegationClient.getDelegation({ delegationId });
       setDelegation(resp.delegation ?? null);
     } catch (err) {
-      setBanner(connectMessage(err) ?? "Failed to load delegation.");
+      setBanner(
+        err instanceof ConnectError && err.code === Code.NotFound
+          ? "Delegation not found."
+          : (connectMessage(err) ?? "Failed to load delegation."),
+      );
     } finally {
       setLoading(false);
       setLoaded(true);
@@ -220,22 +225,35 @@ export default function MyDelegation() {
         </p>
       </Show>
 
+      <Show when={!loaded()}>
+        <p class="mt-6 text-sm text-nu-purple-700">Loading…</p>
+      </Show>
+
       <Show when={loaded()}>
         <Show
           when={delegation()}
           fallback={
-            <Show when={!params.delegationId && conference()}>
-              <section class="mt-6">
-                <CreateBlock
-                  onSubmit={handleCreate}
-                  banner={
-                    <Show when={banner()}>
-                      {(b) => <Banner message={b()} kind="error" />}
-                    </Show>
-                  }
-                />
-              </section>
-            </Show>
+            <>
+              <Show when={params.delegationId && banner()}>
+                {(b) => (
+                  <section class="mt-6">
+                    <Banner message={b()} kind="error" />
+                  </section>
+                )}
+              </Show>
+              <Show when={!params.delegationId && conference()}>
+                <section class="mt-6">
+                  <CreateBlock
+                    onSubmit={handleCreate}
+                    banner={
+                      <Show when={banner()}>
+                        {(b) => <Banner message={b()} kind="error" />}
+                      </Show>
+                    }
+                  />
+                </section>
+              </Show>
+            </>
           }
         >
           {(d) => (
@@ -245,13 +263,20 @@ export default function MyDelegation() {
                 {(b) => <Banner message={b()} kind="error" />}
               </Show>
               <Show when={activeTab() === "overview"}>
-                <EditBlock delegation={d()} onSubmit={handleUpdate} />
+                {/* Keyed: a reload or save hands back a new Delegation, and
+                    the form must re-init from it — otherwise stale edits
+                    would be saved against the newer expected_version. */}
+                <Show when={delegation()} keyed>
+                  {(current) => (
+                    <EditBlock delegation={current} onSubmit={handleUpdate} />
+                  )}
+                </Show>
               </Show>
               <Show when={activeTab() === "delegates"}>
                 <DelegatesPlaceholder delegationId={d().id} />
               </Show>
               <Show when={activeTab() === "payments"}>
-                <DelegationPayments delegation={d()} />
+                <DelegationPayments delegation={d()} onLedgerChanged={reload} />
               </Show>
             </section>
           )}
@@ -373,14 +398,4 @@ function Banner(props: { message: string; kind: "error" | "info" }) {
       {props.message}
     </div>
   );
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) {
-    return err.message;
-  }
-  if (err instanceof Error) {
-    return err.message;
-  }
-  return null;
 }

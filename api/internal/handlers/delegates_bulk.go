@@ -555,13 +555,16 @@ func chunkOps(creates []domain.Delegate, updates []store.DelegateUpdate, softDel
 
 // computeRosterMatches sets PreviewRow.Match to Create or Update against the
 // live roster. Same-upload Conflict matches are preserved if already set.
-// Also populates summary's create/update/match-by-* counts and (for full-sync)
-// soft-delete count is left to planWrites.
+// Also populates summary's create/update/match-by-* counts, and its
+// soft-delete count with how many roster delegates the rows leave unmatched,
+// i.e. what Full sync would soft-delete (BULK_IMPORT.md §5).
 func computeRosterMatches(rows []*v1.PreviewRow, roster []domain.Delegate, summary *v1.PreviewSummary) {
 	byKey := make(map[string]domain.Delegate, len(roster))
 	for _, d := range roster {
 		byKey[delegateDedupeKey(d)] = d
 	}
+	matched := make(map[string]bool, len(roster))
+	defer func() { summary.SoftDeleteCount = int32(len(roster) - len(matched)) }()
 	for _, r := range rows {
 		if _, isConflict := r.Match.(*v1.PreviewRow_Conflict); isConflict {
 			continue
@@ -573,6 +576,7 @@ func computeRosterMatches(rows []*v1.PreviewRow, roster []domain.Delegate, summa
 			summary.CreateCount++
 			continue
 		}
+		matched[match.ID] = true
 		diff := diffFields(match, r.Input)
 		r.Match = &v1.PreviewRow_Update{
 			Update: &v1.PreviewRow_UpdateMatch{

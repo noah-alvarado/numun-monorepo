@@ -1,9 +1,8 @@
 // Bulk import preview — paginated editable table of parsed rows. Confirm
 // disables when any row has errors. See BULK_IMPORT.md §5.
 
-import { createMemo, createSignal, For, Show } from "solid-js";
+import { createMemo, createSignal, For, Index, Show } from "solid-js";
 import { useLocation, useNavigate, useParams } from "@solidjs/router";
-import { ConnectError } from "@connectrpc/connect";
 
 import { create } from "@bufbuild/protobuf";
 
@@ -16,6 +15,7 @@ import {
   type PreviewSummary,
   type PreviewUpsertDelegatesBulkResponse,
 } from "@/gen/numun/v1/delegates_pb";
+import { connectMessage } from "@/lib/errors";
 
 type ImportSource =
   | { kind: "upload"; uploadKey: string; format: number }
@@ -87,11 +87,27 @@ export default function DelegateImportPreview() {
     const start = page() * PAGE_SIZE;
     return rows().slice(start, start + PAGE_SIZE);
   });
-  const hasErrors = createMemo(() => rows().some((r) => r.errors.length > 0));
+  const errorCount = createMemo(
+    () => rows().filter((r) => r.errors.length > 0).length,
+  );
+  const hasErrors = () => errorCount() > 0;
 
   function updateRow(rowNumber: number, patch: Partial<EditableRow>) {
+    // Editing a field clears its preview errors so the advisor can fix rows
+    // inline; the commit re-validates server-side (BULK_IMPORT.md §4).
+    const edited = Object.keys(patch);
     setRows(
-      rows().map((r) => (r.rowNumber === rowNumber ? { ...r, ...patch } : r)),
+      rows().map((r) =>
+        r.rowNumber === rowNumber
+          ? {
+              ...r,
+              ...patch,
+              errors: r.errors.filter(
+                (e) => !edited.some((f) => e.field.startsWith(f)),
+              ),
+            }
+          : r,
+      ),
     );
   }
 
@@ -162,7 +178,16 @@ export default function DelegateImportPreview() {
         )}
       </Show>
 
-      <Show when={summary}>{(s) => <SummaryBar summary={s()} />}</Show>
+      <Show when={summary}>
+        {(s) => (
+          <SummaryBar
+            summary={s()}
+            errorCount={errorCount()}
+            validCount={rows().length - errorCount()}
+            fullSync={mode() === UpsertMode.FULL_SYNC}
+          />
+        )}
+      </Show>
 
       <section class="mt-4 rounded border border-nu-purple-200 bg-white p-4">
         <legend class="text-sm font-semibold text-nu-purple-700">
@@ -223,27 +248,30 @@ export default function DelegateImportPreview() {
             </tr>
           </thead>
           <tbody>
-            <For each={visible()}>
+            {/* Index, not For: edits replace the row object, and For would
+                re-mount the row (losing input focus) on every keystroke. */}
+            <Index each={visible()}>
               {(row) => (
                 <RowView
-                  row={row}
-                  expanded={expanded() === row.rowNumber}
+                  row={row()}
+                  expanded={expanded() === row().rowNumber}
                   onToggleExpand={() =>
                     setExpanded(
-                      expanded() === row.rowNumber ? null : row.rowNumber,
+                      expanded() === row().rowNumber ? null : row().rowNumber,
                     )
                   }
-                  onChange={(patch) => updateRow(row.rowNumber, patch)}
+                  onChange={(patch) => updateRow(row().rowNumber, patch)}
                 />
               )}
-            </For>
+            </Index>
           </tbody>
         </table>
       </section>
 
       <div class="mt-3 flex items-center justify-between text-sm">
         <div class="text-nu-purple-700">
-          Page {page() + 1} of {totalPages()} · {rows().length} rows
+          Page {page() + 1} of {totalPages()} · {rows().length}{" "}
+          {rows().length === 1 ? "row" : "rows"}
         </div>
         <div class="flex gap-2">
           <button
@@ -293,22 +321,33 @@ export default function DelegateImportPreview() {
   );
 }
 
-function SummaryBar(props: { summary: PreviewSummary }) {
+// Valid/Errors track inline fixes; the rest is the server's preview summary.
+function SummaryBar(props: {
+  summary: PreviewSummary;
+  errorCount: number;
+  validCount: number;
+  fullSync: boolean;
+}) {
   const s = props.summary;
   return (
     <section class="mt-4 grid grid-cols-2 gap-2 rounded border border-nu-purple-200 bg-white p-4 text-sm md:grid-cols-4">
       <Stat label="Parsed" value={s.parsedCount} />
-      <Stat label="Valid" value={s.validCount} />
+      <Stat label="Valid" value={props.validCount} />
       <Stat
         label="Errors"
-        value={s.errorCount}
-        kind={s.errorCount > 0 ? "warn" : "ok"}
+        value={props.errorCount}
+        kind={props.errorCount > 0 ? "warn" : "ok"}
       />
       <Stat label="Create" value={s.createCount} />
       <Stat label="Update" value={s.updateCount} />
       <Stat label="Matched by email" value={s.matchByEmail} />
       <Stat label="Matched by name" value={s.matchByName} />
-      <Stat label="Will soft-delete" value={s.softDeleteCount} />
+      {/* Additive imports never delete; the count is what Full sync would. */}
+      <Stat
+        label="Will soft-delete"
+        value={props.fullSync ? s.softDeleteCount : 0}
+        kind={props.fullSync && s.softDeleteCount > 0 ? "warn" : "ok"}
+      />
     </section>
   );
 }
@@ -483,17 +522,35 @@ function DiffTable(props: {
         <For each={entries()}>
           {([k, v]) => (
             <tr>
-              <td class="py-0.5 pr-2 font-semibold">{k}</td>
+              <td class="py-0.5 pr-2 font-semibold">{fieldLabel(k)}</td>
               <td class="py-0.5 pr-2 text-nu-purple-700 line-through">
-                {v.old || "—"}
+                {diffValue(k, v.old)}
               </td>
-              <td class="py-0.5">{v.new || "—"}</td>
+              <td class="py-0.5">{diffValue(k, v.new)}</td>
             </tr>
           )}
         </For>
       </tbody>
     </table>
   );
+}
+
+const FIELD_LABELS: Record<string, string> = {
+  firstName: "First name",
+  lastName: "Last name",
+  email: "Email",
+  experienceLevel: "Experience",
+};
+
+function fieldLabel(field: string): string {
+  return FIELD_LABELS[field] ?? field;
+}
+
+function diffValue(field: string, v: string): string {
+  if (!v) return "—";
+  return field === "experienceLevel"
+    ? v.charAt(0).toUpperCase() + v.slice(1)
+    : v;
 }
 
 function CellInput(props: {
@@ -530,10 +587,4 @@ function toEditable(r: PreviewRow): EditableRow {
     errors: r.errors.map((e) => ({ field: e.field, message: e.message })),
     match: r.match,
   };
-}
-
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
 }

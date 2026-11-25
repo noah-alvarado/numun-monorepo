@@ -21,6 +21,16 @@ export default defineConfig({
     port: 5173,
     strictPort: true,
   },
+  // `vite preview` serves the e2e build (see /e2e). Proxying the API puts it
+  // on the portal's origin: the plain-HTTP Go server (LOCAL_HTTP=true) sends
+  // no CORS headers — API Gateway adds those in prod.
+  preview: {
+    port: 4173,
+    strictPort: true,
+    proxy: {
+      "^/(numun\\.v1\\.|v1/)": "http://localhost:3000",
+    },
+  },
   build: {
     target: "es2022",
     sourcemap: true,

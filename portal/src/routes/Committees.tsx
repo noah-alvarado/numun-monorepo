@@ -11,6 +11,7 @@ import { useNavigate, useParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
 import { committeeClient, positionClient } from "@/lib/api";
+import { conferenceLabel } from "@/lib/conference";
 import { userSignal } from "@/lib/session";
 import {
   CommitteeSize,
@@ -20,6 +21,7 @@ import {
   type Position,
 } from "@/gen/numun/v1/committees_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
+import { connectMessage } from "@/lib/errors";
 
 type CommitteeFormState = {
   name: string;
@@ -39,6 +41,7 @@ export default function Committees() {
   const params = useParams<{ conferenceId: string }>();
   const [user] = userSignal;
   const navigate = useNavigate();
+  const conference = conferenceLabel(() => params.conferenceId);
 
   const [committees, { refetch }] = createResource(
     () => params.conferenceId,
@@ -59,9 +62,7 @@ export default function Committees() {
       <header class="flex items-center justify-between">
         <div>
           <h1 class="text-2xl font-bold text-nu-purple">Committees</h1>
-          <p class="mt-1 text-sm text-nu-purple-700">
-            Conference {params.conferenceId}
-          </p>
+          <p class="mt-1 text-sm text-nu-purple-700">{conference()}</p>
         </div>
         <div class="flex gap-2 text-sm">
           <button
@@ -71,20 +72,22 @@ export default function Committees() {
           >
             Back
           </button>
-          <button
-            type="button"
-            onClick={() => refetch()}
-            class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-          >
-            Reload
-          </button>
-          <button
-            type="button"
-            onClick={() => setCreateOpen(true)}
-            class="rounded bg-nu-purple px-3 py-1 text-white"
-          >
-            Create committee
-          </button>
+          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+            <button
+              type="button"
+              onClick={() => refetch()}
+              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
+            >
+              Reload
+            </button>
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              class="rounded bg-nu-purple px-3 py-1 text-white"
+            >
+              Create committee
+            </button>
+          </Show>
         </div>
       </header>
 
@@ -842,18 +845,12 @@ function committeeSizeLabel(s: CommitteeSize): string {
   }
 }
 
-function connectMessage(err: unknown): string | null {
-  if (err instanceof ConnectError) return err.message;
-  if (err instanceof Error) return err.message;
-  return null;
-}
-
 function handleMutationError(err: unknown): string {
   if (err instanceof ConnectError && err.code === Code.Aborted) {
     return "Another change happened first. Reload to fetch the latest state.";
   }
   if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
-    return err.message;
+    return err.rawMessage;
   }
   return connectMessage(err) ?? "Operation failed.";
 }
