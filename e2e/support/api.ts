@@ -91,3 +91,26 @@ export async function createDelegation(
 export function uniqueSchool(label: string): string {
   return `E2E ${label} ${randomUUID().slice(0, 8)}`;
 }
+
+export type Delegate = { id: string; firstName: string; lastName: string };
+
+export async function createDelegate(
+  advisorId: string,
+  delegationId: string,
+  firstName: string,
+  lastName: string,
+): Promise<Delegate> {
+  const { delegate } = await rpc<{ delegate: Delegate }>(
+    advisorId,
+    "DelegateService/CreateDelegate",
+    { delegationId, input: { firstName, lastName } },
+  );
+  return delegate;
+}
+
+// A last name no other test row will match in a name search.
+export function uniqueSurname(): string {
+  return `Zed${randomUUID()
+    .replace(/[^a-f]/g, "")
+    .slice(0, 8)}`;
+}
