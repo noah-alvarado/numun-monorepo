@@ -3,9 +3,11 @@
 // - Advisor: read-only list of conference awards, plus a permanent
 //   congratulatory hero when one of their delegates / delegations won.
 //   Dismissal persists server-side via UserService.DismissAward.
-// - Staff-staffer: can award delegates / delegate-pairs / delegations /
-//   staffers tied to delegations they're assigned to. Reads see everything.
-// - Staff-admin: full CRUD, any recipient kind, any ID.
+// - Staff-staffer: can award delegates / delegations tied to delegations
+//   they're assigned to. Reads see everything.
+// - Staff-admin: full CRUD, any recipient kind.
+//
+// Recipients are picked by name (delegates via search), never typed as ids.
 //
 // CMS sync status from each mutation is surfaced inline so admins know
 // whether the public site was updated.
@@ -21,7 +23,12 @@ import {
 import { useNavigate } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
-import { awardClient, delegateClient, exportUrls, userClient } from "@/lib/api";
+import {
+  awardClient,
+  committeeClient,
+  delegateClient,
+  userClient,
+} from "@/lib/api";
 import { activeConferenceSignal, userSignal } from "@/lib/session";
 import {
   AwardRecipientKind,
@@ -29,8 +36,10 @@ import {
   type AwardRecipient,
   type CmsSyncStatus,
 } from "@/gen/numun/v1/awards_pb";
-import { User_Role } from "@/gen/numun/v1/users_pb";
+import { User_Role, type User } from "@/gen/numun/v1/users_pb";
 import type { Delegation } from "@/gen/numun/v1/delegations_pb";
+import type { Committee } from "@/gen/numun/v1/committees_pb";
+import type { SearchDelegatesResponse_Hit } from "@/gen/numun/v1/delegates_pb";
 import { listScopedDelegations } from "@/lib/delegations";
 import { connectMessage } from "@/lib/errors";
 
@@ -38,6 +47,15 @@ type RecipientFormRow = {
   kind: AwardRecipientKind;
   id: string;
   displayName: string;
+};
+
+// What the recipient pickers offer, by kind. Delegates are searched by name
+// instead (there can be thousands).
+type PickerOptions = {
+  conference: { id: string; name: string } | null;
+  delegations: Delegation[];
+  committees: Committee[];
+  staff: User[];
 };
 
 type AwardFormState = {
@@ -95,6 +113,40 @@ export default function Awards() {
       return ids;
     },
   );
+
+  // Committees and staff are admin-only recipient kinds.
+  const [committees] = createResource(
+    () => (user()?.role === User_Role.STAFF_ADMIN ? conferenceId() : ""),
+    async (id) => {
+      if (!id) return [] as Committee[];
+      try {
+        return (await committeeClient.listCommittees({ conferenceId: id }))
+          .items;
+      } catch {
+        return [] as Committee[];
+      }
+    },
+  );
+  const [staff] = createResource(
+    () => user()?.role === User_Role.STAFF_ADMIN,
+    async (admin) => {
+      if (!admin) return [] as User[];
+      try {
+        return (await userClient.listStaff({})).items;
+      } catch {
+        return [] as User[];
+      }
+    },
+  );
+  const pickerOptions = (): PickerOptions => {
+    const c = conference();
+    return {
+      conference: c ? { id: c.conferenceId, name: c.name } : null,
+      delegations: myDelegations() ?? [],
+      committees: committees() ?? [],
+      staff: staff() ?? [],
+    };
+  };
 
   const isAdvisor = () => user()?.role === User_Role.ADVISOR;
   const isStaffer = () => user()?.role === User_Role.STAFF_STAFFER;
@@ -246,29 +298,6 @@ export default function Awards() {
           >
             Back
           </button>
-          <Show when={isAdmin() && conferenceId()}>
-            <a
-              href={exportUrls.assignmentsCsv(conferenceId())}
-              download=""
-              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-            >
-              Export assignments.csv
-            </a>
-            <a
-              href={exportUrls.delegatesCsv(conferenceId())}
-              download=""
-              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-            >
-              Export delegates.csv
-            </a>
-            <a
-              href={exportUrls.paymentsCsv(conferenceId())}
-              download=""
-              class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
-            >
-              Export payments.csv
-            </a>
-          </Show>
           <Show when={!isAdvisor() && conferenceId()}>
             <button
               type="button"
@@ -424,6 +453,7 @@ export default function Awards() {
             ],
           }}
           allowedKinds={kindsForCaller(user()?.role)}
+          options={pickerOptions()}
           error={error()}
           onClose={closeModals}
           onSubmit={handleCreate}
@@ -444,6 +474,7 @@ export default function Awards() {
               })),
             }}
             allowedKinds={kindsForCaller(user()?.role)}
+            options={pickerOptions()}
             error={error()}
             onClose={closeModals}
             onSubmit={(s) => handleUpdate(target(), s)}
@@ -472,7 +503,7 @@ function RecipientList(props: { recipients: AwardRecipient[] }) {
       <For each={props.recipients}>
         {(r) => (
           <li>
-            <span class="font-medium">{r.displayName || r.id}</span>{" "}
+            <span class="font-medium">{r.displayName || "Unnamed"}</span>{" "}
             <span class="text-xs text-nu-purple-400">
               ({kindLabel(r.kind)})
             </span>
@@ -487,10 +518,12 @@ function AwardModal(props: {
   title: string;
   initial: AwardFormState;
   allowedKinds: AwardRecipientKind[];
+  options: PickerOptions;
   error: string | null;
   onClose: () => void;
   onSubmit: (s: AwardFormState) => Promise<void>;
 }) {
+  const [localError, setLocalError] = createSignal<string | null>(null);
   const [name, setName] = createSignal(props.initial.name);
   const [category, setCategory] = createSignal(props.initial.category);
   const [recipients, setRecipients] = createSignal<RecipientFormRow[]>(
@@ -517,18 +550,22 @@ function AwardModal(props: {
 
   async function submit(e: SubmitEvent) {
     e.preventDefault();
+    const chosen = recipients().filter((r) => r.id.trim() !== "");
+    if (chosen.length === 0) {
+      setLocalError("Choose at least one recipient.");
+      return;
+    }
+    setLocalError(null);
     setBusy(true);
     try {
       await props.onSubmit({
         name: name().trim(),
         category: category().trim(),
-        recipients: recipients()
-          .filter((r) => r.id.trim() !== "")
-          .map((r) => ({
-            kind: r.kind,
-            id: r.id.trim(),
-            displayName: r.displayName.trim(),
-          })),
+        recipients: chosen.map((r) => ({
+          kind: r.kind,
+          id: r.id.trim(),
+          displayName: r.displayName.trim(),
+        })),
       });
     } finally {
       setBusy(false);
@@ -568,12 +605,15 @@ function AwardModal(props: {
           </legend>
           <For each={recipients()}>
             {(row, i) => (
-              <div class="mt-2 grid grid-cols-[8rem_minmax(0,1fr)_minmax(0,1fr)_auto] gap-2">
+              <div class="mt-2 grid grid-cols-[8rem_minmax(0,1fr)_auto] items-start gap-2">
                 <select
+                  aria-label="Recipient type"
                   value={String(row.kind)}
                   onChange={(e) =>
                     updateRow(i(), {
                       kind: Number(e.currentTarget.value) as AwardRecipientKind,
+                      id: "",
+                      displayName: "",
                     })
                   }
                   class="rounded border border-nu-purple-300 px-2 py-1"
@@ -582,22 +622,12 @@ function AwardModal(props: {
                     {(k) => <option value={String(k)}>{kindLabel(k)}</option>}
                   </For>
                 </select>
-                <input
-                  type="text"
-                  required
-                  placeholder="ID"
-                  value={row.id}
-                  onInput={(e) => updateRow(i(), { id: e.currentTarget.value })}
-                  class="rounded border border-nu-purple-300 px-2 py-1"
-                />
-                <input
-                  type="text"
-                  placeholder="Display name (optional)"
-                  value={row.displayName}
-                  onInput={(e) =>
-                    updateRow(i(), { displayName: e.currentTarget.value })
+                <RecipientPicker
+                  row={row}
+                  options={props.options}
+                  onPick={(id, displayName) =>
+                    updateRow(i(), { id, displayName })
                   }
-                  class="rounded border border-nu-purple-300 px-2 py-1"
                 />
                 <button
                   type="button"
@@ -619,7 +649,7 @@ function AwardModal(props: {
           </button>
         </fieldset>
 
-        <ModalError message={props.error} />
+        <ModalError message={localError() ?? props.error} />
 
         <div class="flex justify-end gap-2 pt-2">
           <button
@@ -639,6 +669,154 @@ function AwardModal(props: {
         </div>
       </form>
     </ModalShell>
+  );
+}
+
+function RecipientPicker(props: {
+  row: RecipientFormRow;
+  options: PickerOptions;
+  onPick: (id: string, displayName: string) => void;
+}) {
+  const choices = (): [string, string][] => {
+    const o = props.options;
+    switch (props.row.kind) {
+      case AwardRecipientKind.DELEGATION:
+        return o.delegations.map((d) => [d.id, d.school]);
+      case AwardRecipientKind.COMMITTEE:
+        return o.committees.map((c) => [c.id, c.name]);
+      case AwardRecipientKind.USER:
+        return o.staff.map((u) => [u.id, u.name || u.email]);
+      case AwardRecipientKind.CONFERENCE:
+        return o.conference ? [[o.conference.id, o.conference.name]] : [];
+      default:
+        return [];
+    }
+  };
+  // Keep an existing recipient selectable even if it's no longer offered.
+  const withCurrent = (): [string, string][] => {
+    const list = choices();
+    const { id, displayName } = props.row;
+    return id && !list.some(([v]) => v === id)
+      ? [[id, displayName || "Current recipient"], ...list]
+      : list;
+  };
+  return (
+    <Show
+      when={props.row.kind !== AwardRecipientKind.DELEGATE}
+      fallback={<DelegateSearch row={props.row} onPick={props.onPick} />}
+    >
+      <select
+        aria-label="Recipient"
+        required
+        value={props.row.id}
+        onChange={(e) => {
+          const id = e.currentTarget.value;
+          props.onPick(id, withCurrent().find(([v]) => v === id)?.[1] ?? "");
+        }}
+        class="rounded border border-nu-purple-300 px-2 py-1"
+      >
+        <option value="">Choose…</option>
+        {/* `selected` rather than the select's value: the value is applied
+            before these options render, which would leave "Choose…". */}
+        <For each={withCurrent()}>
+          {([id, label]) => (
+            <option value={id} selected={id === props.row.id}>
+              {label}
+            </option>
+          )}
+        </For>
+      </select>
+    </Show>
+  );
+}
+
+// Delegates are found by name; the server limits results to the caller's
+// scope (all delegates for admins, assigned delegations for staffers).
+function DelegateSearch(props: {
+  row: RecipientFormRow;
+  onPick: (id: string, displayName: string) => void;
+}) {
+  const [conference] = activeConferenceSignal;
+  const [query, setQuery] = createSignal("");
+  const [hits, setHits] = createSignal<SearchDelegatesResponse_Hit[]>([]);
+  let seq = 0;
+
+  async function search(q: string) {
+    setQuery(q);
+    const conferenceId = conference()?.conferenceId;
+    if (q.trim().length < 2 || !conferenceId) {
+      setHits([]);
+      return;
+    }
+    const mine = ++seq;
+    try {
+      const resp = await delegateClient.searchDelegates({
+        conferenceId,
+        query: q.trim(),
+        limit: 10,
+      });
+      if (mine === seq) setHits(resp.items);
+    } catch {
+      if (mine === seq) setHits([]);
+    }
+  }
+
+  return (
+    <Show
+      when={!props.row.id}
+      fallback={
+        <div class="flex items-center justify-between rounded border border-nu-purple-200 px-2 py-1">
+          <span>{props.row.displayName || "Selected delegate"}</span>
+          <button
+            type="button"
+            onClick={() => props.onPick("", "")}
+            class="text-xs text-nu-purple-700 underline"
+          >
+            Change
+          </button>
+        </div>
+      }
+    >
+      <div>
+        <input
+          type="search"
+          aria-label="Search delegates by name"
+          placeholder="Search delegates by name…"
+          value={query()}
+          onInput={(e) => void search(e.currentTarget.value)}
+          class="w-full rounded border border-nu-purple-300 px-2 py-1"
+        />
+        <Show when={hits().length > 0}>
+          <ul class="mt-1 max-h-40 overflow-y-auto rounded border border-nu-purple-200">
+            <For each={hits()}>
+              {(h) => (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      props.onPick(
+                        h.delegate!.id,
+                        `${h.delegate!.firstName} ${h.delegate!.lastName}`,
+                      )
+                    }
+                    class="w-full px-2 py-1 text-left hover:bg-nu-purple-50"
+                  >
+                    {h.delegate!.firstName} {h.delegate!.lastName}
+                    <span class="text-xs text-nu-purple-700">
+                      {" "}
+                      — {h.delegationSchool}
+                    </span>
+                  </button>
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+        <Show when={query().trim().length >= 2 && hits().length === 0}>
+          <p class="mt-1 text-xs text-nu-purple-700">No matching delegates.</p>
+        </Show>
+      </div>
+    </Show>
   );
 }
 
@@ -735,11 +913,7 @@ function kindsForCaller(role: User_Role | undefined): AwardRecipientKind[] {
     ];
   }
   if (role === User_Role.STAFF_STAFFER) {
-    return [
-      AwardRecipientKind.DELEGATE,
-      AwardRecipientKind.DELEGATION,
-      AwardRecipientKind.USER,
-    ];
+    return [AwardRecipientKind.DELEGATE, AwardRecipientKind.DELEGATION];
   }
   return [];
 }

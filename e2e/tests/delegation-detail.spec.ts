@@ -59,6 +59,10 @@ test("advisor manages the roster by hand", async ({
   await step("edit a delegate", async () => {
     await page.getByRole("button", { name: `Edit Alan ${surname}` }).click();
     const edit = page.getByRole("form", { name: `Edit Alan ${surname}` });
+    await expect(edit.getByLabel("First name")).toHaveValue("Alan");
+    await expect(
+      edit.getByLabel("Experience").locator("option:checked"),
+    ).toHaveText("Novice");
     await edit.getByLabel("Email (optional)").fill("alan@example.com");
     await edit.getByLabel("Experience").selectOption({ label: "Intermediate" });
     await edit.getByRole("button", { name: "Save" }).click();

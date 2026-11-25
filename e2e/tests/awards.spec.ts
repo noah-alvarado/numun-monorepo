@@ -2,9 +2,12 @@ import { expect, test } from "../fixtures";
 import {
   assignStaffer,
   createAdvisor,
+  createDelegate,
   createDelegation,
   createDelegationAward,
+  rpc,
   uniqueSchool,
+  uniqueSurname,
 } from "../support/api";
 import {
   seedConferenceId,
@@ -12,8 +15,17 @@ import {
   seedUsers,
 } from "../support/seed";
 
-test("admin creates and deletes an award", async ({ page, signInAs, step }) => {
+test("admin creates and deletes an award", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
   const awardName = `E2E Award ${Date.now()}`;
+  const school = uniqueSchool("AwardPick");
+  const surname = uniqueSurname();
+  const delegation = await createDelegation(newAdvisor.id, school);
+  await createDelegate(newAdvisor.id, delegation.id, "Ada", surname);
   const errorBanner = page.locator("p.bg-red-50");
 
   // The award list is keyed on the active conference, which loads after the
@@ -38,9 +50,28 @@ test("admin creates and deletes an award", async ({ page, signInAs, step }) => {
     ).toBeVisible();
     await page.getByLabel("Name", { exact: true }).fill(awardName);
     await page.getByLabel("Category").fill("Best Position Paper");
-    await page.getByRole("combobox").selectOption({ label: "conference" });
-    await page.getByPlaceholder("ID", { exact: true }).fill(seedConferenceId);
-    await page.getByPlaceholder("Display name (optional)").fill("E2E Seed");
+  });
+
+  await step("pick a delegate by name", async () => {
+    await page.getByLabel("Search delegates by name").fill(surname);
+    await page
+      .getByRole("button", { name: `Ada ${surname} — ${school}` })
+      .click();
+    await expect(
+      page.getByText(`Ada ${surname}`, { exact: true }),
+    ).toBeVisible();
+    await expect(page.getByLabel("Search delegates by name")).toHaveCount(0);
+  });
+
+  await step("add the conference as a second recipient", async () => {
+    await page.getByRole("button", { name: "Add recipient" }).click();
+    await page
+      .getByLabel("Recipient type")
+      .last()
+      .selectOption({ label: "conference" });
+    await page
+      .getByLabel("Recipient", { exact: true })
+      .selectOption({ label: seedConferenceName });
   });
 
   const row = page.getByRole("row", { name: new RegExp(awardName) });
@@ -54,7 +85,8 @@ test("admin creates and deletes an award", async ({ page, signInAs, step }) => {
     await expect(page.getByText("Saved and synced")).toBeVisible();
     await expect(row).toBeVisible();
     await expect(row).toContainText("Best Position Paper");
-    await expect(row).toContainText("(conference)");
+    await expect(row).toContainText(`Ada ${surname} (delegate)`);
+    await expect(row).toContainText(`${seedConferenceName} (conference)`);
   });
 
   await step("confirm delete", async () => {
@@ -103,6 +135,9 @@ test("admin edits an award", async ({ page, signInAs, newAdvisor, step }) => {
     await expect(page.getByLabel("Name", { exact: true })).toHaveValue(
       original,
     );
+    await expect(
+      page.getByLabel("Recipient", { exact: true }).locator("option:checked"),
+    ).toHaveText(delegation.school);
     await page.getByLabel("Name", { exact: true }).fill(renamed);
     await page.getByLabel("Category").fill("Outstanding Delegation");
     await page.getByRole("button", { name: "Save" }).click();
@@ -188,7 +223,7 @@ test("staffer awards only within their delegations", async ({
   const modal = page
     .getByRole("heading", { name: "Create award" })
     .locator("../..");
-  const recipientRows = modal.getByPlaceholder("ID", { exact: true });
+  const recipientRows = modal.getByLabel("Recipient type");
 
   await signInAs("staffer");
 
@@ -203,9 +238,10 @@ test("staffer awards only within their delegations", async ({
 
   await step("recipient kinds are limited for staffers", async () => {
     await page.getByRole("button", { name: "New award" }).click();
-    await expect(
-      modal.getByRole("combobox").first().locator("option"),
-    ).toHaveText(["delegate", "delegation", "user"]);
+    await expect(recipientRows.first().locator("option")).toHaveText([
+      "delegate",
+      "delegation",
+    ]);
   });
 
   await step("recipient rows can be added and removed", async () => {
@@ -218,21 +254,36 @@ test("staffer awards only within their delegations", async ({
     await expect(recipientRows).toHaveCount(1);
   });
 
-  await step("an award outside their scope is refused", async () => {
+  await step("only their own delegations are offered", async () => {
     await modal.getByLabel("Name", { exact: true }).fill(stafferAward);
     await modal.getByLabel("Category").fill("Delegation Awards");
-    await modal.getByRole("combobox").selectOption({ label: "delegation" });
-    await recipientRows.fill(other.id);
-    await modal.getByRole("button", { name: "Save" }).click();
-    // The error shows inside the dialog, not behind its overlay.
-    await expect(modal.locator("p.bg-red-50")).toContainText(
-      "You don't have permission",
-    );
+    await recipientRows.selectOption({ label: "delegation" });
+    const options = modal
+      .getByLabel("Recipient", { exact: true })
+      .locator("option");
+    await expect(options.filter({ hasText: mine.school })).toHaveCount(1);
+    await expect(options.filter({ hasText: other.school })).toHaveCount(0);
+    // The API enforces the same scope.
+    await expect(
+      rpc(seedUsers.staffer.id, "AwardService/CreateAward", {
+        conferenceId: seedConferenceId,
+        name: stafferAward,
+        category: "Delegation Awards",
+        recipients: [
+          {
+            kind: "AWARD_RECIPIENT_KIND_DELEGATION",
+            id: other.id,
+            displayName: other.school,
+          },
+        ],
+      }),
+    ).rejects.toThrow(/permission_denied|not_found/);
   });
 
   await step("an award for their own delegation saves", async () => {
-    await recipientRows.fill(mine.id);
-    await modal.getByPlaceholder("Display name (optional)").fill(mine.school);
+    await modal
+      .getByLabel("Recipient", { exact: true })
+      .selectOption({ label: mine.school });
     await modal.getByRole("button", { name: "Save" }).click();
     await expect(modal).toBeHidden();
     const row = page.getByRole("row").filter({ hasText: stafferAward });

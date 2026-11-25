@@ -26,6 +26,11 @@ import AdminEmailHealth from "@/routes/AdminEmailHealth";
 import AdminCheckIn from "@/routes/AdminCheckIn";
 import Awards from "@/routes/Awards";
 import NotFound from "@/routes/NotFound";
+import Exports from "@/routes/Exports";
+import Profile from "@/routes/Profile";
+import AdminConferences from "@/routes/AdminConferences";
+import AdminStaff from "@/routes/AdminStaff";
+import AdminAnnouncements from "@/routes/AdminAnnouncements";
 
 const root = document.getElementById("root");
 if (!root) throw new Error("#root not found");
@@ -134,6 +139,46 @@ render(
         component={() => (
           <AppShell>
             <Awards />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/exports"
+        component={() => (
+          <AppShell>
+            <Exports />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/profile"
+        component={() => (
+          <AppShell>
+            <Profile />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/admin/conferences"
+        component={() => (
+          <AppShell>
+            <AdminConferences />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/admin/staff"
+        component={() => (
+          <AppShell>
+            <AdminStaff />
+          </AppShell>
+        )}
+      />
+      <Route
+        path="/admin/announcements"
+        component={() => (
+          <AppShell>
+            <AdminAnnouncements />
           </AppShell>
         )}
       />
