@@ -35,7 +35,7 @@ Single recipient, sent synchronously inline with the triggering request handler.
 |---|---|---|---|
 | **T1** | Delegation approved | Lead advisor + all secondary advisors of the delegation | `noreply@mail.numun.org` |
 | **T2** | Delegation rejected | Same as T1; includes reason if provided | `noreply@mail.numun.org` |
-| **T3** | Payment recorded | Same as T1; includes amount, kind, balance | `noreply@mail.numun.org` |
+| **T3** | Ledger entry recorded (charge, payment or adjustment) | Same as T1; includes amount, kind, balance | `noreply@mail.numun.org` |
 | **T4** | Bulk-import committed | The advisor who committed | `noreply@mail.numun.org` |
 | **T5** | Assignment-run completed | The staffer who triggered the run | `noreply@mail.numun.org` |
 | **T6** | Scope/role change | Affected user | `noreply@mail.numun.org` |
@@ -163,7 +163,7 @@ type TemplateData struct {
 |---|---|
 | `delegation_approved` | `delegationName`, `conferenceName`, `portalLink` |
 | `delegation_rejected` | `delegationName`, `conferenceName`, `reason` (optional) |
-| `payment_recorded` | `delegationName`, `amountFormatted`, `kind`, `newBalanceFormatted`, `notes` (optional) |
+| `payment_recorded` | `delegationName`, `amountFormatted`, `kind`, `entry` (e.g. "A credit of $50.00"), `newBalanceFormatted`, `notes` (optional) |
 | `bulk_import_committed` | `delegationName`, `createCount`, `updateCount`, `softDeleteCount`, `mode` |
 | `assignment_run_completed` | `conferenceName`, `assignmentCount`, `objective`, `runLink` |
 | `scope_role_changed` | `actorName`, `changeSummary` |

@@ -87,10 +87,12 @@ test("advisors are emailed about payments and imports", async ({
     await recordCharge(delegation.id, 450, "MAIL-1");
     const mail = await waitForMail(
       advisor.email!,
-      /^Payment recorded for your NUMUN delegation$/,
+      /^Balance updated for your NUMUN delegation$/,
     );
     await showMail(page, mail);
-    expect(mail.text).toContain(`"${delegation.school}"`);
+    expect(mail.text).toContain(
+      `A charge of $450.00 has been recorded for "${delegation.school}"`,
+    );
     expect(mail.text).toContain("New balance due: $450.00");
   });
 

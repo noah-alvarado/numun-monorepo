@@ -26,6 +26,7 @@ var fixtures = map[string]map[string]any{
 		"delegationName":      "Westside HS",
 		"amountFormatted":     "$120.00",
 		"kind":                "payment",
+		"entry":               "A payment of $120.00",
 		"newBalanceFormatted": "$380.00",
 		"notes":               "Check #1234",
 	},
