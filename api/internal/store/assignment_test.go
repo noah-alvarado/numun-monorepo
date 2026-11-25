@@ -332,3 +332,55 @@ func TestReplaceProposedAssignmentsRollsBack(t *testing.T) {
 		})
 	}
 }
+
+func TestMoveAssignments(t *testing.T) {
+	ctx := context.Background()
+	c := testClient(t)
+	f := newProposalFixture(t, c)
+	ada, grace := newID(t), newID(t)
+
+	if err := c.WriteAssignmentBatch(ctx, "run-1", []domain.Assignment{f.row(f.pos1, ada), f.row(f.pos2, grace)}, nil); err != nil {
+		t.Fatalf("seed: %v", err)
+	}
+	live := func() map[string]domain.Assignment { return proposedByKey(t, c, f.conferenceID) }
+	swap := func() error {
+		cur := live()
+		var a, b domain.Assignment
+		for _, r := range cur {
+			if r.DelegateID == ada {
+				a = r
+			} else {
+				b = r
+			}
+		}
+		_, err := c.MoveAssignments(ctx, []domain.Assignment{a, b}, []domain.Assignment{
+			f.row(a.PositionID, b.DelegateID), f.row(b.PositionID, a.DelegateID),
+		}, "actor")
+		return err
+	}
+
+	// Swapping back re-creates rows at keys that now hold tombstones.
+	for round := range 2 {
+		if err := swap(); err != nil {
+			t.Fatalf("swap %d: %v", round, err)
+		}
+	}
+	got := live()
+	if len(got) != 2 || got[f.pos1+"|"+ada].ID == "" || got[f.pos2+"|"+grace].ID == "" {
+		t.Fatalf("after swapping back: %+v", got)
+	}
+
+	// A stale version aborts the whole move.
+	stale := got[f.pos1+"|"+ada]
+	stale.Version--
+	if _, err := c.MoveAssignments(ctx, []domain.Assignment{stale}, []domain.Assignment{f.row(f.pos2, ada)}, "actor"); !errors.Is(err, store.ErrVersionMismatch) {
+		t.Fatalf("stale move: want ErrVersionMismatch, got %v", err)
+	}
+	// So does a target key holding a live row.
+	if _, err := c.MoveAssignments(ctx, []domain.Assignment{got[f.pos1+"|"+ada]}, []domain.Assignment{f.row(f.pos2, grace)}, "actor"); !errors.Is(err, store.ErrAlreadyExists) {
+		t.Fatalf("move onto live row: want ErrAlreadyExists, got %v", err)
+	}
+	if after := live(); len(after) != 2 || after[f.pos1+"|"+ada].ID != got[f.pos1+"|"+ada].ID {
+		t.Fatalf("failed moves changed rows: %+v", after)
+	}
+}

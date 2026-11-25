@@ -499,18 +499,11 @@ func (s *AssignmentService) UnapproveByIds(ctx context.Context, req *connect.Req
 	return connect.NewResponse(out), nil
 }
 
-// SwapAssignments swaps two delegate↔position pairings. Implemented as two
-// UpdateAssignment-style edits (delete old, create new) but ordered so both
-// rows land in a consistent state — we delete both old rows first, then
-// create both new pairings. If either delete fails the function returns
-// before any new row is written; if a create fails we attempt to roll back
-// the delete by writing the original row shape.
-//
-// At v1 scale this is sequential rather than transactional; the
-// AssignmentRun integrity invariant (one position ↔ one delegate per
-// conference) is preserved because both pairings change atomically from
-// the caller's perspective — the brief window between deletes and creates
-// is staff-only and not observable to advisors.
+// SwapAssignments swaps two delegate↔position pairings. Each pairing's
+// PK/SK changes, so the swap soft-deletes both rows and creates the swapped
+// pair in one transaction: it either fully applies or leaves both rows as
+// they were. Each new row keeps its position's status (approved/proposed), so
+// a swap between two approved rows lands as two approved rows.
 func (s *AssignmentService) SwapAssignments(ctx context.Context, req *connect.Request[v1.SwapAssignmentsRequest]) (*connect.Response[v1.SwapAssignmentsResponse], error) {
 	if err := auth.MustBeStaffAdmin(ctx); err != nil {
 		return nil, connect.NewError(connect.CodePermissionDenied, errors.New("admin only"))
@@ -535,66 +528,41 @@ func (s *AssignmentService) SwapAssignments(ctx context.Context, req *connect.Re
 	if a.ConferenceID != b.ConferenceID {
 		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("assignments must share a conference"))
 	}
+	if a.PositionID == b.PositionID {
+		return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("both delegates hold the same position; nothing to swap"))
+	}
 	if a.Version != int(aMut.GetExpectedVersion()) || b.Version != int(bMut.GetExpectedVersion()) {
 		return nil, connect.NewError(connect.CodeAborted, errors.New("version mismatch on one or both assignments"))
 	}
 
-	// Delete the two old rows, then create the swapped pairings. Each new
-	// row inherits the original assignment's status (approved/proposed) so
-	// a swap between two approved rows lands as two approved rows.
-	if err := s.Store.SoftDeleteAssignment(ctx, a.PositionID, a.DelegateID, a.Version, caller.UserID); err != nil {
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("delete A failed"))
+	swapped := func(slot, holder domain.Assignment) domain.Assignment {
+		return domain.Assignment{
+			ConferenceID: slot.ConferenceID,
+			CommitteeID:  slot.CommitteeID,
+			PositionID:   slot.PositionID,
+			DelegationID: holder.DelegationID,
+			DelegateID:   holder.DelegateID,
+			Status:       slot.Status,
+			ApprovedAt:   slot.ApprovedAt,
+			ApprovedBy:   slot.ApprovedBy,
+			RunID:        slot.RunID,
+			Reason:       "swapped by staff",
+			CreatedBy:    caller.UserID,
+			UpdatedBy:    caller.UserID,
+		}
 	}
-	if err := s.Store.SoftDeleteAssignment(ctx, b.PositionID, b.DelegateID, b.Version, caller.UserID); err != nil {
-		// Best-effort rollback of A's soft-delete is impractical; surface the
-		// failure and let the operator reconcile via the audit log + portal.
-		s.log().Error("SwapAssignments: A deleted but B delete failed", "aID", aID, "bID", bID, "err", err)
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("delete B failed; A already deleted — reconcile via studio"))
-	}
-
-	// Look up the new positions' denormalized fields.
-	posA, err := s.Store.FindPositionByID(ctx, a.PositionID)
+	created, err := s.Store.MoveAssignments(ctx,
+		[]domain.Assignment{a, b},
+		[]domain.Assignment{swapped(a, b), swapped(b, a)},
+		caller.UserID)
 	if err != nil {
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("load position A failed"))
+		if errors.Is(err, store.ErrVersionMismatch) {
+			return nil, connect.NewError(connect.CodeAborted, errors.New("version mismatch on one or both assignments"))
+		}
+		s.log().Error("SwapAssignments: move", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-	posB, err := s.Store.FindPositionByID(ctx, b.PositionID)
-	if err != nil {
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("load position B failed"))
-	}
-
-	// New A: delegate from old B → position from old A.
-	newA, err := s.Store.CreateAssignment(ctx, domain.Assignment{
-		ConferenceID: a.ConferenceID,
-		CommitteeID:  posA.CommitteeID,
-		PositionID:   a.PositionID,
-		DelegationID: b.DelegationID,
-		DelegateID:   b.DelegateID,
-		Status:       a.Status,
-		RunID:        a.RunID,
-		ProposedAt:   time.Now().UTC(),
-		CreatedBy:    caller.UserID,
-		UpdatedBy:    caller.UserID,
-	})
-	if err != nil {
-		s.log().Error("SwapAssignments: create new-A failed", "err", err)
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("create new pairing A failed"))
-	}
-	newB, err := s.Store.CreateAssignment(ctx, domain.Assignment{
-		ConferenceID: b.ConferenceID,
-		CommitteeID:  posB.CommitteeID,
-		PositionID:   b.PositionID,
-		DelegationID: a.DelegationID,
-		DelegateID:   a.DelegateID,
-		Status:       b.Status,
-		RunID:        b.RunID,
-		ProposedAt:   time.Now().UTC(),
-		CreatedBy:    caller.UserID,
-		UpdatedBy:    caller.UserID,
-	})
-	if err != nil {
-		s.log().Error("SwapAssignments: create new-B failed", "err", err)
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("create new pairing B failed; new-A already created — reconcile via studio"))
-	}
+	newA, newB := created[0], created[1]
 
 	s.audit(ctx, domain.AuthAuditEvent{
 		UserID:      caller.UserID,
@@ -695,31 +663,54 @@ func (s *AssignmentService) UpdateAssignment(ctx context.Context, req *connect.R
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
 
-	// Soft-delete the old row, then create the new one. Not transactional
-	// (different PK/SK); acceptable for a manual edit. Audited as one
-	// manually-edited event.
-	if err := s.Store.SoftDeleteAssignment(ctx, existing.PositionID, existing.DelegateID, existing.Version, caller.UserID); err != nil {
-		s.log().Error("UpdateAssignment: soft-delete old", "err", err)
-		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	if newPosition.ConferenceID != existing.ConferenceID {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("position_id belongs to another conference"))
 	}
-	newAssignment := domain.Assignment{
-		ConferenceID: existing.ConferenceID,
-		DelegateID:   newDelegateID,
-		PositionID:   newPositionID,
-		CommitteeID:  newPosition.CommitteeID,
-		DelegationID: newDelegate.DelegationID,
-		Status:       domain.AssignmentStatusProposed,
-		ProposedAt:   time.Now().UTC(),
-		RunID:        existing.RunID,
-		Reason:       "manually edited by staff",
-		CreatedBy:    caller.UserID,
-		UpdatedBy:    caller.UserID,
+	if newPositionID != existing.PositionID {
+		holders, err := s.Store.ListAssignmentsByPosition(ctx, newPositionID)
+		if err != nil {
+			s.log().Error("UpdateAssignment: load position holders", "err", err)
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		taken := 0
+		for _, h := range holders {
+			if h.DelegateID != existing.DelegateID {
+				taken++
+			}
+		}
+		if taken >= newPosition.MaxDelegates {
+			return nil, connect.NewError(connect.CodeFailedPrecondition, fmt.Errorf("%s is full", newPosition.Name))
+		}
 	}
-	created, err := s.Store.CreateAssignment(ctx, newAssignment)
+
+	// The row's PK/SK changes, so this is a soft-delete plus a create, done in
+	// one transaction. Audited as one manually-edited event.
+	moved, err := s.Store.MoveAssignments(ctx,
+		[]domain.Assignment{existing},
+		[]domain.Assignment{{
+			ConferenceID: existing.ConferenceID,
+			DelegateID:   newDelegateID,
+			PositionID:   newPositionID,
+			CommitteeID:  newPosition.CommitteeID,
+			DelegationID: newDelegate.DelegationID,
+			Status:       domain.AssignmentStatusProposed,
+			RunID:        existing.RunID,
+			Reason:       "manually edited by staff",
+			CreatedBy:    caller.UserID,
+			UpdatedBy:    caller.UserID,
+		}},
+		caller.UserID)
 	if err != nil {
-		s.log().Error("UpdateAssignment: create new", "err", err)
+		switch {
+		case errors.Is(err, store.ErrVersionMismatch):
+			return nil, connect.NewError(connect.CodeAborted, errors.New("version mismatch"))
+		case errors.Is(err, store.ErrAlreadyExists):
+			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("delegate already holds that position"))
+		}
+		s.log().Error("UpdateAssignment: move", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
+	created := moved[0]
 	s.audit(ctx, domain.AuthAuditEvent{
 		UserID:      caller.UserID,
 		ActorUserID: caller.UserID,

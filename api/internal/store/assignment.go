@@ -517,6 +517,69 @@ func (c *Client) SoftDeleteAssignment(ctx context.Context, positionID, delegateI
 	return nil
 }
 
+// MoveAssignments atomically soft-deletes each `from` row (conditioned on its
+// version) and creates each `to` row. Manual edits and swaps change a row's
+// PK/SK, so they are a delete plus a create; doing both in one transaction
+// means a failure leaves every row as it was. A `to` row may reuse the key of
+// a soft-deleted tombstone (e.g. swapping back), but never a live row.
+//
+// Returns ErrVersionMismatch if a `from` row changed or is gone, and
+// ErrAlreadyExists if a `to` key holds a live assignment.
+func (c *Client) MoveAssignments(ctx context.Context, from, to []domain.Assignment, actorUserID string) ([]domain.Assignment, error) {
+	now := time.Now().UTC().Format(time.RFC3339Nano)
+	items := make([]ddbtypes.TransactWriteItem, 0, len(from)+len(to))
+	for _, a := range from {
+		items = append(items, ddbtypes.TransactWriteItem{Update: &ddbtypes.Update{
+			TableName:           aws.String(c.Table),
+			Key:                 assignmentKeyAV(a.PositionID, a.DelegateID),
+			UpdateExpression:    aws.String("SET isDeleted = :true, version = :nv, updatedAt = :now, updatedBy = :actor"),
+			ConditionExpression: aws.String("version = :ev AND isDeleted = :false"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":true":  &ddbtypes.AttributeValueMemberBOOL{Value: true},
+				":false": &ddbtypes.AttributeValueMemberBOOL{Value: false},
+				":ev":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(a.Version)},
+				":nv":    &ddbtypes.AttributeValueMemberN{Value: strconv.Itoa(a.Version + 1)},
+				":now":   &ddbtypes.AttributeValueMemberS{Value: now},
+				":actor": &ddbtypes.AttributeValueMemberS{Value: actorUserID},
+			},
+		}})
+	}
+	created := make([]domain.Assignment, 0, len(to))
+	for _, a := range to {
+		a = prepareNewAssignment(a)
+		created = append(created, a)
+		av, err := attributevalue.MarshalMap(assignmentToItem(a))
+		if err != nil {
+			return nil, fmt.Errorf("marshal assignment: %w", err)
+		}
+		items = append(items, ddbtypes.TransactWriteItem{Put: &ddbtypes.Put{
+			TableName:           aws.String(c.Table),
+			Item:                av,
+			ConditionExpression: aws.String("attribute_not_exists(PK) OR isDeleted = :true"),
+			ExpressionAttributeValues: map[string]ddbtypes.AttributeValue{
+				":true": &ddbtypes.AttributeValueMemberBOOL{Value: true},
+			},
+		}})
+	}
+	_, err := c.DDB.TransactWriteItems(ctx, &dynamodb.TransactWriteItemsInput{TransactItems: items})
+	if err != nil {
+		var txnErr *ddbtypes.TransactionCanceledException
+		if errors.As(err, &txnErr) {
+			for i, r := range txnErr.CancellationReasons {
+				if r.Code == nil || *r.Code != "ConditionalCheckFailed" {
+					continue
+				}
+				if i < len(from) {
+					return nil, ErrVersionMismatch
+				}
+				return nil, ErrAlreadyExists
+			}
+		}
+		return nil, fmt.Errorf("move assignments: %w", err)
+	}
+	return created, nil
+}
+
 // WriteAssignmentBatch lands a single TransactWriteItems containing up to 25
 // creates + 25 deletes (DDB hard cap is 100, but the runtime keeps it conservative).
 // Callers chunk larger batches. Used by the algorithm integration handler to
