@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -181,11 +182,18 @@ func (s *DelegateService) buildParseRequest(ctx context.Context, callerUserID st
 		}
 		return domain.BulkImportSourceGoogleSheet, url, parse.ParseRequest{
 			SheetURL:   url,
-			HTTPClient: httpclient.New(),
+			HTTPClient: s.sheetsClient(),
 			TabName:    strings.TrimSpace(g.GetTabName()),
 		}, nil
 	}
 	return "", "", parse.ParseRequest{}, connect.NewError(connect.CodeInvalidArgument, errors.New("source required"))
+}
+
+func (s *DelegateService) sheetsClient() *http.Client {
+	if s.SheetsHTTPClient != nil {
+		return s.SheetsHTTPClient
+	}
+	return httpclient.New()
 }
 
 // UpsertDelegatesBulk applies the previewed import. Re-validates the rows,

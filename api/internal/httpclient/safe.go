@@ -25,6 +25,7 @@ import (
 	"net"
 	"net/http"
 	"net/netip"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -224,3 +225,24 @@ func isDisallowedIP(ip net.IP) bool {
 	}
 	return false
 }
+
+// NewDevSheetsProxy returns a client that sends every request to origin
+// (e.g. http://127.0.0.1:4599) instead of the Google host in the URL, so
+// local dev and e2e can import from a fake Google Sheets server. It skips
+// every SSRF check: callers must only use it when DEV_MODE=true.
+func NewDevSheetsProxy(origin *url.URL) *http.Client {
+	return &http.Client{
+		Timeout: defaultTotalTimeout,
+		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
+			r = r.Clone(r.Context())
+			r.URL.Scheme = origin.Scheme
+			r.URL.Host = origin.Host
+			r.Host = origin.Host
+			return http.DefaultTransport.RoundTrip(r)
+		}),
+	}
+}
+
+type roundTripFunc func(*http.Request) (*http.Response, error)
+
+func (f roundTripFunc) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }

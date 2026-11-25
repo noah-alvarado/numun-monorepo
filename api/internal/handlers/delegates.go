@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -23,6 +24,9 @@ type DelegateService struct {
 	Scoper *auth.Scoper
 	Email  email.Service
 	Logger *slog.Logger
+	// SheetsHTTPClient fetches Google Sheets; nil means the SSRF-hardened
+	// httpclient.New(). Local dev swaps in a fake-server proxy.
+	SheetsHTTPClient *http.Client
 }
 
 // ListDelegates within a delegation. Scope: any role with scope on the

@@ -15,6 +15,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -29,6 +30,7 @@ import (
 	healthv1 "github.com/numun/numun/api/internal/gen/numun/v1"
 	"github.com/numun/numun/api/internal/gen/numun/v1/numunv1connect"
 	"github.com/numun/numun/api/internal/handlers"
+	"github.com/numun/numun/api/internal/httpclient"
 	numunlog "github.com/numun/numun/api/internal/log"
 	"github.com/numun/numun/api/internal/middleware/edge"
 	"github.com/numun/numun/api/internal/middleware/idempotency"
@@ -172,6 +174,15 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	mux.Handle(delPath, delHandler)
 
 	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
+	if origin := os.Getenv("DEV_SHEETS_ORIGIN"); origin != "" && os.Getenv("DEV_MODE") == "true" {
+		u, err := url.Parse(origin)
+		if err != nil || u.Host == "" {
+			logger.Error("DEV_SHEETS_ORIGIN is not a URL", "value", origin)
+			os.Exit(1)
+		}
+		logger.Warn("dev: Google Sheets requests go to a fake server", "origin", origin)
+		delegateSvc.SheetsHTTPClient = httpclient.NewDevSheetsProxy(u)
+	}
 	delegatePath, delegateHandler := numunv1connect.NewDelegateServiceHandler(delegateSvc, opts)
 	mux.Handle(delegatePath, delegateHandler)
 

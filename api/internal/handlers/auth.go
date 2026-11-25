@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/base64"
+	"encoding/json"
 	"errors"
 	"log/slog"
 	"strings"
@@ -46,12 +47,16 @@ func (s *AuthService) Exchange(ctx context.Context, req *connect.Request[authv1.
 	}
 
 	// In dev-bypass mode the portal still POSTs Exchange — but Cognito tokens
-	// aren't real. The seed-users flow stamps `dev-` prefixed values; we
-	// accept them and synthesize claims from the access_token field (which
-	// the dev shim sets to the seed user id). Real prod path uses the verifier.
+	// aren't real. Tokens prefixed `dev-` are accepted unverified: the e2e
+	// fake Cognito issues JWT-shaped ones whose claims are read as-is;
+	// otherwise the access_token field carries the seed user id. Real prod
+	// path uses the verifier.
 	var claims auth.IDTokenClaims
 	if isDevBypassActive() && strings.HasPrefix(id, "dev-") {
-		claims = auth.IDTokenClaims{Sub: strings.TrimPrefix(at, "dev-")}
+		claims = devIDTokenClaims(id, at)
+		if claims.Sub == "" {
+			return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("invalid id token"))
+		}
 	} else {
 		if s.Verifier == nil {
 			return nil, connect.NewError(connect.CodeFailedPrecondition, errors.New("token verifier not configured"))
@@ -169,6 +174,27 @@ func (s *AuthService) Exchange(ctx context.Context, req *connect.Request[authv1.
 	})
 
 	return resp, nil
+}
+
+// devIDTokenClaims reads the claims of an unsigned dev-bypass id token
+// ("dev-<header>.<payload>.<sig>"), falling back to the "dev-<user id>"
+// access token the dev shim sends.
+func devIDTokenClaims(idToken, accessToken string) auth.IDTokenClaims {
+	parts := strings.Split(idToken, ".")
+	if len(parts) == 3 {
+		raw, err := base64.RawURLEncoding.DecodeString(parts[1])
+		var c struct {
+			Sub   string `json:"sub"`
+			Email string `json:"email"`
+			Name  string `json:"name"`
+			Role  string `json:"custom:role"`
+		}
+		if err == nil && json.Unmarshal(raw, &c) == nil {
+			return auth.IDTokenClaims{Sub: c.Sub, Email: c.Email, Name: c.Name, Role: c.Role}
+		}
+		return auth.IDTokenClaims{}
+	}
+	return auth.IDTokenClaims{Sub: strings.TrimPrefix(accessToken, "dev-")}
 }
 
 // Logout — see AUTH.md §8.
