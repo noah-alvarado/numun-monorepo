@@ -127,7 +127,7 @@ const hostedConference = defineCollection({
     forAdvisorsBody: z.string().optional(),
     forDelegatesBody: z.string().optional(),
     // Optional override. When empty, the page renders the env-appropriate
-    // portal URL (https://portal.<apex>) computed from Astro.site at build
+    // portal URL (https://portal.<apex>) computed from SITE_APEX at build
     // time. Keeping the default out of the schema avoids baking the wrong
     // origin into prod or test content trees.
     registrationPortalUrl: z.string().optional(),

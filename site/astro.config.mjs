@@ -62,6 +62,10 @@ function cmsUploads() {
 // dev` keeps the build green without ever silently shipping a wrong origin
 // to prod.
 const site = process.env.SITE_BASE ?? "http://localhost:4321";
+// The environment's apex, for links to the portal/API/CMS (see
+// src/lib/site-urls.ts). Differs from SITE_BASE's host only for PR previews,
+// which live under pr-<n>.preview.<apex> but link to <apex>'s portal.
+const siteApex = process.env.SITE_APEX || new URL(site).hostname;
 
 // https://astro.build/config
 export default defineConfig({
@@ -76,6 +80,7 @@ export default defineConfig({
     // `@astrojs/tailwind` integration is pinned to Tailwind 3 and is
     // not upgraded for v4 yet).
     plugins: [tailwindcss()],
+    define: { __SITE_APEX__: JSON.stringify(siteApex) },
   },
   server: {
     port: 4321,

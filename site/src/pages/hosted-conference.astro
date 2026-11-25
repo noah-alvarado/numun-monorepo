@@ -17,8 +17,7 @@ const {
   seo,
 } = hc.data;
 
-if (!Astro.site) throw new Error("Astro.site is required (set SITE_BASE)");
-const registerUrl = registrationPortalUrl || portalUrl(Astro.site, "/sign-up");
+const registerUrl = registrationPortalUrl || portalUrl("/sign-up");
 
 const infoLinks = [
   { label: "For Advisers", href: "/info/advisers" },

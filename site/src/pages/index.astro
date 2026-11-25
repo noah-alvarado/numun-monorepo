@@ -13,10 +13,8 @@ const { hero, intro, featuredSections, currentConferenceTeaser, seo } =
 
 // Env-aware register URL: prefer the CMS-supplied CTA href; fall back to the
 // env's portal sign-up URL so test deploys never link to prod.
-if (!Astro.site) throw new Error("Astro.site is required (set SITE_BASE)");
-const heroPrimaryHref =
-  hero.primaryCta.href || portalUrl(Astro.site, "/sign-up");
-const registerUrl = portalUrl(Astro.site, "/sign-up");
+const heroPrimaryHref = hero.primaryCta.href || portalUrl("/sign-up");
+const registerUrl = portalUrl("/sign-up");
 
 const conf = activeConference;
 ---
