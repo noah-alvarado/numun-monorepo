@@ -29,4 +29,4 @@ pre-commit:
 
     buf-lint:
       glob: "api/proto/**/*.proto"
-      run: bash -c "cd api && buf lint"
+      run: bash -c "cd api/proto && buf lint"
