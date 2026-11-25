@@ -240,7 +240,7 @@ func (s *AssignmentService) Propose(ctx context.Context, req *connect.Request[v1
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("persistence failed"))
 	}
 
-	created := buildAssignmentRows(prop, conferenceID, persistedRun.ID, caller.UserID)
+	created := buildAssignmentRows(prop, in.PinnedAssignments, conferenceID, persistedRun.ID, caller.UserID)
 	for i := 0; i < len(created); i += assignmentBatchSize {
 		end := i + assignmentBatchSize
 		if end > len(created) {
@@ -980,11 +980,20 @@ func domainPrefsToAlgo(p domain.CommitteePreferences) assignment.CommitteePrefer
 }
 
 // buildAssignmentRows converts the algorithm's Proposal into domain.Assignment
-// rows ready for the store. All produced rows are status=proposed.
-func buildAssignmentRows(p *assignment.Proposal, conferenceID, runID, actorUserID string) []domain.Assignment {
+// rows ready for the store. All produced rows are status=proposed. The
+// Proposal echoes pinned (approved) assignments (H6); those rows already
+// exist, so they are skipped rather than re-created.
+func buildAssignmentRows(p *assignment.Proposal, pinned []assignment.PinnedAssignment, conferenceID, runID, actorUserID string) []domain.Assignment {
+	isPinned := make(map[[2]string]bool, len(pinned))
+	for _, pa := range pinned {
+		isPinned[[2]string{pa.PositionID, pa.DelegateID}] = true
+	}
 	out := make([]domain.Assignment, 0, len(p.Assignments))
 	now := time.Now().UTC()
 	for _, pa := range p.Assignments {
+		if isPinned[[2]string{pa.PositionID, pa.DelegateID}] {
+			continue
+		}
 		out = append(out, domain.Assignment{
 			ConferenceID: conferenceID,
 			DelegateID:   pa.DelegateID,
