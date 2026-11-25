@@ -113,6 +113,8 @@ e2e-stack: ## Start DDB Local + LocalStack (keeps existing data) and seed — pr
 	docker compose up -d dynamodb-local ddb-init localstack
 	@docker wait numun-ddb-init >/dev/null
 	@until curl -fsS http://localhost:4566/_localstack/health >/dev/null 2>&1; do sleep 1; done
+	@# Re-apply the (idempotent) init so an already-running LocalStack picks up new resources.
+	@docker exec numun-localstack /etc/localstack/init/ready.d/init.sh >/dev/null
 	@$(MAKE) seed
 
 e2e: e2e-stack ## Run Playwright e2e tests; starts the Go API (:3000) + portal preview (:4173) itself.

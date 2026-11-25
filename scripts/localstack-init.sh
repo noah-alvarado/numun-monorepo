@@ -13,6 +13,18 @@ awslocal s3 mb s3://numun-test-assets    2>/dev/null || true
 awslocal s3 mb s3://numun-test-uploads   2>/dev/null || true
 awslocal s3 mb s3://numun-test-artifacts 2>/dev/null || true
 
+# Browsers PUT bulk-import files straight to presigned URLs (BULK_IMPORT.md §5);
+# mirrors UploadsBucket's CorsConfiguration in infra/base-data with the local
+# portal origins (Vite dev :5173, e2e preview :4173).
+awslocal s3api put-bucket-cors --bucket numun-test-uploads --cors-configuration '{
+  "CORSRules": [{
+    "AllowedHeaders": ["*"],
+    "AllowedMethods": ["PUT", "GET"],
+    "AllowedOrigins": ["http://localhost:5173", "http://localhost:4173"],
+    "MaxAgeSeconds": 3000
+  }]
+}'
+
 # Email pipeline (EMAIL.md §3).
 awslocal sqs create-queue --queue-name numun-test-email-send-dlq         >/dev/null 2>&1 || true
 awslocal sqs create-queue --queue-name numun-test-email-send             >/dev/null 2>&1 || true
