@@ -13,7 +13,8 @@ type StepFn = <T>(
 type Fixtures = {
   // Wraps test.step and attaches a full-page screenshot once the step's body
   // finishes. Files land in test-results/<test>/NN-<slug>.png as well as the
-  // HTML report, so they can be reviewed without opening the report.
+  // HTML report, so they can be reviewed without opening the report. Also
+  // fails the step if a raw UUID is visible on the page.
   step: StepFn;
   // Starts a real cookie session via the dev-bypass branch of
   // AuthService.Exchange (no Cognito), then lands on /dashboard.
@@ -29,6 +30,10 @@ export const test = base.extend<Fixtures>({
     await use(<T>(title: string, body: () => Promise<T>, shot = page) =>
       base.step(title, async () => {
         const result = await body();
+        // Users should see names, never raw entity ids.
+        await expect(shot.locator("body"), "raw id on screen").not.toHaveText(
+          UUID,
+        );
         n += 1;
         const name = `${String(n).padStart(2, "0")}-${slug(title)}`;
         const path = testInfo.outputPath(`${name}.png`);
@@ -54,6 +59,8 @@ export const test = base.extend<Fixtures>({
 });
 
 export { expect };
+
+const UUID = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
 
 async function exchangeSession(page: Page, userId: string) {
   // page.request shares the browser context's cookie jar, so the

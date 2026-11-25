@@ -3,6 +3,7 @@ import type { Page } from "@playwright/test";
 import { expect, test } from "../fixtures";
 import {
   approveDelegation,
+  createAdvisor,
   createCommittee,
   createDelegate,
   createDelegation,
@@ -154,5 +155,155 @@ test("infeasible inputs fail with a diagnostic and save nothing", async ({
       /infeasible/,
     );
     await expect(emptyState(page)).toBeVisible();
+  });
+});
+
+test("admin filters, edits, swaps and approves all", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  // Two delegates from the arranged school plus one from a second school:
+  // three delegates over four seats, so one position stays free to edit into.
+  const { conferenceId, names } = await arrange(newAdvisor.id, 2);
+  const otherAdvisor = await createAdvisor("AssignOther");
+  const otherSchool = uniqueSchool("AssignOther");
+  const other = await createDelegation(otherAdvisor.id, otherSchool, {
+    conferenceId,
+  });
+  await approveDelegation(other);
+  const otherSurname = uniqueSurname();
+  await createDelegate(otherAdvisor.id, other.id, "Katherine", otherSurname);
+  const all = [...names, `Katherine ${otherSurname}`];
+  const filter = (label: string) =>
+    page.locator("label").filter({ hasText: label }).getByRole("combobox");
+  const placement = (name: string) =>
+    assignmentRow(page, name).getByRole("cell").nth(2);
+
+  await signInAs("admin");
+
+  await step("propose", async () => {
+    await page.goto(`/conferences/${conferenceId}/assignments`);
+    await expect(page.getByText("No runs yet")).toBeVisible();
+    await page.getByRole("button", { name: "Propose", exact: true }).click();
+    await expect(page.getByText("Proposed 3 assignments.")).toBeVisible();
+    for (const name of all) {
+      await expect(assignmentRow(page, name)).toBeVisible();
+    }
+    await expect(page.getByText(/^Last run: done · obj /)).toBeVisible();
+  });
+
+  await step("filter by committee, and it survives a reload", async () => {
+    await filter("Committee").selectOption({ label: "Security Council" });
+    await expect(page).toHaveURL(/committee=/);
+    await page.reload();
+    await expect(filter("Committee").locator("option:checked")).toHaveText(
+      "Security Council",
+    );
+    const rows = page
+      .getByRole("row")
+      .filter({ has: page.getByRole("checkbox") });
+    await expect(rows.first()).toBeVisible();
+    for (const text of await rows.allTextContents()) {
+      expect(text).toContain("Security Council");
+    }
+  });
+
+  await step("filter by delegation", async () => {
+    await filter("Committee").selectOption({ label: "All" });
+    await filter("Delegation").selectOption({ label: otherSchool });
+    await expect(page.getByText("1 assignment", { exact: true })).toBeVisible();
+    await expect(assignmentRow(page, all[2])).toBeVisible();
+  });
+
+  await step("filter by status shows a filtered empty state", async () => {
+    await filter("Delegation").selectOption({ label: "All" });
+    await filter("Status").selectOption({ label: "Approved" });
+    await expect(
+      page.getByText("No assignments match these filters."),
+    ).toBeVisible();
+  });
+
+  await step(
+    "edit refuses a full position, then moves to the free one",
+    async () => {
+      await filter("Status").selectOption({ label: "All" });
+      await expect(
+        page.getByText("3 assignments", { exact: true }),
+      ).toBeVisible();
+      const slots = new Map<string, string>();
+      for (const name of all) {
+        const [committee, position] = await placement(name)
+          .locator("div")
+          .allTextContents();
+        slots.set(`${committee} — ${position}`, name);
+      }
+      const row = assignmentRow(page, all[0]);
+      const dialog = page
+        .getByRole("heading", { name: "Edit assignment" })
+        .locator("../..");
+      const options = dialog.getByRole("combobox").locator("option");
+
+      await row.getByRole("button", { name: "Edit" }).click();
+      const full = [...slots].find(([, holder]) => holder !== all[0])![0];
+      await dialog.getByRole("combobox").selectOption({ label: full });
+      await dialog.getByRole("button", { name: "Save" }).click();
+      await expect(dialog.locator("p.bg-red-50")).toHaveText(
+        `${full.split(" — ")[1]} is full`,
+      );
+
+      const free = (await options.allTextContents()).find(
+        (o) => !slots.has(o),
+      )!;
+      await dialog.getByRole("combobox").selectOption({ label: free });
+      await dialog.getByRole("button", { name: "Save" }).click();
+      await expect(dialog).toBeHidden();
+      const [committee, position] = free.split(" — ");
+      await expect(placement(all[0])).toContainText(committee);
+      await expect(placement(all[0])).toContainText(position);
+      await expect(row).toContainText("manually edited by staff");
+    },
+  );
+
+  await step("swap exchanges two placements, and swaps back", async () => {
+    const before = [
+      (await placement(all[0]).textContent()) ?? "",
+      (await placement(all[1]).textContent()) ?? "",
+    ];
+    for (let round = 0; round < 2; round++) {
+      for (const name of all.slice(0, 2)) {
+        await assignmentRow(page, name)
+          .getByRole("checkbox", { name: "Select assignment" })
+          .check();
+      }
+      await page.getByRole("button", { name: "Swap", exact: true }).click();
+      await expect(page.getByText(/^\d+ selected$/)).toBeHidden();
+      await expect(page.locator("p.bg-red-50")).toHaveCount(0);
+      const expected = round === 0 ? [before[1], before[0]] : before;
+      await expect(placement(all[0])).toHaveText(expected[0]);
+      await expect(placement(all[1])).toHaveText(expected[1]);
+    }
+  });
+
+  await step("approve all", async () => {
+    await page.getByRole("button", { name: "Approve all" }).click();
+    const dialog = page
+      .getByRole("heading", {
+        name: "Approve all proposed assignments?",
+      })
+      .locator("../..");
+    await dialog.getByRole("button", { name: "Approve all" }).click();
+    await expect(dialog).toBeHidden();
+    for (const name of all) {
+      await expect(assignmentRow(page, name)).toContainText("Approved");
+    }
+  });
+
+  await step("run history lists the run", async () => {
+    await page.getByRole("button", { name: /Run history/ }).click();
+    const history = page.getByRole("row").filter({ hasText: "Done" });
+    await expect(history).toHaveCount(1);
+    await expect(history).toContainText("3");
   });
 });

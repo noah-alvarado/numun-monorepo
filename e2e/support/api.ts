@@ -205,3 +205,44 @@ export async function recordCharge(
     reference,
   });
 }
+
+// Gives a staffer direct oversight of a delegation (AUTH.md §9 case a).
+export async function assignStaffer(
+  delegationId: string,
+  stafferId: string,
+): Promise<void> {
+  await rpc(admin, "DelegationService/AssignStaffer", {
+    delegationId,
+    userId: stafferId,
+  });
+}
+
+const DDB_LOCAL_URL = "http://localhost:8000";
+
+// Stands in for the SES feedback Lambda (cmd/email-feedback), which only runs
+// behind SNS: writes User.emailStatus straight into DynamoDB Local. DDB Local
+// accepts any well-formed SigV4 header, so no signing is needed.
+export async function setEmailStatus(
+  userId: string,
+  status: "bounced" | "complained",
+): Promise<void> {
+  const resp = await fetch(DDB_LOCAL_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/x-amz-json-1.0",
+      "X-Amz-Target": "DynamoDB_20120810.UpdateItem",
+      Authorization:
+        "AWS4-HMAC-SHA256 Credential=local/20260101/us-east-2/dynamodb/aws4_request, SignedHeaders=host, Signature=0",
+    },
+    body: JSON.stringify({
+      TableName: "numun-test",
+      Key: { PK: { S: `USER#${userId}` }, SK: { S: "PROFILE" } },
+      UpdateExpression: "SET emailStatus = :s",
+      ConditionExpression: "attribute_exists(PK)",
+      ExpressionAttributeValues: { ":s": { S: status } },
+    }),
+  });
+  if (!resp.ok) {
+    throw new Error(`setEmailStatus: HTTP ${resp.status} ${await resp.text()}`);
+  }
+}

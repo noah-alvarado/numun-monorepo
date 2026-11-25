@@ -1,10 +1,12 @@
 import { expect, test } from "../fixtures";
 import {
+  assignStaffer,
   createDelegate,
   createDelegation,
   uniqueSchool,
   uniqueSurname,
 } from "../support/api";
+import { seedUsers } from "../support/seed";
 
 test("staff check in a delegate by name", async ({
   page,
@@ -87,5 +89,17 @@ test("check-in is staff-only and scoped", async ({
     await page.getByPlaceholder(/Search by first or last name/).fill(surname);
     await page.getByRole("button", { name: "Search" }).click();
     await expect(page.getByText("No matches.")).toBeVisible();
+  });
+
+  await step("assigned staffer finds and checks them in", async () => {
+    await assignStaffer(delegation.id, seedUsers.staffer.id);
+    await page.getByRole("button", { name: "Search" }).click();
+    const hit = page
+      .getByRole("listitem")
+      .filter({ hasText: `${surname}, Ada` });
+    await hit.getByRole("button", { name: "Check in" }).click();
+    await expect(
+      hit.getByRole("button", { name: "✓ Checked in" }),
+    ).toBeDisabled();
   });
 });

@@ -214,13 +214,14 @@ make e2e ARGS="tests/awards.spec.ts"       # one spec
 pnpm --filter @numun/e2e run e2e:report    # open the HTML report
 ```
 
-Playwright starts the API and portal itself (and reuses them if already running locally). Global setup gives the seed advisor a pending delegation if it has none. Wrap each user-visible action in the `step` fixture: it attaches a full-page screenshot per step to the report and writes it to `e2e/test-results/<test>/NN-<step>.png`. Traces are kept on failure. The `E2E` workflow runs on PRs touching `portal/`, `api/` or `e2e/` and uploads the report + screenshots as an artifact; it isn't a required check yet.
+Playwright starts the API and portal itself (and reuses them if already running locally). Global setup gives the seed advisor a pending delegation if it has none. Wrap each user-visible action in the `step` fixture: it attaches a full-page screenshot per step to the report and writes it to `e2e/test-results/<test>/NN-<step>.png`, and fails the step if a raw UUID is visible on the page (users should only ever see names). Traces are kept on failure. The `E2E` workflow runs on PRs touching `portal/`, `api/` or `e2e/` and uploads the report + screenshots as an artifact; it isn't a required check yet.
 
 Tests share one table, so keep them independent of each other and of leftover local data:
 
 - Use the `newAdvisor` fixture for anything that creates or changes a delegation; dev-bypass `Exchange` lazily creates a fresh advisor per test. The seed users are for read-mostly flows.
 - Arrange data through `e2e/support/api.ts` (Connect calls with `X-Dev-User-Id`), then drive the behavior under test through the UI.
 - Give created rows unique names (`uniqueSchool`, `uniqueSurname`) and locate them by name.
+- State only a Lambda outside the API can produce (e.g. a bounced email from the SES feedback handler) is written straight to DynamoDB Local by helpers like `setEmailStatus`.
 - Assignment-algorithm tests create their own draft conference (`createDraftConference`); drafts never become the active conference, so the algorithm sees only that test's data.
 
 There are no pixel-diff (`toHaveScreenshot`) assertions yet; their baselines would need generating on CI's Linux runners to avoid font-rendering diffs.
