@@ -3,10 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex" />
     <title>NUMUN CMS</title>
-    <!-- Decap CMS static bundle served from a CDN; the locally-hosted version
-         lands in M5 alongside the OAuth proxy wire-up. -->
-    <script src="https://unpkg.com/decap-cms@^3.0.0/dist/decap-cms.js"></script>
   </head>
-  <body></body>
+  <body>
+    <!-- Decap mounts into document.body, so it must load inside <body>
+         (from <head> it throws and the CMS stays blank). Pinned with SRI:
+         this page holds editors' GitHub tokens. To upgrade, change the
+         version and recompute the hash:
+         curl -sL <url> | openssl dgst -sha384 -binary | openssl base64 -A -->
+    <script
+      src="https://unpkg.com/decap-cms@3.18.0/dist/decap-cms.js"
+      integrity="sha384-Vu0vdYOBhK+2KywHCtNZ9sCqpzkwx358AT6pCSg8om/clLoDzpWYF41jrtEk/WMM"
+      crossorigin="anonymous"
+    ></script>
+  </body>
 </html>
