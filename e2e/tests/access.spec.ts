@@ -2,6 +2,27 @@ import { expect, test } from "../fixtures";
 import { createAdvisor, createDelegation, uniqueSchool } from "../support/api";
 import { seedUsers } from "../support/seed";
 
+const dashboardCards = [
+  "My Delegation",
+  "Pending Delegations",
+  "Committees",
+  "Assignment Studio",
+  "Day-of Check-In",
+  "Awards",
+  "Email Health",
+] as const;
+
+async function expectCards(
+  page: import("@playwright/test").Page,
+  visible: readonly (typeof dashboardCards)[number][],
+) {
+  for (const title of dashboardCards) {
+    const card = page.getByRole("button", { name: new RegExp(`^${title}`) });
+    if (visible.includes(title)) await expect(card).toBeVisible();
+    else await expect(card).toHaveCount(0);
+  }
+}
+
 test("dashboard shows each role its own tools", async ({
   page,
   signInAs,
@@ -10,20 +31,13 @@ test("dashboard shows each role its own tools", async ({
   await signInAs("advisor");
   await step("advisor dashboard", async () => {
     await expect(page.getByText("Advisor", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /My Delegation/ }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /Pending Delegations/ }),
-    ).toHaveCount(0);
+    await expectCards(page, ["My Delegation", "Awards"]);
   });
 
   await signInAs("staffer");
   await step("staffer dashboard", async () => {
     await expect(page.getByText("Staffer", { exact: true })).toBeVisible();
-    await expect(
-      page.getByRole("button", { name: /My Delegation|Pending Delegations/ }),
-    ).toHaveCount(0);
+    await expectCards(page, ["Day-of Check-In", "Awards"]);
   });
 
   await signInAs("admin");
@@ -31,16 +45,29 @@ test("dashboard shows each role its own tools", async ({
     await expect(
       page.getByText("Administrator", { exact: true }),
     ).toBeVisible();
-    for (const name of [
-      /Pending Delegations/,
-      /Committees/,
-      /Assignment Studio/,
-    ]) {
-      await expect(page.getByRole("button", { name })).toBeVisible();
+    await expectCards(page, [
+      "Pending Delegations",
+      "Committees",
+      "Assignment Studio",
+      "Day-of Check-In",
+      "Awards",
+      "Email Health",
+    ]);
+  });
+
+  await step("admin cards open their pages", async () => {
+    for (const [title, url, heading] of [
+      ["Day-of Check-In", "/admin/check-in", "Day-of Check-In"],
+      ["Awards", "/awards", "Awards"],
+      ["Email Health", "/admin/email-health", "Email Health"],
+    ] as const) {
+      await page.goto("/dashboard");
+      await page.getByRole("button", { name: new RegExp(`^${title}`) }).click();
+      await expect(page).toHaveURL(url);
+      await expect(
+        page.getByRole("heading", { level: 1, name: heading }),
+      ).toBeVisible();
     }
-    await expect(
-      page.getByRole("button", { name: /My Delegation/ }),
-    ).toHaveCount(0);
   });
 });
 
