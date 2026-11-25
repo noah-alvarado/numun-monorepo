@@ -341,16 +341,16 @@ The Sheets path **never writes the file to S3.** Parsed rows go straight into th
 
 The portal's bulk import screen shows two "Download template" links:
 
-- `/templates/delegate-import-template.csv`
-- `/templates/delegate-import-template.xlsx`
+- `delegate-import-template.csv`
+- `delegate-import-template.xlsx`
 
-Both files are static assets served from `numun-org-assets` via `assets.numun.org`. Each contains:
+Both files live in `portal/src/assets/templates/` and are bundled by Vite (`?url&no-inline` imports), so they ship content-hashed (`/assets/delegate-import-template-<hash>.csv`) under the portal's far-future `immutable` cache headers. Template changes ship through the normal portal deploy pipeline. Each contains:
 
 - Header row with the canonical column names.
 - 2 example rows showing realistic values (including one with `experienceLevel = "advanced"` and one omitted, demonstrating the default).
 - A second sheet (XLSX only) with a brief "How to use this template" guide.
 
-Templates are versioned by file content hash in the URL (`delegate-import-template.<hash>.csv`); cache headers set far-future expiration. Template changes ship through the normal landing-site deploy pipeline.
+The e2e suite downloads both templates and runs them through Preview, so a template that stops importing cleanly fails the e2e run.
 
 ---
 
@@ -452,7 +452,7 @@ Optional GSI lookup (not in v1): by `userId` to list a user's recent imports.
 | Soft delete on Full sync | Yes | Matches global soft-delete rule |
 | Audit | `bulk_import_previewed` + `bulk_import_committed` | Anti-abuse + forensics |
 | Rate limit | 10 previews + 10 commits per hour per advisor | Modest cap |
-| Templates | Downloadable CSV + XLSX from `assets.numun.org` | Self-service onboarding |
+| Templates | Downloadable CSV + XLSX bundled (content-hashed) with the portal | Self-service onboarding |
 | Server-side parsing | All formats parsed in Go | Bundle size + auth consistency |
 | New cache entity | `BulkImportPreview` (DDB TTL'd) | Bridges preview and commit |
 

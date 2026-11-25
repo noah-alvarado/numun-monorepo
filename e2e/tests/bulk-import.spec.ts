@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import path from "node:path";
 
 import type { Page } from "@playwright/test";
@@ -255,27 +256,59 @@ test("advisor imports an XLSX roster from a chosen tab", async ({
   });
 });
 
-// BULK_IMPORT.md §9: both templates should download. The links point at
-// /templates/* on the portal, but no such files ship (the spec has them on
-// assets.${apex}). Un-fixme once the templates are published.
-test.fixme("starter templates download", async ({
+// BULK_IMPORT.md §9: both starter templates download and import as-is — the
+// two example rows, one advanced and one defaulting to intermediate.
+test("starter templates download and import cleanly", async ({
   page,
   signInAs,
   newAdvisor,
+  step,
 }) => {
   const delegation = await createDelegation(
     newAdvisor.id,
     uniqueSchool("Templates"),
   );
   await signInAs(newAdvisor);
-  await page.goto(`/delegations/${delegation.id}/delegates/import`);
+  const importUrl = `/delegations/${delegation.id}/delegates/import`;
+
   for (const name of [
     "delegate-import-template.csv",
     "delegate-import-template.xlsx",
   ]) {
-    const href = await page.getByRole("link", { name }).getAttribute("href");
-    const resp = await page.request.get(href!);
-    expect(resp.ok()).toBe(true);
-    expect(resp.headers()["content-type"]).not.toContain("text/html");
+    await step(`${name} round-trips through preview`, async () => {
+      await page.goto(importUrl);
+      const download = page.waitForEvent("download");
+      await page.getByRole("link", { name }).click();
+      const file = await (await download).path();
+      expect((await download).suggestedFilename()).toBe(name);
+
+      await page.getByLabel("File").setInputFiles({
+        name,
+        mimeType: name.endsWith(".csv")
+          ? "text/csv"
+          : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        buffer: await readFile(file),
+      });
+      await page.getByRole("button", { name: "Preview import" }).click();
+      if (name.endsWith(".xlsx")) {
+        await page
+          .getByRole("button", { name: "Delegates", exact: true })
+          .click();
+      }
+      await expect(
+        page.getByRole("heading", { name: "Review import" }),
+      ).toBeVisible();
+      await expect(stat(page, "Valid")).toContainText("2");
+      await expect(stat(page, "Errors")).toContainText("0");
+      await expect(previewRow(page, 1).getByRole("textbox").nth(0)).toHaveValue(
+        "Ada",
+      );
+      await expect(
+        previewRow(page, 1).getByRole("combobox").locator("option:checked"),
+      ).toHaveText("Advanced");
+      await expect(
+        previewRow(page, 2).getByRole("combobox").locator("option:checked"),
+      ).toHaveText("Intermediate");
+    });
   }
 });
