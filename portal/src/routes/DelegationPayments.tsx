@@ -23,7 +23,12 @@ type LedgerRow = {
   currency: string;
 };
 
-export default function DelegationPayments(props: { delegation: Delegation }) {
+export default function DelegationPayments(props: {
+  delegation: Delegation;
+  // Balance + paidInFull live on the parent's Delegation; ledger writes must
+  // refetch it or the header goes stale.
+  onLedgerChanged?: () => Promise<void>;
+}) {
   const [user] = userSignal;
   const isAdmin = () => user()?.role === User_Role.STAFF_ADMIN;
 
@@ -49,7 +54,7 @@ export default function DelegationPayments(props: { delegation: Delegation }) {
   const [banner, setBanner] = createSignal<string | null>(null);
 
   async function reload() {
-    await refetch();
+    await Promise.all([refetch(), props.onLedgerChanged?.()]);
   }
 
   return (

@@ -271,7 +271,7 @@ export default function MyDelegation() {
                 <DelegatesPlaceholder delegationId={d().id} />
               </Show>
               <Show when={activeTab() === "payments"}>
-                <DelegationPayments delegation={d()} />
+                <DelegationPayments delegation={d()} onLedgerChanged={reload} />
               </Show>
             </section>
           )}
