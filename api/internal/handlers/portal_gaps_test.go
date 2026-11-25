@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"connectrpc.com/connect"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/numun/numun/api/internal/auth"
 	"github.com/numun/numun/api/internal/domain"
@@ -239,5 +241,40 @@ func TestRejectedDelegationIsReadOnlyForAdvisors(t *testing.T) {
 	// Staff can still correct a rejected registration.
 	if _, err := delegates.CreateDelegate(as("admin", domain.RoleStaffAdmin), connect.NewRequest(&v1.CreateDelegateRequest{DelegationId: del.ID, Input: &v1.DelegateInput{FirstName: "Ada", LastName: "Lovelace"}})); err != nil {
 		t.Fatalf("admin create on rejected delegation: %v", err)
+	}
+}
+
+func TestOnlyOneConferenceCanBeActive(t *testing.T) {
+	st := testStore(t)
+	ctx := context.Background()
+	svc := &handlers.ConferenceService{Store: st, Scoper: auth.NewScoper(st)}
+	admin := as("admin", domain.RoleStaffAdmin)
+	dates := func(r *v1.CreateConferenceRequest) *v1.CreateConferenceRequest {
+		r.StartsAt = timestamppb.New(time.Date(2030, 4, 1, 0, 0, 0, 0, time.UTC))
+		r.EndsAt = timestamppb.New(time.Date(2030, 4, 3, 0, 0, 0, 0, time.UTC))
+		return r
+	}
+
+	// Make sure one conference is active (the local seed usually is).
+	if _, err := st.FindActiveConference(ctx); errors.Is(err, store.ErrNotFound) {
+		if _, err := svc.CreateConference(admin, connect.NewRequest(dates(&v1.CreateConferenceRequest{Name: "Active", EditionNumber: 1, Year: 2030, Status: v1.Conference_STATUS_OPEN_FOR_REGISTRATION}))); err != nil {
+			t.Fatalf("create the active conference: %v", err)
+		}
+	}
+
+	_, err := svc.CreateConference(admin, connect.NewRequest(dates(&v1.CreateConferenceRequest{Name: "Second open", EditionNumber: 2, Year: 2030, Status: v1.Conference_STATUS_OPEN_FOR_REGISTRATION})))
+	wantCode(t, err, connect.CodeFailedPrecondition)
+
+	draft, err := svc.CreateConference(admin, connect.NewRequest(dates(&v1.CreateConferenceRequest{Name: "Draft", EditionNumber: 3, Year: 2030})))
+	if err != nil {
+		t.Fatalf("create draft: %v", err)
+	}
+	inProgress := v1.Conference_STATUS_IN_PROGRESS
+	_, err = svc.UpdateConference(admin, connect.NewRequest(&v1.UpdateConferenceRequest{ConferenceId: draft.Msg.Conference.Id, Status: &inProgress, ExpectedVersion: draft.Msg.Conference.Version}))
+	wantCode(t, err, connect.CodeFailedPrecondition)
+
+	closed := v1.Conference_STATUS_CLOSED
+	if _, err := svc.UpdateConference(admin, connect.NewRequest(&v1.UpdateConferenceRequest{ConferenceId: draft.Msg.Conference.Id, Status: &closed, ExpectedVersion: draft.Msg.Conference.Version})); err != nil {
+		t.Fatalf("closing a draft is fine: %v", err)
 	}
 }
