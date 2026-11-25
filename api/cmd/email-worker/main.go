@@ -47,6 +47,13 @@ func main() {
 		os.Exit(1)
 	}
 	h := &handler{store: st, email: es, logger: logger}
+	if len(os.Args) > 1 && os.Args[1] == "-local" {
+		if err := runLocal(ctx, h); err != nil {
+			logger.Error("email-worker -local", "err", err)
+			os.Exit(1)
+		}
+		return
+	}
 	lambda.Start(h.Handle)
 }
 
@@ -136,9 +143,17 @@ func (h *handler) sendNewRegistrationSummary(ctx context.Context, req email.Enqu
 	// Use the existing per-conference list and filter in-memory; volumes here
 	// are tiny (one window's worth of registrations). The list excludes
 	// soft-deleted rows.
-	all, _, err := h.store.ListDelegationsByConference(ctx, confID, "", 500)
-	if err != nil {
-		return fmt.Errorf("list delegations: %w", err)
+	var all []domain.Delegation
+	for cursor := ""; ; {
+		page, next, err := h.store.ListDelegationsByConference(ctx, confID, cursor, 500)
+		if err != nil {
+			return fmt.Errorf("list delegations: %w", err)
+		}
+		all = append(all, page...)
+		if next == "" {
+			break
+		}
+		cursor = next
 	}
 	windowStart := req.WindowStartedAt
 	windowEnd := windowStart.Add(windowDuration)
@@ -173,10 +188,9 @@ func (h *handler) sendNewRegistrationSummary(ctx context.Context, req email.Enqu
 			}
 		}
 		rows = append(rows, map[string]any{
-			"name":         d.School,
 			"school":       d.School,
 			"advisorEmail": advisorEmail,
-			"createdAt":    d.CreatedAt.Format("Jan 2, 2006 at 3:04 PM") + " CT",
+			"createdAt":    email.FormatCentral(d.CreatedAt),
 		})
 	}
 	additional := 0

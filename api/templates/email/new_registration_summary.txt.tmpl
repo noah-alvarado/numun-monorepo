@@ -3,7 +3,7 @@
 
 The following delegations registered for {{index .Vars "conferenceName"}} in the last 15 minutes:
 
-{{range index .Vars "delegations"}}  - {{index . "name"}} — {{index . "school"}} — {{index . "advisorEmail"}} — {{index . "createdAt"}}
+{{range index .Vars "delegations"}}  - {{index . "school"}} — {{index . "advisorEmail"}} — {{index . "createdAt"}}
 {{end}}{{with index .Vars "additionalCount"}}{{if gt . 0}}
 …and {{.}} more.
 {{end}}{{end}}

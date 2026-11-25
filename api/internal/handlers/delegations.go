@@ -182,7 +182,7 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 			s.log().Error("CreateDelegation: txn", "err", err)
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 		}
-		s.scheduleNewRegistrationSummary(ctx, conferenceID)
+		s.scheduleNewRegistrationSummary(ctx, conferenceID, created.CreatedAt)
 		return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
 	}
 
@@ -193,14 +193,15 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 		s.log().Error("CreateDelegation: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-	s.scheduleNewRegistrationSummary(ctx, conferenceID)
+	s.scheduleNewRegistrationSummary(ctx, conferenceID, created.CreatedAt)
 	return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
 }
 
 // scheduleNewRegistrationSummary opens a 15-minute dedupe window on first
 // registration of the window; subsequent calls within the window are no-ops.
-// EMAIL.md §7.1.
-func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, conferenceID string) {
+// The window starts at the opening registration's createdAt so the summary
+// includes it. EMAIL.md §7.1.
+func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, conferenceID string, createdAt time.Time) {
 	if s.Email == nil {
 		return
 	}
@@ -214,13 +215,28 @@ func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, 
 	if !acquired {
 		return
 	}
+	if !createdAt.IsZero() && createdAt.Before(windowStart) {
+		windowStart = createdAt
+	}
 	if err := s.Email.Enqueue(ctx, email.EnqueueRequest{
 		Kind:            domain.EmailKindNewRegistrationSummary,
 		ConferenceID:    conferenceID,
 		WindowStartedAt: windowStart,
-	}, window); err != nil {
+	}, registrationSummaryDelay(window)); err != nil {
 		s.log().Warn("schedule registration summary: enqueue", "err", err)
 	}
+}
+
+// registrationSummaryDelay is how long the summary waits for more
+// registrations. Local dev and e2e can shorten it with
+// DEV_REGISTRATION_SUMMARY_DELAY (DEV_MODE only).
+func registrationSummaryDelay(window time.Duration) time.Duration {
+	if os.Getenv("DEV_MODE") == "true" {
+		if d, err := time.ParseDuration(os.Getenv("DEV_REGISTRATION_SUMMARY_DELAY")); err == nil {
+			return d
+		}
+	}
+	return window
 }
 
 // UpdateDelegation — scope-gated.

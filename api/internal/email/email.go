@@ -15,6 +15,7 @@ import (
 	"net/mail"
 	"os"
 	"time"
+	_ "time/tzdata"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
@@ -196,8 +197,13 @@ func New(ctx context.Context, st *store.Client, logger *slog.Logger) (*Client, e
 			emailCfg.UnsubscribeSecret = secret
 		}
 	}
+	var sender sesAPI = ses
+	if addr := os.Getenv("DEV_SMTP_ADDR"); addr != "" && os.Getenv("DEV_MODE") == "true" {
+		logger.Warn("dev: email is delivered over SMTP instead of SES", "addr", addr)
+		sender = devSMTP{addr: addr}
+	}
 	return &Client{
-		SES:    ses,
+		SES:    sender,
 		SQS:    sq,
 		Store:  st,
 		Logger: logger,
@@ -349,11 +355,6 @@ func (c *Client) writeEvent(ctx context.Context, req SendRequest, sesID string, 
 }
 
 func (c *Client) buildTemplateData(req SendRequest) TemplateData {
-	loc, _ := time.LoadLocation("America/Chicago")
-	now := time.Now()
-	if loc != nil {
-		now = now.In(loc)
-	}
 	luURL := ""
 	if req.Kind == domain.EmailKindAnnouncement {
 		luURL, _ = SignedUnsubscribeURL(c.Cfg.UnsubscribeBaseURL, c.Cfg.UnsubscribeSecret, req.User.ID)
@@ -361,7 +362,7 @@ func (c *Client) buildTemplateData(req SendRequest) TemplateData {
 	return TemplateData{
 		RecipientName:  req.User.Name,
 		Subject:        req.Subject,
-		NowFormatted:   now.Format("Jan 2, 2006 at 3:04 PM") + " CT",
+		NowFormatted:   FormatCentral(time.Now()),
 		BrandColor:     c.Cfg.BrandColor,
 		AssetsBaseURL:  c.Cfg.AssetsBaseURL,
 		PortalBaseURL:  c.Cfg.PortalBaseURL,
@@ -369,4 +370,14 @@ func (c *Client) buildTemplateData(req SendRequest) TemplateData {
 		Kind:           string(req.Kind),
 		Vars:           req.Vars,
 	}
+}
+
+// FormatCentral renders t in NUMUN's time zone (Evanston, US Central), the
+// way emails show times. The zone database is embedded (time/tzdata) because
+// the Lambda runtime image doesn't ship one.
+func FormatCentral(t time.Time) string {
+	if loc, err := time.LoadLocation("America/Chicago"); err == nil {
+		t = t.In(loc)
+	}
+	return t.Format("Jan 2, 2006 at 3:04 PM") + " CT"
 }
