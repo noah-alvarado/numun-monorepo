@@ -4,7 +4,7 @@ import path from "node:path";
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
-import { createDelegation, uniqueSchool } from "../support/api";
+import { createDelegate, createDelegation, uniqueSchool } from "../support/api";
 
 function csv(rows: string[][]): {
   name: string;
@@ -165,6 +165,8 @@ test("row errors block confirm until fixed inline", async ({
     await email.pressSequentially("bad.email@example.com");
     await expect(email).toHaveValue("bad.email@example.com");
     await expect(bad).not.toContainText("email:");
+    await expect(stat(page, "Errors")).toContainText("0");
+    await expect(stat(page, "Valid")).toContainText("2");
     await expect(
       page.getByRole("button", { name: "Confirm import" }),
     ).toBeEnabled();
@@ -311,4 +313,87 @@ test("starter templates download and import cleanly", async ({
       ).toHaveText("Intermediate");
     });
   }
+});
+
+test("full sync soft-deletes delegates missing from the file", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("FullSync"),
+  );
+  await createDelegate(newAdvisor.id, delegation.id, "Alan", "Turing");
+  await createDelegate(newAdvisor.id, delegation.id, "Barbara", "Liskov");
+  await signInAs(newAdvisor);
+
+  await step("preview a file that drops one delegate", async () => {
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page.getByLabel("File").setInputFiles(
+      csv([
+        ["firstName", "lastName"],
+        ["Alan", "Turing"],
+        ["Edsger", "Dijkstra"],
+      ]),
+    );
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(stat(page, "Create")).toContainText("1");
+    await expect(stat(page, "Matched by name")).toContainText("1");
+  });
+
+  await step("full sync warns before soft-deleting", async () => {
+    await page.getByLabel(/Full sync/).check();
+    await expect(page.getByText(/Full sync will soft-delete/)).toBeVisible();
+    await expect(stat(page, "Will soft-delete")).toContainText("1");
+  });
+
+  await step("confirm reports the soft-delete", async () => {
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await expect(
+      page.getByText(/1 created · \d+ updated · 1 soft-deleted/),
+    ).toBeVisible();
+  });
+});
+
+test("large previews page through rows", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("ImportPages"),
+  );
+  await signInAs(newAdvisor);
+  const rows = Array.from({ length: 60 }, (_, i) => [
+    `First${i + 1}`,
+    `Last${i + 1}`,
+  ]);
+
+  await step("preview 60 rows", async () => {
+    await page.goto(`/delegations/${delegation.id}/delegates/import`);
+    await page
+      .getByLabel("File")
+      .setInputFiles(csv([["firstName", "lastName"], ...rows]));
+    await page.getByRole("button", { name: "Preview import" }).click();
+    await expect(page.getByText("Page 1 of 2 · 60 rows")).toBeVisible();
+    await expect(previewRow(page, 50)).toBeVisible();
+    await expect(previewRow(page, 51)).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Prev" })).toBeDisabled();
+  });
+
+  await step("next page shows the rest", async () => {
+    await page.getByRole("button", { name: "Next" }).click();
+    await expect(page.getByText("Page 2 of 2 · 60 rows")).toBeVisible();
+    await expect(previewRow(page, 60)).toBeVisible();
+    await expect(page.getByRole("button", { name: "Next" })).toBeDisabled();
+  });
+
+  await step("all 60 import", async () => {
+    await page.getByRole("button", { name: "Confirm import" }).click();
+    await expect(page.getByText("Imported 60 delegates")).toBeVisible();
+  });
 });

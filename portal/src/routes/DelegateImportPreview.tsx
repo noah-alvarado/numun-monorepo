@@ -87,7 +87,10 @@ export default function DelegateImportPreview() {
     const start = page() * PAGE_SIZE;
     return rows().slice(start, start + PAGE_SIZE);
   });
-  const hasErrors = createMemo(() => rows().some((r) => r.errors.length > 0));
+  const errorCount = createMemo(
+    () => rows().filter((r) => r.errors.length > 0).length,
+  );
+  const hasErrors = () => errorCount() > 0;
 
   function updateRow(rowNumber: number, patch: Partial<EditableRow>) {
     // Editing a field clears its preview errors so the advisor can fix rows
@@ -175,7 +178,16 @@ export default function DelegateImportPreview() {
         )}
       </Show>
 
-      <Show when={summary}>{(s) => <SummaryBar summary={s()} />}</Show>
+      <Show when={summary}>
+        {(s) => (
+          <SummaryBar
+            summary={s()}
+            errorCount={errorCount()}
+            validCount={rows().length - errorCount()}
+            fullSync={mode() === UpsertMode.FULL_SYNC}
+          />
+        )}
+      </Show>
 
       <section class="mt-4 rounded border border-nu-purple-200 bg-white p-4">
         <legend class="text-sm font-semibold text-nu-purple-700">
@@ -308,22 +320,33 @@ export default function DelegateImportPreview() {
   );
 }
 
-function SummaryBar(props: { summary: PreviewSummary }) {
+// Valid/Errors track inline fixes; the rest is the server's preview summary.
+function SummaryBar(props: {
+  summary: PreviewSummary;
+  errorCount: number;
+  validCount: number;
+  fullSync: boolean;
+}) {
   const s = props.summary;
   return (
     <section class="mt-4 grid grid-cols-2 gap-2 rounded border border-nu-purple-200 bg-white p-4 text-sm md:grid-cols-4">
       <Stat label="Parsed" value={s.parsedCount} />
-      <Stat label="Valid" value={s.validCount} />
+      <Stat label="Valid" value={props.validCount} />
       <Stat
         label="Errors"
-        value={s.errorCount}
-        kind={s.errorCount > 0 ? "warn" : "ok"}
+        value={props.errorCount}
+        kind={props.errorCount > 0 ? "warn" : "ok"}
       />
       <Stat label="Create" value={s.createCount} />
       <Stat label="Update" value={s.updateCount} />
       <Stat label="Matched by email" value={s.matchByEmail} />
       <Stat label="Matched by name" value={s.matchByName} />
-      <Stat label="Will soft-delete" value={s.softDeleteCount} />
+      {/* Additive imports never delete; the count is what Full sync would. */}
+      <Stat
+        label="Will soft-delete"
+        value={props.fullSync ? s.softDeleteCount : 0}
+        kind={props.fullSync && s.softDeleteCount > 0 ? "warn" : "ok"}
+      />
     </section>
   );
 }
