@@ -9,11 +9,16 @@
 //   Control        /__control/* — tests register sheets and users, read
 //                  emailed codes, and queue errors (see e2e/support/fakes.ts)
 //
-// Tokens are JWT-shaped but unsigned, with a "dev-" prefix the API's
-// dev-bypass Exchange accepts (it reads the claims without verifying).
+// Tokens are real RS256 JWTs; the API verifies ID tokens against this
+// server's JWKS (COGNITO_ISSUER_URL), exactly as it does Cognito's.
 
 import { execFileSync } from "node:child_process";
-import { randomUUID } from "node:crypto";
+import {
+  generateKeyPairSync,
+  randomUUID,
+  sign,
+  type KeyObject,
+} from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -21,6 +26,16 @@ import {
 } from "node:http";
 
 const PORT = Number(process.env.FAKES_PORT ?? 4599);
+const POOL_ID = "us-east-2_e2eFake";
+const CLIENT_ID = "e2efakeclient";
+const ISSUER = `http://127.0.0.1:${PORT}/${POOL_ID}`;
+
+const signingKey = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const KID = "fake-1";
+// Signs with the right kid but the wrong key, for forgery tests.
+const forgeryKey = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+}).privateKey;
 
 type Tab = { name: string; gid: string; csv: string };
 const sheets = new Map<string, Tab[]>();
@@ -39,6 +54,9 @@ const users = new Map<string, User>();
 const signUpCodes = new Map<string, string>();
 const resetCodes = new Map<string, string>();
 const challengeSessions = new Map<string, string>();
+// Live refresh tokens → sub. Revoking a user drops theirs.
+const refreshTokens = new Map<string, string>();
+const refreshCalls = new Map<string, number>();
 // Errors queued per operation; the next call to that operation fails.
 const queuedErrors = new Map<string, { type: string; message: string }[]>();
 
@@ -74,20 +92,49 @@ function checkPassword(pw: unknown) {
 const b64url = (v: unknown) =>
   Buffer.from(JSON.stringify(v)).toString("base64url");
 
-function tokens(u: User) {
+function signJwt(
+  claims: Record<string, unknown>,
+  opts: { key?: KeyObject; lifetime?: number } = {},
+) {
   const now = Math.floor(Date.now() / 1000);
-  const jwt = (claims: Record<string, unknown>) =>
-    `dev-${b64url({ alg: "none", typ: "JWT" })}.${b64url({ ...claims, iat: now, exp: now + 3600 })}.fake`;
+  const head = b64url({ alg: "RS256", typ: "JWT", kid: KID });
+  const body = b64url({
+    iss: ISSUER,
+    iat: now,
+    exp: now + (opts.lifetime ?? 3600),
+    ...claims,
+  });
+  const sig = sign(
+    "sha256",
+    Buffer.from(`${head}.${body}`),
+    opts.key ?? signingKey.privateKey,
+  ).toString("base64url");
+  return `${head}.${body}.${sig}`;
+}
+
+function idClaims(u: User) {
   return {
-    IdToken: jwt({
+    sub: u.sub,
+    aud: CLIENT_ID,
+    email: u.email,
+    name: u.name,
+    "custom:role": u.role,
+    token_use: "id",
+  };
+}
+
+function tokens(u: User) {
+  const refresh = `rt.${randomUUID()}`;
+  refreshTokens.set(refresh, u.sub);
+  return {
+    IdToken: signJwt(idClaims(u)),
+    AccessToken: signJwt({
       sub: u.sub,
-      email: u.email,
-      name: u.name,
-      "custom:role": u.role,
-      token_use: "id",
+      client_id: CLIENT_ID,
+      token_use: "access",
+      username: u.email,
     }),
-    AccessToken: jwt({ sub: u.sub, token_use: "access", username: u.email }),
-    RefreshToken: `dev-rt-${u.sub}`,
+    RefreshToken: refresh,
     ExpiresIn: 3600,
     TokenType: "Bearer",
   };
@@ -206,10 +253,8 @@ const cognito: Record<string, (b: Body) => unknown> = {
 
   InitiateAuth(b) {
     if (b.AuthFlow === "REFRESH_TOKEN_AUTH") {
-      const sub = String(b.AuthParameters?.REFRESH_TOKEN ?? "").replace(
-        /^dev-rt-/,
-        "",
-      );
+      const sub = refreshTokens.get(String(b.AuthParameters?.REFRESH_TOKEN));
+      if (sub) refreshCalls.set(sub, (refreshCalls.get(sub) ?? 0) + 1);
       const u = [...users.values()].find((x) => x.sub === sub);
       if (!u) {
         throw new CognitoError(
@@ -338,7 +383,8 @@ const cognito: Record<string, (b: Body) => unknown> = {
     };
   },
 
-  RevokeToken() {
+  RevokeToken(b) {
+    refreshTokens.delete(String(b.Token));
     return {};
   },
 };
@@ -424,6 +470,35 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
       : send(res, 404, { error: "no code" });
   }
 
+  // POST /revoke { email } — invalidates the user's refresh tokens, as if
+  // they were signed out everywhere or disabled.
+  if (path === "/revoke" && req.method === "POST") {
+    const u = mustFind(body.email);
+    for (const [t, sub] of refreshTokens)
+      if (sub === u.sub) refreshTokens.delete(t);
+    return send(res, 200, {});
+  }
+
+  // GET /refreshes?email= — how many REFRESH_TOKEN_AUTH calls the user's
+  // tokens have seen.
+  if (path === "/refreshes") {
+    const u = mustFind(url.searchParams.get("email"));
+    return send(res, 200, { count: refreshCalls.get(u.sub) ?? 0 });
+  }
+
+  // POST /id-token { email, variant?: "forged" | "expired" | "wrong-audience" }
+  // — an ID token for the user, possibly invalid, to exercise verification.
+  if (path === "/id-token" && req.method === "POST") {
+    const u = mustFind(body.email);
+    const claims: Record<string, unknown> = idClaims(u);
+    if (body.variant === "wrong-audience") claims.aud = "some-other-client";
+    const token = signJwt(claims, {
+      key: body.variant === "forged" ? forgeryKey : undefined,
+      lifetime: body.variant === "expired" ? -600 : undefined,
+    });
+    return send(res, 200, { token });
+  }
+
   // POST /errors { op, type, message } — the next <op> call fails.
   // DELETE /errors clears the queue.
   if (path === "/errors" && req.method === "POST") {
@@ -444,6 +519,13 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   if (req.method === "OPTIONS") return send(res, 204, "");
   if (url.pathname.startsWith("/__control")) return control(req, res, url);
+
+  if (url.pathname === `/${POOL_ID}/.well-known/jwks.json`) {
+    const jwk = signingKey.publicKey.export({ format: "jwk" });
+    return send(res, 200, {
+      keys: [{ ...jwk, kid: KID, alg: "RS256", use: "sig" }],
+    });
+  }
 
   const sheet = url.pathname.match(
     /^\/spreadsheets\/d\/([^/]+)\/(htmlview|export)$/,

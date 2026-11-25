@@ -42,14 +42,16 @@ const apiEnv = {
   AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER: FAKES_URL,
   COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
   COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
+  // ID tokens from the fake are verified against its JWKS.
+  COGNITO_ISSUER_URL: `${FAKES_URL}/${COGNITO_POOL_ID}`,
   // Mail goes to Mailpit (docker compose) instead of SES; tests read it back
   // through its API (support/mail.ts).
   DEV_SMTP_ADDR: "localhost:1025",
   DEV_REGISTRATION_SUMMARY_DELAY: "1s",
 };
 
-// The portal talks to the fake Cognito like it would to the real one; the
-// API's dev-bypass Exchange accepts the fake's unsigned tokens.
+// The portal talks to the fake Cognito like it would to the real one, and
+// the API verifies the fake's signed tokens.
 const portalEnv = {
   VITE_DEV_BYPASS: "false",
   VITE_API_BASE_URL: PORTAL_URL,

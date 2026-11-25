@@ -73,6 +73,10 @@ func main() {
 		os.Exit(1)
 	}
 	verifier := auth.NewVerifier(cog.Region, cog.UserPoolID)
+	if iss := os.Getenv("COGNITO_ISSUER_URL"); iss != "" && os.Getenv("DEV_MODE") == "true" {
+		logger.Warn("dev: ID tokens are verified against a non-AWS issuer", "issuer", iss)
+		verifier.WithIssuer(iss)
+	}
 
 	emailSvc, err := email.New(ctx, st, logger)
 	if err != nil {

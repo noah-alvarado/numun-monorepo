@@ -77,3 +77,29 @@ export async function failNextCognitoCall(
 export async function clearCognitoErrors(): Promise<void> {
   await control("DELETE", "/errors");
 }
+
+// Invalidates the user's Cognito refresh tokens (signed out everywhere).
+export async function revokeRefreshTokens(email: string): Promise<void> {
+  await control("POST", "/revoke", { email });
+}
+
+// How many times the API refreshed this user's access token with Cognito.
+export async function refreshCount(email: string): Promise<number> {
+  const { count } = await control<{ count: number }>(
+    "GET",
+    `/refreshes?email=${encodeURIComponent(email)}`,
+  );
+  return count;
+}
+
+// An ID token for the user from the fake Cognito, optionally invalid.
+export async function idToken(
+  email: string,
+  variant?: "forged" | "expired" | "wrong-audience",
+): Promise<string> {
+  const { token } = await control<{ token: string }>("POST", "/id-token", {
+    email,
+    variant,
+  });
+  return token;
+}

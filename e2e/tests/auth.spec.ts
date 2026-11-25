@@ -1,8 +1,12 @@
 import { expect, test } from "../fixtures";
+import { expireAccessToken } from "../support/ddb";
 import {
   clearCognitoErrors,
   failNextCognitoCall,
+  idToken,
   putCognitoUser,
+  refreshCount,
+  revokeRefreshTokens,
 } from "../support/fakes";
 import { seedPassword, seedUsers } from "../support/seed";
 
@@ -146,5 +150,89 @@ test("invited staff set a new password on first sign-in", async ({
     await expect(page).toHaveURL(/\/dashboard$/);
     await expect(page.getByText("Invited Staffer")).toBeVisible();
     await expect(page.getByText("Staffer", { exact: true })).toBeVisible();
+  });
+});
+
+test("the API only accepts genuine ID tokens", async ({ page, step }) => {
+  const email = `tokens.${Date.now()}@example.com`;
+  await putCognitoUser({
+    email,
+    password: "token test pass 1",
+    name: "Token Tester",
+  });
+  const exchange = async (token: string) =>
+    page.request.post("/numun.v1.AuthService/Exchange", {
+      headers: { "Connect-Protocol-Version": "1" },
+      data: {
+        idToken: token,
+        accessToken: "access",
+        refreshToken: "refresh",
+        expiresIn: 3600,
+      },
+    });
+
+  await step(
+    "forged, expired and misaddressed tokens are refused",
+    async () => {
+      await page.goto("/sign-in");
+      for (const variant of ["forged", "expired", "wrong-audience"] as const) {
+        const resp = await exchange(await idToken(email, variant));
+        expect(resp.status(), variant).toBe(401);
+        expect(await resp.text(), variant).toContain("invalid id token");
+      }
+      const cookies = await page.context().cookies();
+      expect(cookies.find((c) => c.name === "numun_session")).toBeUndefined();
+    },
+  );
+
+  await step("a genuine token starts a session", async () => {
+    const resp = await exchange(await idToken(email));
+    expect(resp.status()).toBe(200);
+    await page.goto("/dashboard");
+    await expect(page.getByText("Token Tester")).toBeVisible();
+  });
+});
+
+test("expired access tokens are refreshed until the session is revoked", async ({
+  page,
+  step,
+}) => {
+  const email = `refresh.${Date.now()}@example.com`;
+  const password = "refresh test pass 1";
+  await putCognitoUser({ email, password, name: "Refresh Tester" });
+  const sessionId = async () =>
+    (await page.context().cookies()).find((c) => c.name === "numun_session")!
+      .value;
+
+  await step("sign in", async () => {
+    await page.goto("/sign-in");
+    await page.getByLabel("Email").fill(email);
+    await page.getByLabel("Password").fill(password);
+    await page.getByRole("button", { name: "Sign in" }).click();
+    await expect(page.getByText("Refresh Tester")).toBeVisible();
+    expect(await refreshCount(email)).toBe(0);
+  });
+
+  await step("an expired access token is refreshed silently", async () => {
+    await expireAccessToken(await sessionId());
+    await page.reload();
+    await expect(page.getByText("Refresh Tester")).toBeVisible();
+    expect(await refreshCount(email)).toBe(1);
+    // The refreshed token is cached; the next request doesn't refresh again.
+    await page.reload();
+    await expect(page.getByText("Refresh Tester")).toBeVisible();
+    expect(await refreshCount(email)).toBe(1);
+  });
+
+  await step("once Cognito revokes it, the user is signed out", async () => {
+    await revokeRefreshTokens(email);
+    await expireAccessToken(await sessionId());
+    await page.reload();
+    await expect(page).toHaveURL(/\/sign-in\?ended=1$/);
+    await expect(
+      page.getByText("Your session ended. Sign in again to continue."),
+    ).toBeVisible();
+    const cookies = await page.context().cookies();
+    expect(cookies.find((c) => c.name === "numun_session")).toBeUndefined();
   });
 });
