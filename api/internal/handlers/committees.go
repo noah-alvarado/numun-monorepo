@@ -449,7 +449,7 @@ var guideRefPattern = regexp.MustCompile(`^/content/background-guides/[a-z0-9][a
 func backgroundGuideRef(raw string) (string, error) {
 	ref := strings.TrimSpace(raw)
 	if ref != "" && !guideRefPattern.MatchString(ref) {
-		return "", connect.NewError(connect.CodeInvalidArgument, errors.New("background guide must be a path like /content/background-guides/numun-xxiv/unsc.md"))
+		return "", connect.NewError(connect.CodeInvalidArgument, errors.New("background guide must be a path like /content/background-guides/numun-xxiv/unclos.md"))
 	}
 	return ref, nil
 }

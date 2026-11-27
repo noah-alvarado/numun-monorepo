@@ -298,7 +298,8 @@ const backgroundGuides = defineCollection({
     committeeType: z.enum(["crisis", "non-crisis"]),
     committeeSize: z.enum(["small", "medium", "large"]),
     conferenceName: z.string().max(80),
-    pdfFile: z.string(),
+    // Empty until the guide is published.
+    pdfFile: z.string().optional(),
     updatedAt: z.coerce.date().optional(),
     // Committee-detail display fields (optional; ported from old site).
     abbreviation: z.string().max(20).optional(),

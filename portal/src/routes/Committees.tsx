@@ -621,7 +621,7 @@ function CommitteeModal(props: {
             type="text"
             value={guide()}
             onInput={(e) => setGuide(e.currentTarget.value)}
-            placeholder="/content/background-guides/numun-xxiv/unsc.md"
+            placeholder="/content/background-guides/numun-xxiv/unclos.md"
             aria-describedby="guide-hint"
             class="mt-1 w-full rounded border border-nu-purple-300 px-2 py-1"
           />

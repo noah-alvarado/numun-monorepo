@@ -185,7 +185,7 @@ test("a committee links to its background guide on the site", async ({
   await step("the guide's CMS path becomes a link", async () => {
     await modal(page)
       .getByLabel("Background guide")
-      .fill("/content/background-guides/numun-xxiv/unsc.md");
+      .fill("/content/background-guides/numun-xxiv/unclos.md");
     await modal(page).getByRole("button", { name: "Save" }).click();
     await expect(modal(page)).toBeHidden();
     await expect(
@@ -201,7 +201,7 @@ test("a committee links to its background guide on the site", async ({
       .getByRole("link", { name: "View guide" })
       .click();
     const site = await popup;
-    await expect(site).toHaveURL(/\/committees\/numun-xxiv\/unsc$/);
+    await expect(site).toHaveURL(/\/committees\/numun-xxiv\/unclos$/);
     await expect(site.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });
