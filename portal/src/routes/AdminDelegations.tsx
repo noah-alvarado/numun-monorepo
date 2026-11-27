@@ -1,9 +1,10 @@
-// Admin Pending Delegations — staff-admin reviews pending registrations and
-// can approve or reject inline. Backed by GSI2 (DelegationService.ListDelegations
-// with status=PENDING).
+// Delegations — staff browse the conference's delegations by status and open
+// one for its roster and payments. Admins see all of them and approve or
+// reject pending ones inline; staffers see the delegations they oversee
+// (ListDelegations scopes the results server-side).
 
-import { createSignal, For, onMount, Show } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { createEffect, createSignal, For, on, Show } from "solid-js";
+import { useNavigate, useSearchParams } from "@solidjs/router";
 import { ConnectError, Code } from "@connectrpc/connect";
 
 import { delegationClient } from "@/lib/api";
@@ -15,7 +16,21 @@ import {
 import { User_Role } from "@/gen/numun/v1/users_pb";
 import { listScopedDelegations } from "@/lib/delegations";
 import RejectDelegationDialog from "@/components/RejectDelegationDialog";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
+import { formatMoney, moneyToCents } from "@/lib/money";
+
+const FILTERS = [
+  ["pending", "Pending", Delegation_Status.PENDING],
+  ["approved", "Approved", Delegation_Status.APPROVED],
+  ["rejected", "Rejected", Delegation_Status.REJECTED],
+  ["all", "All", Delegation_Status.UNSPECIFIED],
+] as const;
+
+const STATUS_LABEL: Record<number, string> = {
+  [Delegation_Status.PENDING]: "Pending",
+  [Delegation_Status.APPROVED]: "Approved",
+  [Delegation_Status.REJECTED]: "Rejected",
+};
 
 export default function AdminDelegations() {
   const [user] = userSignal;
@@ -27,6 +42,16 @@ export default function AdminDelegations() {
   const [error, setError] = createSignal<string | null>(null);
   const [busy, setBusy] = createSignal<string | null>(null);
 
+  const isAdmin = () => user()?.role === User_Role.STAFF_ADMIN;
+  const isStaff = () => isAdmin() || user()?.role === User_Role.STAFF_STAFFER;
+
+  // Admins mostly come here to review registrations; staffers can't, so
+  // they start with everything they oversee.
+  const [params, setParams] = useSearchParams<{ status?: string }>();
+  const filter = () =>
+    FILTERS.find(([key]) => key === params.status) ??
+    FILTERS.find(([key]) => key === (isAdmin() ? "pending" : "all"))!;
+
   async function load() {
     const conf = conference();
     if (!conf) {
@@ -35,12 +60,7 @@ export default function AdminDelegations() {
     }
     setError(null);
     try {
-      setItems(
-        await listScopedDelegations(
-          conf.conferenceId,
-          Delegation_Status.PENDING,
-        ),
-      );
+      setItems(await listScopedDelegations(conf.conferenceId, filter()[2]));
     } catch (err) {
       setError(connectMessage(err) ?? "Failed to load delegations.");
     } finally {
@@ -48,7 +68,14 @@ export default function AdminDelegations() {
     }
   }
 
-  onMount(load);
+  createEffect(
+    on(
+      () => filter()[0],
+      () => {
+        if (isStaff()) void load();
+      },
+    ),
+  );
 
   async function approve(d: Delegation) {
     setBusy(d.id);
@@ -58,9 +85,9 @@ export default function AdminDelegations() {
         delegationId: d.id,
         expectedVersion: d.version,
       });
-      setItems(items().filter((it) => it.id !== d.id));
+      await load();
     } catch (err) {
-      handleMutationError(err);
+      await handleMutationError(err);
     } finally {
       setBusy(null);
     }
@@ -78,20 +105,19 @@ export default function AdminDelegations() {
         expectedVersion: d.version,
         reason,
       });
-      setItems(items().filter((it) => it.id !== d.id));
+      await load();
     } catch (err) {
-      handleMutationError(err);
+      await handleMutationError(err);
     } finally {
       setBusy(null);
       setRejectTarget(null);
     }
   }
 
-  function handleMutationError(err: unknown) {
-    if (err instanceof ConnectError && err.code === Code.Aborted) {
-      setError(
-        "Another change happened first. Reload to fetch the latest state.",
-      );
+  async function handleMutationError(err: unknown) {
+    if (isConflict(err)) {
+      await load();
+      setError(conflictMessage("this delegation"));
       return;
     }
     if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
@@ -105,7 +131,7 @@ export default function AdminDelegations() {
     <main class="mx-auto max-w-4xl px-6 py-8">
       <header class="flex items-center justify-between">
         <div>
-          <h1 class="text-2xl font-bold text-nu-purple">Pending Delegations</h1>
+          <h1 class="text-2xl font-bold text-nu-purple">Delegations</h1>
           <Show when={conference()}>
             {(c) => <p class="mt-1 text-sm text-nu-purple-700">{c().name}</p>}
           </Show>
@@ -118,7 +144,7 @@ export default function AdminDelegations() {
           >
             Back
           </button>
-          <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+          <Show when={isStaff()}>
             <button
               type="button"
               onClick={load}
@@ -130,13 +156,13 @@ export default function AdminDelegations() {
         </div>
       </header>
 
-      <Show when={user()?.role !== User_Role.STAFF_ADMIN}>
+      <Show when={!isStaff()}>
         <p class="mt-6 rounded bg-amber-50 p-3 text-sm text-amber-900">
-          Admin only.
+          Staff only.
         </p>
       </Show>
 
-      <Show when={user()?.role === User_Role.STAFF_ADMIN}>
+      <Show when={isStaff()}>
         <Show when={error()}>
           {(e) => (
             <p class="mt-4 rounded bg-red-50 p-3 text-sm text-red-900">{e()}</p>
@@ -149,6 +175,21 @@ export default function AdminDelegations() {
           </p>
         </Show>
 
+        <Show when={conference()}>
+          <label class="mt-6 flex items-center gap-2 text-sm text-nu-purple-700">
+            Status
+            <select
+              value={filter()[0]}
+              onChange={(e) => setParams({ status: e.currentTarget.value })}
+              class="rounded border border-nu-purple-300 px-2 py-1"
+            >
+              <For each={FILTERS}>
+                {([key, label]) => <option value={key}>{label}</option>}
+              </For>
+            </select>
+          </label>
+        </Show>
+
         <Show when={!loaded()}>
           <p class="mt-6 text-sm text-nu-purple-700">Loading…</p>
         </Show>
@@ -158,16 +199,25 @@ export default function AdminDelegations() {
             when={items().length > 0}
             fallback={
               <p class="mt-6 text-sm text-nu-purple-700">
-                No pending delegations.
+                {isAdmin()
+                  ? filter()[0] === "all"
+                    ? "No delegations yet."
+                    : `No ${filter()[1].toLowerCase()} delegations.`
+                  : "No delegations are assigned to you here."}
               </p>
             }
           >
-            <ul class="mt-6 space-y-3">
+            <ul class="mt-4 space-y-3">
               <For each={items()}>
                 {(d) => (
                   <li class="flex items-start justify-between gap-4 rounded border border-nu-purple-200 bg-white p-4">
                     <div>
-                      <div class="text-base font-semibold">{d.school}</div>
+                      <div class="flex items-center gap-2">
+                        <span class="text-base font-semibold">{d.school}</span>
+                        <span class="rounded bg-nu-purple-50 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-nu-purple-700">
+                          {STATUS_LABEL[d.status] ?? "—"}
+                        </span>
+                      </div>
                       <div class="text-sm text-nu-purple-700">
                         <Show when={d.address}>
                           {(a) => (
@@ -180,6 +230,10 @@ export default function AdminDelegations() {
                       </div>
                       <div class="mt-1 text-xs text-nu-purple-700">
                         Est. {d.estimatedDelegates?.total ?? 0} delegates
+                        <Show when={moneyToCents(d.balanceDue) !== 0n}>
+                          {" "}
+                          · Balance due {formatMoney(d.balanceDue)}
+                        </Show>
                       </div>
                     </div>
                     <div class="flex gap-2">
@@ -189,22 +243,28 @@ export default function AdminDelegations() {
                       >
                         Open
                       </a>
-                      <button
-                        type="button"
-                        disabled={busy() === d.id}
-                        onClick={() => approve(d)}
-                        class="rounded bg-nu-purple px-3 py-1 text-sm text-white disabled:opacity-50"
+                      <Show
+                        when={
+                          isAdmin() && d.status === Delegation_Status.PENDING
+                        }
                       >
-                        {busy() === d.id ? "…" : "Approve"}
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy() === d.id}
-                        onClick={() => setRejectTarget(d)}
-                        class="rounded border border-nu-purple-300 px-3 py-1 text-sm text-nu-purple-700 disabled:opacity-50"
-                      >
-                        Reject
-                      </button>
+                        <button
+                          type="button"
+                          disabled={busy() === d.id}
+                          onClick={() => approve(d)}
+                          class="rounded bg-nu-purple px-3 py-1 text-sm text-white disabled:opacity-50"
+                        >
+                          {busy() === d.id ? "…" : "Approve"}
+                        </button>
+                        <button
+                          type="button"
+                          disabled={busy() === d.id}
+                          onClick={() => setRejectTarget(d)}
+                          class="rounded border border-nu-purple-300 px-3 py-1 text-sm text-nu-purple-700 disabled:opacity-50"
+                        >
+                          Reject
+                        </button>
+                      </Show>
                     </div>
                   </li>
                 )}

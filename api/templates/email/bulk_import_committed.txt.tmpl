@@ -5,8 +5,9 @@ Your delegate import for "{{index .Vars "delegationName"}}" ({{index .Vars "mode
 
   - {{index .Vars "createCount"}} delegates created
   - {{index .Vars "updateCount"}} delegates updated
+  - {{index .Vars "unchangedCount"}} delegates unchanged
   - {{index .Vars "softDeleteCount"}} delegates removed
 
-Open My Delegation in the portal to review the roster:
-{{.PortalBaseURL}}/delegation
+Review the roster in the portal:
+{{.PortalBaseURL}}/delegations/{{index .Vars "delegationId"}}?tab=delegates
 {{end}}

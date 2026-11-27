@@ -68,7 +68,7 @@ func (s *DelegationService) ListDelegations(ctx context.Context, req *connect.Re
 	}
 
 	// Scope-filter the result set in-app rather than at the store.
-	dels = filterDelegationsForCaller(ctx, s.Scoper, caller, dels)
+	dels = filterDelegationsForCaller(ctx, s.Store, s.Scoper, caller, dels)
 
 	out := &v1.ListDelegationsResponse{
 		Items: make([]*v1.Delegation, 0, len(dels)),
@@ -93,21 +93,18 @@ func (s *DelegationService) ListAllDelegations(ctx context.Context, req *connect
 	if err := s.Scoper.MustHaveScopeOnConference(ctx, conferenceID); err != nil {
 		return nil, mapScopeErr(err)
 	}
-	var dels []domain.Delegation
-	var err error
-	if status, ok := domainDelegationStatus(req.Msg.GetStatus()); ok && status != "" {
-		dels, _, err = s.Store.ListDelegationsByStatus(ctx, conferenceID, status, "", 1000)
-	} else {
-		dels, _, err = s.Store.ListDelegationsByConference(ctx, conferenceID, "", 1000)
-	}
+	status, _ := domainDelegationStatus(req.Msg.GetStatus())
+	dels, err := s.Store.ListAllDelegationsInConference(ctx, conferenceID, status)
 	if err != nil {
 		s.log().Error("ListAllDelegations: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
+	// Scope first: an advisor's own delegations must be found however many
+	// the conference has. The cap only bounds what one response carries.
+	dels = filterDelegationsForCaller(ctx, s.Store, s.Scoper, caller, dels)
 	if len(dels) >= 1000 {
 		return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("set exceeds non-paginated cap; use ListDelegations"))
 	}
-	dels = filterDelegationsForCaller(ctx, s.Scoper, caller, dels)
 	out := &v1.ListAllDelegationsResponse{Items: make([]*v1.Delegation, 0, len(dels))}
 	for _, d := range dels {
 		out.Items = append(out.Items, delegationToProto(d))
@@ -182,7 +179,7 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 			s.log().Error("CreateDelegation: txn", "err", err)
 			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 		}
-		s.scheduleNewRegistrationSummary(ctx, conferenceID)
+		s.scheduleNewRegistrationSummary(ctx, conferenceID, created.CreatedAt)
 		return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
 	}
 
@@ -193,14 +190,15 @@ func (s *DelegationService) CreateDelegation(ctx context.Context, req *connect.R
 		s.log().Error("CreateDelegation: store", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
-	s.scheduleNewRegistrationSummary(ctx, conferenceID)
+	s.scheduleNewRegistrationSummary(ctx, conferenceID, created.CreatedAt)
 	return connect.NewResponse(&v1.CreateDelegationResponse{Delegation: delegationToProto(created)}), nil
 }
 
 // scheduleNewRegistrationSummary opens a 15-minute dedupe window on first
 // registration of the window; subsequent calls within the window are no-ops.
-// EMAIL.md §7.1.
-func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, conferenceID string) {
+// The window starts at the opening registration's createdAt so the summary
+// includes it. EMAIL.md §7.1.
+func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, conferenceID string, createdAt time.Time) {
 	if s.Email == nil {
 		return
 	}
@@ -214,13 +212,28 @@ func (s *DelegationService) scheduleNewRegistrationSummary(ctx context.Context, 
 	if !acquired {
 		return
 	}
+	if !createdAt.IsZero() && createdAt.Before(windowStart) {
+		windowStart = createdAt
+	}
 	if err := s.Email.Enqueue(ctx, email.EnqueueRequest{
 		Kind:            domain.EmailKindNewRegistrationSummary,
 		ConferenceID:    conferenceID,
 		WindowStartedAt: windowStart,
-	}, window); err != nil {
+	}, registrationSummaryDelay(window)); err != nil {
 		s.log().Warn("schedule registration summary: enqueue", "err", err)
 	}
+}
+
+// registrationSummaryDelay is how long the summary waits for more
+// registrations. Local dev and e2e can shorten it with
+// DEV_REGISTRATION_SUMMARY_DELAY (DEV_MODE only).
+func registrationSummaryDelay(window time.Duration) time.Duration {
+	if os.Getenv("DEV_MODE") == "true" {
+		if d, err := time.ParseDuration(os.Getenv("DEV_REGISTRATION_SUMMARY_DELAY")); err == nil {
+			return d
+		}
+	}
+	return window
 }
 
 // UpdateDelegation — scope-gated.
@@ -861,11 +874,29 @@ func findAdvisor(advisors []domain.DelegationAdvisor, userID string) (domain.Del
 // filterDelegationsForCaller drops rows the caller has no scope on. Admin
 // passes through; advisors keep only their advisor-linked delegations;
 // staff-staffer keeps oversight (case a). Case (c) deferred to M7.
-func filterDelegationsForCaller(ctx context.Context, scoper *auth.Scoper, caller auth.Caller, dels []domain.Delegation) []domain.Delegation {
+func filterDelegationsForCaller(ctx context.Context, st *store.Client, scoper *auth.Scoper, caller auth.Caller, dels []domain.Delegation) []domain.Delegation {
 	if caller.Role == domain.RoleStaffAdmin {
 		return dels
 	}
 	out := make([]domain.Delegation, 0, len(dels))
+	// An advisor's scope is exactly their advisor links: one query instead of
+	// a scope check per delegation in the conference.
+	if caller.Role == domain.RoleAdvisor {
+		links, err := st.ListAdvisorshipsByUser(ctx, caller.UserID)
+		if err != nil {
+			return out
+		}
+		mine := make(map[string]bool, len(links))
+		for _, l := range links {
+			mine[l.DelegationID] = true
+		}
+		for _, d := range dels {
+			if mine[d.ID] {
+				out = append(out, d)
+			}
+		}
+		return out
+	}
 	for _, d := range dels {
 		if err := scoper.MustHaveScopeOnDelegation(ctx, d.ID); err == nil {
 			out = append(out, d)

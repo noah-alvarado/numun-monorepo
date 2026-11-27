@@ -256,6 +256,11 @@ DDB UUID) so renames don't lose history. Manual edits via Decap are
 permissible but will be overwritten on the next API write — treat the CMS UI
 as a forensic / read view for awards rather than the authoritative editor.
 
+Creates and updates save to DDB first and report the sync result; a failed
+sync is retried by saving the award again. Deletes remove the file first and
+only delete the award once that succeeds, so a failed delete leaves the award
+in place to retry.
+
 Recipient kinds were expanded in M11 beyond `delegate` / `delegation` to also
 include committees, users (covers both staff-staffer and advisor), and
 conferences. A delegate-pair (two delegates sharing a dual-delegation

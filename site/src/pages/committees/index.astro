@@ -13,7 +13,20 @@ const sorted = [...all].sort(
     a.data.committeeName.localeCompare(b.data.committeeName),
 );
 
-const conferenceNames = [...new Set(sorted.map((e) => e.data.conferenceName))];
+// Newest conference first ("NUMUN XXIV" before "NUMUN XXII").
+const edition = (name: string) => {
+  const numeral = name.match(/\b([IVXLC]+)\b/)?.[1] ?? "";
+  const value: Record<string, number> = { I: 1, V: 5, X: 10, L: 50, C: 100 };
+  let total = 0;
+  for (let i = 0; i < numeral.length; i++) {
+    const v = value[numeral[i]];
+    total += v < (value[numeral[i + 1]] ?? 0) ? -v : v;
+  }
+  return total;
+};
+const conferenceNames = [
+  ...new Set(sorted.map((e) => e.data.conferenceName)),
+].sort((a, b) => edition(b) - edition(a));
 const groups = conferenceNames.map((name) => ({
   name,
   items: sorted.filter((e) => e.data.conferenceName === name),

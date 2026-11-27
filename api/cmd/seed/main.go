@@ -85,6 +85,8 @@ func main() {
 			Email: u.Email,
 			Name:  u.Name,
 			Phone: u.Phone,
+			// DATA_MODEL.md: announcements are opt-out.
+			AnnouncementsOptIn: true,
 		})
 		switch {
 		case errors.Is(err, store.ErrAlreadyExists):

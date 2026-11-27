@@ -46,7 +46,7 @@ func (s *DelegateService) PreviewUpsertDelegatesBulk(ctx context.Context, req *c
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLPreview); err != nil {
 		if errors.Is(err, store.ErrBulkImportRateLimitExceeded) {
-			return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("bulk-import preview rate limit (10/hour) exceeded"))
+			return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("you can preview 10 imports an hour; try again after the top of the hour"))
 		}
 		s.log().Error("PreviewUpsertDelegatesBulk: incr counter", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
@@ -221,7 +221,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 	// BULK_IMPORT.md §8.2: 10/hr/user per kind.
 	if err := s.Store.IncrBulkImportHourlyCounter(ctx, caller.UserID, store.BulkImportRLCommit); err != nil {
 		if errors.Is(err, store.ErrBulkImportRateLimitExceeded) {
-			return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("bulk-import commit rate limit (10/hour) exceeded"))
+			return nil, connect.NewError(connect.CodeResourceExhausted, errors.New("you can confirm 10 imports an hour; try again after the top of the hour"))
 		}
 		s.log().Error("UpsertDelegatesBulk: incr counter", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
@@ -313,7 +313,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 				"uploadId":        uploadID,
 			},
 		})
-		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), len(softDeletes))
+		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), int(summary.UnchangedCount), len(softDeletes))
 		return connect.NewResponse(&v1.UpsertDelegatesBulkResponse{
 			Summary: &v1.CommitSummary{
 				CreateCount:     int32(len(creates)),
@@ -325,6 +325,18 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 	}
 
 	// Large import: persist a BulkImportJob row and run batches sequentially.
+	// Resume replans from the cached rows, so cache the rows being committed
+	// (they include any fixes made in the preview), not the uploaded ones.
+	committedRaw, err := marshalPreviewRows(previewRows)
+	if err != nil {
+		s.log().Error("UpsertDelegatesBulk: encode rows", "err", err)
+		return nil, connect.NewError(connect.CodeInternal, errors.New("encode failed"))
+	}
+	preview.ParsedRowsRaw = committedRaw
+	if _, err := s.Store.PutBulkImportPreview(ctx, preview); err != nil {
+		s.log().Error("UpsertDelegatesBulk: cache rows", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
 	batches := chunkOps(creates, updates, softDeletes, transactBatchSize)
 	job := domain.BulkImportJob{
 		UploadID:     uploadID,
@@ -374,7 +386,7 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 		},
 	})
 	if lastErr == nil {
-		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), len(softDeletes))
+		s.notifyBulkImportCommitted(ctx, caller.UserID, delID, mode, len(creates), len(updates), int(summary.UnchangedCount), len(softDeletes))
 	}
 
 	resp := &v1.UpsertDelegatesBulkResponse{
@@ -390,9 +402,9 @@ func (s *DelegateService) UpsertDelegatesBulk(ctx context.Context, req *connect.
 			LastError:        persistedJob.LastError,
 		},
 	}
-	if lastErr != nil {
-		return connect.NewResponse(resp), connect.NewError(connect.CodeAborted, errors.New("partial failure — resume via ResumeBulkImport"))
-	}
+	// A partial failure is reported in the summary (status "failed"), not
+	// as an error: Connect drops the response body of a failed call, and the
+	// portal needs the job id to offer Resume.
 	return connect.NewResponse(resp), nil
 }
 
@@ -471,9 +483,13 @@ func (s *DelegateService) ResumeBulkImport(ctx context.Context, req *connect.Req
 		s.log().Error("ResumeBulkImport: list roster", "err", err)
 		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
 	}
+	// Matching against the current roster turns rows the applied batches
+	// already wrote into no-op updates (and keeps full sync from deleting
+	// them), so every batch of the new plan is still outstanding.
+	computeRosterMatches(previewRows, roster, &v1.PreviewSummary{})
 	creates, updates, softDeletes := planWrites(previewRows, roster, job.Mode, caller.UserID, job.ConferenceID, job.DelegationID)
 	batches := chunkOps(creates, updates, softDeletes, transactBatchSize)
-	if job.CompletedBatches >= len(batches) {
+	if len(batches) == 0 {
 		job.Status = domain.BulkImportJobComplete
 		_ = s.Store.UpdateBulkImportJob(ctx, job)
 		_ = s.Store.DeleteBulkImportPreview(ctx, job.UploadID)
@@ -486,9 +502,8 @@ func (s *DelegateService) ResumeBulkImport(ctx context.Context, req *connect.Req
 			},
 		}), nil
 	}
-	remaining := batches[job.CompletedBatches:]
-	completed, lastErr := s.runBatches(ctx, job, remaining)
-	job.CompletedBatches += completed
+	completed, lastErr := s.runBatches(ctx, job, batches)
+	job.CompletedBatches = max(job.CompletedBatches, job.TotalBatches-(len(batches)-completed))
 	if lastErr != nil {
 		job.Status = domain.BulkImportJobFailed
 		job.LastError = lastErr.Error()
@@ -512,9 +527,6 @@ func (s *DelegateService) ResumeBulkImport(ctx context.Context, req *connect.Req
 			LastError:        job.LastError,
 		},
 	}
-	if lastErr != nil {
-		return connect.NewResponse(resp), connect.NewError(connect.CodeAborted, errors.New("partial failure"))
-	}
 	return connect.NewResponse(resp), nil
 }
 
@@ -522,13 +534,34 @@ func (s *DelegateService) ResumeBulkImport(ctx context.Context, req *connect.Req
 
 // runBatches applies the supplied batches sequentially, returning the count
 // applied and the first error encountered.
-func (s *DelegateService) runBatches(ctx context.Context, _ domain.BulkImportJob, batches []bulkImportBatch) (int, error) {
+func (s *DelegateService) runBatches(ctx context.Context, job domain.BulkImportJob, batches []bulkImportBatch) (int, error) {
 	for i, b := range batches {
-		if err := s.Store.ApplyBulkImportBatch(ctx, b.Creates, b.Updates, b.SoftDeletes); err != nil {
+		err := s.devBatchFault(b)
+		if err == nil {
+			err = s.Store.ApplyBulkImportBatch(ctx, b.Creates, b.Updates, b.SoftDeletes)
+		}
+		if err != nil {
+			s.log().Error("bulk import: batch failed", "bulkImportJobId", job.ID, "batch", i, "err", err)
 			return i, err
 		}
 	}
 	return len(batches), nil
+}
+
+// devBatchFault lets the e2e suite fail a batch on purpose (DEV_MODE only,
+// see DevFailBatch).
+func (s *DelegateService) devBatchFault(b bulkImportBatch) error {
+	if s.DevFailBatch == nil {
+		return nil
+	}
+	names := make([]string, len(b.Creates))
+	for i, d := range b.Creates {
+		names[i] = d.LastName
+	}
+	if s.DevFailBatch(names) {
+		return errors.New("injected batch failure (DEV_MODE)")
+	}
+	return nil
 }
 
 // bulkImportBatch carries one chunk of ops sized to transactBatchSize.

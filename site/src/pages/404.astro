@@ -1,0 +1,23 @@
+---
+// Served by CloudFront for any path the bucket doesn't have
+// (infra/base-cdn SiteDistribution CustomErrorResponses).
+import Layout from "../layouts/Layout.astro";
+import Container from "../components/Container.astro";
+import PageHeader from "../components/PageHeader.astro";
+---
+
+<Layout title="Page not found" noindex>
+  <Container>
+    <PageHeader title="Page not found" />
+    <p class="mt-6 text-nu-black-700">
+      We couldn't find that page. It may have moved after a conference wrapped
+      up.
+    </p>
+    <ul class="mt-6 list-disc space-y-1 pl-6 text-nu-purple">
+      <li><a class="underline" href="/">Home</a></li>
+      <li><a class="underline" href="/committees">Committees</a></li>
+      <li><a class="underline" href="/news">News</a></li>
+      <li><a class="underline" href="/contact">Contact us</a></li>
+    </ul>
+  </Container>
+</Layout>

@@ -29,6 +29,9 @@ type Verifier struct {
 	region string
 	pool   string
 	keys   jwk.Set
+	// issuerURL overrides the Cognito issuer (and so the JWKS location);
+	// set only in DEV_MODE, for the e2e fake Cognito.
+	issuerURL string
 	// In dev-bypass mode the verifier is built without a real pool; methods
 	// will refuse to operate.
 	enabled bool
@@ -44,11 +47,22 @@ func NewVerifier(region, userPoolID string) *Verifier {
 	}
 }
 
+// WithIssuer points the verifier at a non-AWS issuer (the e2e fake
+// Cognito). Callers must only use it when DEV_MODE=true.
+func (v *Verifier) WithIssuer(issuerURL string) *Verifier {
+	v.issuerURL = strings.TrimRight(issuerURL, "/")
+	v.enabled = true
+	return v
+}
+
 func (v *Verifier) jwksURL() string {
-	return fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s/.well-known/jwks.json", v.region, v.pool)
+	return v.issuer() + "/.well-known/jwks.json"
 }
 
 func (v *Verifier) issuer() string {
+	if v.issuerURL != "" {
+		return v.issuerURL
+	}
 	return fmt.Sprintf("https://cognito-idp.%s.amazonaws.com/%s", v.region, v.pool)
 }
 

@@ -17,6 +17,8 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"strings"
+	"sync"
 	"time"
 
 	"connectrpc.com/connect"
@@ -73,6 +75,10 @@ func main() {
 		os.Exit(1)
 	}
 	verifier := auth.NewVerifier(cog.Region, cog.UserPoolID)
+	if iss := os.Getenv("COGNITO_ISSUER_URL"); iss != "" && os.Getenv("DEV_MODE") == "true" {
+		logger.Warn("dev: ID tokens are verified against a non-AWS issuer", "issuer", iss)
+		verifier.WithIssuer(iss)
+	}
 
 	emailSvc, err := email.New(ctx, st, logger)
 	if err != nil {
@@ -105,6 +111,14 @@ func main() {
 // without GitHub App credentials. See IMPLEMENTATION_PLAN.md M11.
 func buildCMSClient(ctx context.Context, logger *slog.Logger) *cms.Client {
 	devMode := os.Getenv("DEV_MODE") == "true"
+	if url := os.Getenv("DEV_CMS_GITHUB_API_URL"); devMode && url != "" {
+		client, err := cms.NewDev(url, logger)
+		if err != nil {
+			logger.Warn("cms: dev client init failed — using stub", "err", err)
+			return cms.NewStub(logger)
+		}
+		return client
+	}
 	cfg, err := cms.LoadConfigFromSSM(ctx, logger)
 	if err != nil {
 		if !devMode {
@@ -174,6 +188,21 @@ func buildHandler(logger *slog.Logger, st *store.Client, cog *auth.Cognito, ver 
 	mux.Handle(delPath, delHandler)
 
 	delegateSvc := &handlers.DelegateService{Store: st, Scoper: scoper, Email: emailSvc, Logger: logger}
+	if prefix := os.Getenv("DEV_BULK_IMPORT_FAIL_SURNAME"); prefix != "" && os.Getenv("DEV_MODE") == "true" {
+		// The first batch creating a delegate whose last name starts with
+		// prefix fails, once per last name, so e2e can exercise Resume.
+		var failed sync.Map
+		delegateSvc.DevFailBatch = func(names []string) bool {
+			for _, n := range names {
+				if strings.HasPrefix(n, prefix) {
+					if _, seen := failed.LoadOrStore(n, true); !seen {
+						return true
+					}
+				}
+			}
+			return false
+		}
+	}
 	if origin := os.Getenv("DEV_SHEETS_ORIGIN"); origin != "" && os.Getenv("DEV_MODE") == "true" {
 		u, err := url.Parse(origin)
 		if err != nil || u.Host == "" {

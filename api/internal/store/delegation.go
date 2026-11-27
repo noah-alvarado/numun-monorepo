@@ -432,6 +432,37 @@ func (c *Client) SetDelegationStatus(ctx context.Context, conferenceID, id strin
 	return delegationFromItem(it), nil
 }
 
+// listAllPageSize is the page size ListAllDelegationsInConference asks for
+// (the per-call maximum); tests shrink it.
+var listAllPageSize int32 = 500
+
+// ListAllDelegationsInConference pages through every live delegation in a
+// conference, optionally only those with status (empty = any). The paged
+// queries return at most 500 rows per call and can stop short of that (the
+// soft-delete filter applies after Limit), so callers wanting everything must
+// follow the cursor rather than ask for a large page.
+func (c *Client) ListAllDelegationsInConference(ctx context.Context, conferenceID string, status domain.DelegationStatus) ([]domain.Delegation, error) {
+	var all []domain.Delegation
+	for cursor := ""; ; {
+		var page []domain.Delegation
+		var next string
+		var err error
+		if status == "" {
+			page, next, err = c.ListDelegationsByConference(ctx, conferenceID, cursor, listAllPageSize)
+		} else {
+			page, next, err = c.ListDelegationsByStatus(ctx, conferenceID, status, cursor, listAllPageSize)
+		}
+		if err != nil {
+			return nil, err
+		}
+		all = append(all, page...)
+		if next == "" {
+			return all, nil
+		}
+		cursor = next
+	}
+}
+
 // ListDelegationsByConference returns delegations within a conference using
 // the base-table Query (PK = CONF#<id>, SK begins_with DELEGATION#).
 // Soft-deleted rows are filtered server-side.

@@ -6,13 +6,23 @@
 //                  (the API's DEV_SHEETS_ORIGIN proxy sends them here)
 //   Cognito        POST / with X-Amz-Target: AWSCognitoIdentityProviderService.<Op>
 //                  (portal VITE_COGNITO_ENDPOINT, API AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER)
+//   GitHub         /github/* — the App token, branch head, contents and
+//                  createCommitOnBranch calls the API's award CMS sync makes
+//                  (DEV_CMS_GITHUB_API_URL); commits land in memory
 //   Control        /__control/* — tests register sheets and users, read
-//                  emailed codes, and queue errors (see e2e/support/fakes.ts)
+//                  emailed codes and committed files, and queue errors (see
+//                  e2e/support/fakes.ts)
 //
-// Tokens are JWT-shaped but unsigned, with a "dev-" prefix the API's
-// dev-bypass Exchange accepts (it reads the claims without verifying).
+// Tokens are real RS256 JWTs; the API verifies ID tokens against this
+// server's JWKS (COGNITO_ISSUER_URL), exactly as it does Cognito's.
 
-import { randomUUID } from "node:crypto";
+import { execFileSync } from "node:child_process";
+import {
+  generateKeyPairSync,
+  randomUUID,
+  sign,
+  type KeyObject,
+} from "node:crypto";
 import {
   createServer,
   type IncomingMessage,
@@ -20,6 +30,16 @@ import {
 } from "node:http";
 
 const PORT = Number(process.env.FAKES_PORT ?? 4599);
+const POOL_ID = "us-east-2_e2eFake";
+const CLIENT_ID = "e2efakeclient";
+const ISSUER = `http://127.0.0.1:${PORT}/${POOL_ID}`;
+
+const signingKey = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const KID = "fake-1";
+// Signs with the right kid but the wrong key, for forgery tests.
+const forgeryKey = generateKeyPairSync("rsa", {
+  modulusLength: 2048,
+}).privateKey;
 
 type Tab = { name: string; gid: string; csv: string };
 const sheets = new Map<string, Tab[]>();
@@ -28,6 +48,7 @@ type User = {
   sub: string;
   email: string;
   name: string;
+  phone: string;
   role: string;
   password: string;
   confirmed: boolean;
@@ -37,8 +58,17 @@ const users = new Map<string, User>();
 const signUpCodes = new Map<string, string>();
 const resetCodes = new Map<string, string>();
 const challengeSessions = new Map<string, string>();
+// Live refresh tokens → sub. Revoking a user drops theirs.
+const refreshTokens = new Map<string, string>();
+const refreshCalls = new Map<string, number>();
 // Errors queued per operation; the next call to that operation fails.
 const queuedErrors = new Map<string, { type: string; message: string }[]>();
+
+// The content repo as the CMS sync has committed it: path → file contents.
+const repoFiles = new Map<string, string>();
+let repoHead = "0".repeat(40);
+// GitHub calls left to fail with a 502 (each sync retries up to 3 times).
+let githubFailures = 0;
 
 class CognitoError extends Error {
   type: string;
@@ -72,20 +102,49 @@ function checkPassword(pw: unknown) {
 const b64url = (v: unknown) =>
   Buffer.from(JSON.stringify(v)).toString("base64url");
 
-function tokens(u: User) {
+function signJwt(
+  claims: Record<string, unknown>,
+  opts: { key?: KeyObject; lifetime?: number } = {},
+) {
   const now = Math.floor(Date.now() / 1000);
-  const jwt = (claims: Record<string, unknown>) =>
-    `dev-${b64url({ alg: "none", typ: "JWT" })}.${b64url({ ...claims, iat: now, exp: now + 3600 })}.fake`;
+  const head = b64url({ alg: "RS256", typ: "JWT", kid: KID });
+  const body = b64url({
+    iss: ISSUER,
+    iat: now,
+    exp: now + (opts.lifetime ?? 3600),
+    ...claims,
+  });
+  const sig = sign(
+    "sha256",
+    Buffer.from(`${head}.${body}`),
+    opts.key ?? signingKey.privateKey,
+  ).toString("base64url");
+  return `${head}.${body}.${sig}`;
+}
+
+function idClaims(u: User) {
   return {
-    IdToken: jwt({
+    sub: u.sub,
+    aud: CLIENT_ID,
+    email: u.email,
+    name: u.name,
+    "custom:role": u.role,
+    token_use: "id",
+  };
+}
+
+function tokens(u: User) {
+  const refresh = `rt.${randomUUID()}`;
+  refreshTokens.set(refresh, u.sub);
+  return {
+    IdToken: signJwt(idClaims(u)),
+    AccessToken: signJwt({
       sub: u.sub,
-      email: u.email,
-      name: u.name,
-      "custom:role": u.role,
-      token_use: "id",
+      client_id: CLIENT_ID,
+      token_use: "access",
+      username: u.email,
     }),
-    AccessToken: jwt({ sub: u.sub, token_use: "access", username: u.email }),
-    RefreshToken: `dev-rt-${u.sub}`,
+    RefreshToken: refresh,
     ExpiresIn: 3600,
     TokenType: "Bearer",
   };
@@ -96,6 +155,36 @@ function attr(
   name: string,
 ) {
   return attrs?.find((a) => a.Name === name)?.Value ?? "";
+}
+
+// Runs the real post-confirmation trigger (api/cmd/cognito-post-confirmation
+// -local), synchronously like Cognito, when POST_CONFIRMATION_BIN is set.
+function postConfirmation(triggerSource: string, u: User) {
+  const bin = process.env.POST_CONFIRMATION_BIN;
+  if (!bin) return;
+  const event = {
+    version: "1",
+    triggerSource,
+    region: "us-east-2",
+    userPoolId: "us-east-2_e2eFake",
+    userName: u.email,
+    callerContext: { awsSdkVersion: "fake", clientId: "e2efakeclient" },
+    request: {
+      userAttributes: {
+        sub: u.sub,
+        email: u.email,
+        email_verified: "true",
+        name: u.name,
+        phone_number: u.phone,
+        "custom:role": u.role,
+      },
+    },
+    response: {},
+  };
+  execFileSync(bin, ["-local"], {
+    input: JSON.stringify(event),
+    stdio: ["pipe", "ignore", "inherit"],
+  });
 }
 
 function userAttributes(u: User) {
@@ -141,6 +230,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
       sub: randomUUID(),
       email,
       name: attr(b.UserAttributes, "name"),
+      phone: attr(b.UserAttributes, "phone_number"),
       role: "advisor",
       password: b.Password,
       confirmed: false,
@@ -161,6 +251,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
     }
     u.confirmed = true;
     signUpCodes.delete(u.email);
+    postConfirmation("PostConfirmation_ConfirmSignUp", u);
     return {};
   },
 
@@ -172,10 +263,8 @@ const cognito: Record<string, (b: Body) => unknown> = {
 
   InitiateAuth(b) {
     if (b.AuthFlow === "REFRESH_TOKEN_AUTH") {
-      const sub = String(b.AuthParameters?.REFRESH_TOKEN ?? "").replace(
-        /^dev-rt-/,
-        "",
-      );
+      const sub = refreshTokens.get(String(b.AuthParameters?.REFRESH_TOKEN));
+      if (sub) refreshCalls.set(sub, (refreshCalls.get(sub) ?? 0) + 1);
       const u = [...users.values()].find((x) => x.sub === sub);
       if (!u) {
         throw new CognitoError(
@@ -258,8 +347,10 @@ const cognito: Record<string, (b: Body) => unknown> = {
       );
     }
     checkPassword(b.Password);
-    mustFind(email).password = b.Password;
+    const u = mustFind(email);
+    u.password = b.Password;
     resetCodes.delete(email);
+    postConfirmation("PostConfirmation_ConfirmForgotPassword", u);
     return {};
   },
 
@@ -275,6 +366,7 @@ const cognito: Record<string, (b: Body) => unknown> = {
       sub: randomUUID(),
       email,
       name: attr(b.UserAttributes, "name"),
+      phone: "",
       role: attr(b.UserAttributes, "custom:role") || "advisor",
       password: `temp-${code()}-password`,
       confirmed: true,
@@ -301,7 +393,8 @@ const cognito: Record<string, (b: Body) => unknown> = {
     };
   },
 
-  RevokeToken() {
+  RevokeToken(b) {
+    refreshTokens.delete(String(b.Token));
     return {};
   },
 };
@@ -360,6 +453,7 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
       sub: body.sub ?? users.get(email)?.sub ?? randomUUID(),
       email,
       name: body.name ?? "",
+      phone: "",
       role: body.role ?? "advisor",
       password: body.password,
       confirmed: body.confirmed ?? true,
@@ -386,6 +480,49 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
       : send(res, 404, { error: "no code" });
   }
 
+  // POST /revoke { email } — invalidates the user's refresh tokens, as if
+  // they were signed out everywhere or disabled.
+  if (path === "/revoke" && req.method === "POST") {
+    const u = mustFind(body.email);
+    for (const [t, sub] of refreshTokens)
+      if (sub === u.sub) refreshTokens.delete(t);
+    return send(res, 200, {});
+  }
+
+  // GET /refreshes?email= — how many REFRESH_TOKEN_AUTH calls the user's
+  // tokens have seen.
+  if (path === "/refreshes") {
+    const u = mustFind(url.searchParams.get("email"));
+    return send(res, 200, { count: refreshCalls.get(u.sub) ?? 0 });
+  }
+
+  // POST /id-token { email, variant?: "forged" | "expired" | "wrong-audience" }
+  // — an ID token for the user, possibly invalid, to exercise verification.
+  if (path === "/id-token" && req.method === "POST") {
+    const u = mustFind(body.email);
+    const claims: Record<string, unknown> = idClaims(u);
+    if (body.variant === "wrong-audience") claims.aud = "some-other-client";
+    const token = signJwt(claims, {
+      key: body.variant === "forged" ? forgeryKey : undefined,
+      lifetime: body.variant === "expired" ? -600 : undefined,
+    });
+    return send(res, 200, { token });
+  }
+
+  // GET /github/files?path= — a file the CMS sync committed.
+  if (path === "/github/files") {
+    const f = repoFiles.get(url.searchParams.get("path") ?? "");
+    return f === undefined
+      ? send(res, 404, { error: "no such file" })
+      : send(res, 200, { content: f });
+  }
+
+  // POST /github/fail { count } — the next <count> GitHub calls fail.
+  if (path === "/github/fail" && req.method === "POST") {
+    githubFailures = body.count;
+    return send(res, 200, {});
+  }
+
   // POST /errors { op, type, message } — the next <op> call fails.
   // DELETE /errors clears the queue.
   if (path === "/errors" && req.method === "POST") {
@@ -402,10 +539,54 @@ async function control(req: IncomingMessage, res: ServerResponse, url: URL) {
   send(res, 404, { error: `unknown control path ${path}` });
 }
 
+// The slice of GitHub's REST + GraphQL API that api/internal/cms/git.go uses.
+async function github(req: IncomingMessage, res: ServerResponse, url: URL) {
+  const path = url.pathname.replace(/^\/github/, "");
+  if (githubFailures > 0) {
+    githubFailures -= 1;
+    return send(res, 502, { message: "Server Error (fake)" });
+  }
+  if (/^\/app\/installations\/[^/]+\/access_tokens$/.test(path)) {
+    const expires = new Date(Date.now() + 3600_000).toISOString();
+    return send(res, 201, { token: "ghs_fake", expires_at: expires });
+  }
+  if (/^\/repos\/[^/]+\/[^/]+\/git\/ref\/heads\/[^/]+$/.test(path)) {
+    return send(res, 200, { object: { sha: repoHead } });
+  }
+  const contents = path.match(/^\/repos\/[^/]+\/[^/]+\/contents\/(.+)$/);
+  if (contents && req.method === "GET") {
+    return repoFiles.has(contents[1])
+      ? send(res, 200, { sha: `blob-${contents[1]}` })
+      : send(res, 404, { message: "Not Found" });
+  }
+  if (path === "/graphql" && req.method === "POST") {
+    const { input } = (await readJSON(req)).variables;
+    if (input.expectedHeadOid !== repoHead) {
+      return send(res, 200, { errors: [{ message: "head moved" }] });
+    }
+    for (const a of input.fileChanges.additions ?? []) {
+      repoFiles.set(a.path, Buffer.from(a.contents, "base64").toString("utf8"));
+    }
+    for (const d of input.fileChanges.deletions ?? []) repoFiles.delete(d.path);
+    repoHead = randomUUID().replaceAll("-", "").padEnd(40, "0");
+    return send(res, 200, {
+      data: { createCommitOnBranch: { commit: { oid: repoHead } } },
+    });
+  }
+  send(res, 404, { message: "Not Found" });
+}
+
 async function handle(req: IncomingMessage, res: ServerResponse) {
   const url = new URL(req.url ?? "/", `http://${req.headers.host}`);
   if (req.method === "OPTIONS") return send(res, 204, "");
   if (url.pathname.startsWith("/__control")) return control(req, res, url);
+
+  if (url.pathname === `/${POOL_ID}/.well-known/jwks.json`) {
+    const jwk = signingKey.publicKey.export({ format: "jwk" });
+    return send(res, 200, {
+      keys: [{ ...jwk, kid: KID, alg: "RS256", use: "sig" }],
+    });
+  }
 
   const sheet = url.pathname.match(
     /^\/spreadsheets\/d\/([^/]+)\/(htmlview|export)$/,
@@ -421,6 +602,8 @@ async function handle(req: IncomingMessage, res: ServerResponse) {
     if (!tab) return send(res, 400, "Bad gid", "text/html");
     return send(res, 200, tab.csv, "text/csv");
   }
+
+  if (url.pathname.startsWith("/github/")) return github(req, res, url);
 
   const target = String(req.headers["x-amz-target"] ?? "");
   if (

@@ -41,7 +41,7 @@ import type { Delegation } from "@/gen/numun/v1/delegations_pb";
 import type { Committee } from "@/gen/numun/v1/committees_pb";
 import type { SearchDelegatesResponse_Hit } from "@/gen/numun/v1/delegates_pb";
 import { listScopedDelegations } from "@/lib/delegations";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
 
 type RecipientFormRow = {
   kind: AwardRecipientKind;
@@ -94,9 +94,10 @@ export default function Awards() {
   );
 
   // For the advisor hero: union of delegate IDs in the advisor's delegations.
-  // Best-effort — failures collapse to "no winners shown".
+  // Best-effort — failures collapse to "no winners shown". Advisors only: for
+  // staff this would be one roster request per delegation in the conference.
   const [myDelegateIds] = createResource(
-    () => myDelegations(),
+    () => (user()?.role === User_Role.ADVISOR ? myDelegations() : undefined),
     async (delegations) => {
       if (!delegations || delegations.length === 0) return new Set<string>();
       const ids = new Set<string>();
@@ -221,6 +222,12 @@ export default function Awards() {
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
+      if (isConflict(err)) {
+        setEditTarget(null);
+        await refetchAwards();
+        setError(conflictMessage("this award"));
+        return;
+      }
       setError(handleMutationError(err));
     }
   }
@@ -237,6 +244,12 @@ export default function Awards() {
       setCmsBanner(resp.cmsSync ?? null);
       await refetchAwards();
     } catch (err) {
+      if (isConflict(err)) {
+        setDeleteTarget(null);
+        await refetchAwards();
+        setError(conflictMessage("this award"));
+        return;
+      }
       setError(handleMutationError(err));
     }
   }
@@ -321,18 +334,28 @@ export default function Awards() {
           <Show
             when={s().ok}
             fallback={
-              <p class="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">
-                {cmsVerb()} in the database, but CMS sync failed after{" "}
-                {s().attempts} attempts: {s().finalError}. Retry by editing the
-                award.
-              </p>
+              <div class="mt-4 rounded bg-amber-50 p-3 text-sm text-amber-900">
+                <p>
+                  {cmsVerb() === "Saved"
+                    ? "Saved, but the public site wasn't updated. Save the award again to retry."
+                    : "Not deleted: the award couldn't be taken off the public site. Delete it again to retry."}
+                </p>
+                <p class="mt-1 text-xs" title={s().finalError}>
+                  GitHub returned an error on all {s().attempts} tries.
+                </p>
+              </div>
             }
           >
             <p class="mt-4 rounded bg-green-50 p-3 text-sm text-green-900">
-              {cmsVerb()} and synced to the public site.
-              <Show when={s().commitSha}>
-                {" "}
-                <code class="text-xs">{s().commitSha.slice(0, 7)}</code>
+              <Show
+                when={s().attempts > 0}
+                fallback={`${cmsVerb()}. This environment doesn't sync awards to the public site.`}
+              >
+                {cmsVerb()} and synced to the public site.
+                <Show when={s().commitSha}>
+                  {" "}
+                  <code class="text-xs">{s().commitSha.slice(0, 7)}</code>
+                </Show>
               </Show>
             </p>
           </Show>
@@ -370,9 +393,11 @@ export default function Awards() {
       </Show>
 
       <Show
-        when={!awards.loading}
+        when={conferenceId() && !awards.loading}
         fallback={
-          <p class="mt-6 text-sm text-nu-purple-700">Loading awards…</p>
+          <Show when={conferenceId()}>
+            <p class="mt-6 text-sm text-nu-purple-700">Loading awards…</p>
+          </Show>
         }
       >
         <Show
@@ -944,9 +969,6 @@ function formRowToProto(r: RecipientFormRow): AwardRecipient {
 }
 
 function handleMutationError(err: unknown): string {
-  if (err instanceof ConnectError && err.code === Code.Aborted) {
-    return "Another change happened first. Reload to fetch the latest state.";
-  }
   if (err instanceof ConnectError && err.code === Code.PermissionDenied) {
     return "You don't have permission to write that award.";
   }

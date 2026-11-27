@@ -56,7 +56,18 @@ export default function Dashboard() {
               </dl>
             </section>
 
-            <Show when={conference()}>
+            <Show
+              when={conference()}
+              fallback={
+                <section class="mt-4 rounded bg-amber-50 p-4 text-sm text-amber-900">
+                  {u().role === User_Role.STAFF_ADMIN
+                    ? "No conference is open. Open registration for one under Conferences."
+                    : u().role === User_Role.ADVISOR
+                      ? "Registration isn't open right now. You can register once NUMUN opens the next conference."
+                      : "No conference is open right now."}
+                </section>
+              }
+            >
               {(c) => (
                 <section class="mt-4 rounded border border-nu-purple-200 bg-nu-purple-50 p-4 text-sm">
                   <span class="font-semibold text-nu-purple-700">
@@ -82,8 +93,8 @@ export default function Dashboard() {
             <Show when={u().role === User_Role.STAFF_ADMIN}>
               <section class="mt-6 grid gap-3">
                 <NavCard
-                  title="Pending Delegations"
-                  description="Review and approve school registrations."
+                  title="Delegations"
+                  description="Approve registrations, and open any delegation's roster and payments."
                   onClick={() => navigate("/admin/delegations")}
                 />
                 <Show when={conference()}>
@@ -138,6 +149,11 @@ export default function Dashboard() {
 
             <Show when={u().role === User_Role.STAFF_STAFFER}>
               <section class="mt-6 grid gap-3">
+                <NavCard
+                  title="Delegations"
+                  description="The delegations you oversee: their rosters and payments."
+                  onClick={() => navigate("/admin/delegations")}
+                />
                 <CheckInCard onClick={() => navigate("/admin/check-in")} />
                 <AwardsCard onClick={() => navigate("/awards")} />
                 <ExportsCard onClick={() => navigate("/exports")} />

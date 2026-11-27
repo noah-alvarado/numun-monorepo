@@ -1,4 +1,4 @@
-// Drives fakes/server.ts (fake Google Sheets + Cognito) from tests.
+// Drives fakes/server.ts (fake Google Sheets, Cognito and GitHub) from tests.
 
 import { FAKES_URL } from "../playwright.config";
 
@@ -76,4 +76,44 @@ export async function failNextCognitoCall(
 
 export async function clearCognitoErrors(): Promise<void> {
   await control("DELETE", "/errors");
+}
+
+// Invalidates the user's Cognito refresh tokens (signed out everywhere).
+export async function revokeRefreshTokens(email: string): Promise<void> {
+  await control("POST", "/revoke", { email });
+}
+
+// How many times the API refreshed this user's access token with Cognito.
+export async function refreshCount(email: string): Promise<number> {
+  const { count } = await control<{ count: number }>(
+    "GET",
+    `/refreshes?email=${encodeURIComponent(email)}`,
+  );
+  return count;
+}
+
+// An ID token for the user from the fake Cognito, optionally invalid.
+export async function idToken(
+  email: string,
+  variant?: "forged" | "expired" | "wrong-audience",
+): Promise<string> {
+  const { token } = await control<{ token: string }>("POST", "/id-token", {
+    email,
+    variant,
+  });
+  return token;
+}
+
+// A file the API's award sync committed to the (fake) content repo, or null.
+export async function committedFile(path: string): Promise<string | null> {
+  const resp = await fetch(
+    `${FAKES_URL}/__control/github/files?path=${encodeURIComponent(path)}`,
+  );
+  if (resp.status === 404) return null;
+  return ((await resp.json()) as { content: string }).content;
+}
+
+// Makes the next <count> GitHub calls fail, as during a GitHub outage.
+export async function failGitHub(count: number): Promise<void> {
+  await control("POST", "/github/fail", { count });
 }

@@ -102,3 +102,40 @@ func TestAssignmentRunLifecycle(t *testing.T) {
 		t.Fatalf("expected 2 runs, got %d", len(runs))
 	}
 }
+
+// A run left "running" by a Lambda that died is expired rather than blocking
+// the conference forever.
+func TestStaleRunningRunIsExpired(t *testing.T) {
+	ctx := context.Background()
+	c := testClient(t)
+	conferenceID := newID(t)
+	stale, err := c.CreateAssignmentRun(ctx, domain.AssignmentRun{
+		ConferenceID: conferenceID,
+		RunOrdinal:   1,
+		TriggeredBy:  newID(t),
+		TriggeredAt:  time.Now().UTC().Add(-store.StaleRunAfter - time.Minute),
+		Status:       domain.AssignmentRunStatusRunning,
+	})
+	if err != nil {
+		t.Fatalf("create stale run: %v", err)
+	}
+
+	if _, err := c.FindInFlightRun(ctx, conferenceID); !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("find in-flight: want ErrNotFound for a stale run, got %v", err)
+	}
+	got, err := c.GetAssignmentRun(ctx, stale.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Status != domain.AssignmentRunStatusFailed || got.Diagnostics == "" {
+		t.Fatalf("stale run: status %s, diagnostics %q; want failed with a reason", got.Status, got.Diagnostics)
+	}
+	if _, err := c.CreateAssignmentRun(ctx, domain.AssignmentRun{
+		ConferenceID: conferenceID,
+		RunOrdinal:   2,
+		TriggeredBy:  newID(t),
+		Status:       domain.AssignmentRunStatusRunning,
+	}); err != nil {
+		t.Fatalf("new run after a stale one: %v", err)
+	}
+}

@@ -117,7 +117,6 @@ func (s *AnnouncementService) Send(ctx context.Context, req *connect.Request[v1.
 		for _, u := range recipients {
 			vars := map[string]any{
 				"subject":  subject,
-				"bodyHTML": bodyHTML,
 				"bodyText": bodyText,
 			}
 			if err := s.Email.Enqueue(ctx, email.EnqueueRequest{

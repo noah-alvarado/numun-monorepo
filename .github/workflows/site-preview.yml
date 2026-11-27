@@ -4,14 +4,14 @@ name: site preview
 # Decap's editorial workflow shows the `deploy/preview` commit status as its
 # "View preview" link. Previews always deploy to the test account; the
 # deploy-preview role can only write the previews bucket.
+#
+# "Site preview" is a required check on main, so the workflow runs on every
+# PR. It only builds and deploys when the PR touches the site; otherwise (and
+# for fork PRs, which get no AWS credentials) the job is skipped, which
+# counts as passing.
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
-    paths:
-      - "site/**"
-      - "content/**"
-      - "packages/tailwind-tokens/**"
-      - ".github/workflows/site-preview.yml"
 
 permissions:
   id-token: write
@@ -31,10 +31,39 @@ env:
   COMMENT_MARKER: "<!-- site-preview -->"
 
 jobs:
-  deploy:
-    # Fork PRs get no OIDC token; skip them instead of failing.
-    if: github.event.action != 'closed' && github.event.pull_request.head.repo.full_name == github.repository
+  # Decides whether there's anything to preview. Kept separate from deploy so
+  # PRs that don't touch the site don't create empty test-preview deployments.
+  changes:
+    if: github.event.action != 'closed'
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.changes.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: changes
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
+        run: |
+          if [ "$FORK" = "true" ]; then
+            echo "Fork PRs get no AWS credentials; skipping the preview."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          elif git diff --name-only "$BASE"...HEAD | grep -Eq '^(site/|content/|packages/tailwind-tokens/|e2e/site/|e2e/fixtures\.ts$|e2e/playwright\.deployed\.config\.ts$|e2e/package\.json$|pnpm-lock\.yaml$|\.nvmrc$|scripts/gh-api-retry\.sh$|\.github/workflows/site-preview\.yml$)'; then
+            echo "run=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "No site changes; skipping the preview."
+            echo "run=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  # The required check. A job skipped by its `if` counts as passing.
+  deploy:
+    name: Site preview
+    needs: changes
+    if: needs.changes.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
     environment:
       name: test-preview
       url: ${{ steps.urls.outputs.preview }}
@@ -53,7 +82,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+          scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
             -f state=pending -f context=deploy/preview -f description="Building preview"
       - name: Fetch active conference
         # Same fallback behavior as site.yml.
@@ -76,42 +105,79 @@ jobs:
           cache: "pnpm"
       - run: pnpm install --frozen-lockfile
       - name: build site
+        # Canonicals use the preview's own URL; links to the portal/API use
+        # test's, exactly like a test build.
         env:
           SITE_BASE: ${{ env.PREVIEW_URL }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
           PUBLIC_VERSION: ${{ env.PR }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ env.DEPLOY_ROLE_PREVIEW_ARN }}
           aws-region: ${{ env.AWS_REGION }}
+      # Same object metadata as site.yml (notably the HTML charset), except
+      # no-cache so every push shows up immediately.
       - name: upload preview
-        run: aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" --delete --cache-control "no-cache"
+        run: |
+          aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" \
+            --delete \
+            --cache-control "no-cache" \
+            --exclude "*.html"
+          aws s3 sync site/dist/ "s3://${BUCKET}/${PR}/" \
+            --delete \
+            --cache-control "no-cache" \
+            --content-type "text/html; charset=utf-8" \
+            --exclude "*" --include "*.html"
       - name: mark preview ready
+        id: ready
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+          scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
             -f state=success -f context=deploy/preview \
             -f target_url="$PREVIEW_URL" -f description="Preview ready"
+      # Reviewers find the preview through this comment, so failing to post
+      # it (after retries) fails the check.
       - name: comment preview link
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           body=$(printf '%s\n**Site preview:** %s\n\nBuilt from %s. Updates on every push; removed when the PR closes.' \
             "$COMMENT_MARKER" "$PREVIEW_URL" "${HEAD_SHA:0:7}")
-          id=$(gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
+          id=$(scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" --paginate \
             --jq "[.[] | select(.body | startswith(\"${COMMENT_MARKER}\"))][0].id // empty" | head -1)
           if [ -n "$id" ]; then
-            gh api -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null
+            scripts/gh-api-retry.sh -X PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${id}" -f body="$body" >/dev/null
           else
-            gh api "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
+            scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" -f body="$body" >/dev/null
           fi
-      - name: mark preview failed
+      # The preview must behave exactly like test: the same smoke tests site.yml
+      # runs after each test deploy.
+      - name: Install Chromium
+        run: pnpm --filter @numun/e2e exec playwright install --with-deps chromium
+      - name: smoke-test the preview
+        env:
+          DEPLOYED_SITE_URL: ${{ env.PREVIEW_URL }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
+        run: pnpm --filter @numun/e2e exec playwright test -c playwright.deployed.config.ts
+      - name: upload smoke report
         if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-smoke-report
+          path: |
+            e2e/playwright-report-deployed/
+            e2e/test-results-deployed/
+          retention-days: 7
+      # Only when the preview itself didn't go up: if just the comment
+      # failed, the preview is live and Decap's link to it must keep working.
+      - name: mark preview failed
+        if: failure() && steps.ready.outcome != 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
+          scripts/gh-api-retry.sh "repos/${GITHUB_REPOSITORY}/statuses/${HEAD_SHA}" \
             -f state=failure -f context=deploy/preview \
             -f target_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}" \
             -f description="Preview build failed"

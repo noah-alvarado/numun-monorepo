@@ -97,6 +97,7 @@ jobs:
         # client bundle via import.meta.env.
         env:
           SITE_BASE: https://${{ env.APEX_DOMAIN }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
           PUBLIC_VERSION: ${{ steps.version.outputs.version }}
         run: pnpm --filter @numun/site build
       - uses: aws-actions/configure-aws-credentials@v4
@@ -113,15 +114,37 @@ jobs:
             --delete \
             --cache-control "public, max-age=300" \
             --exclude "*.html"
+          # --delete here too, or removed pages would linger.
           aws s3 sync site/dist/ "s3://$BUCKET/" \
+            --delete \
             --cache-control "public, max-age=60, must-revalidate" \
             --content-type "text/html; charset=utf-8" \
             --exclude "*" --include "*.html"
       - name: CloudFront invalidation
         run: |
-          aws cloudfront create-invalidation \
+          id=$(aws cloudfront create-invalidation \
             --distribution-id "$SiteDistributionId" \
-            --paths "/*"
+            --paths "/*" --query Invalidation.Id --output text)
+          # The smoke tests below must see this deploy, not cached pages.
+          aws cloudfront wait invalidation-completed \
+            --distribution-id "$SiteDistributionId" --id "$id"
+      - name: Install Chromium
+        run: pnpm --filter @numun/e2e exec playwright install --with-deps chromium
+      - name: smoke-test the deploy
+        # The same tests every PR preview must pass (site-preview.yml).
+        env:
+          DEPLOYED_SITE_URL: https://${{ env.APEX_DOMAIN }}
+          SITE_APEX: ${{ env.APEX_DOMAIN }}
+        run: pnpm --filter @numun/e2e exec playwright test -c playwright.deployed.config.ts
+      - name: upload smoke report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-smoke-report
+          path: |
+            e2e/playwright-report-deployed/
+            e2e/test-results-deployed/
+          retention-days: 7
       - name: tag release
         env:
           TAG: ${{ steps.version.outputs.tag }}

@@ -116,5 +116,7 @@ message DeleteAwardRequest {
   int32 expected_version = 2 [(buf.validate.field).int32.gt = 0];
 }
 message DeleteAwardResponse {
+  // The award is removed from the public site before it is deleted. When
+  // cms_sync.ok is false nothing was deleted and the call can be retried.
   CmsSyncStatus cms_sync = 1;
 }

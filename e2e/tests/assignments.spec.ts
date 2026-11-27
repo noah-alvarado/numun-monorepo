@@ -8,9 +8,12 @@ import {
   createDelegate,
   createDelegation,
   createDraftConference,
+  rpc,
   uniqueSchool,
   uniqueSurname,
 } from "../support/api";
+import { showMail, waitForMail } from "../support/mail";
+import { seedUsers } from "../support/seed";
 
 function assignmentRow(page: Page, delegate: string) {
   return page.getByRole("row").filter({ hasText: delegate });
@@ -92,8 +95,23 @@ test("admin proposes, approves and re-runs assignments", async ({
     ).toBeVisible();
   });
 
+  await step("the admin who ran it is emailed", async () => {
+    const { conference } = await rpc<{ conference: { name: string } }>(
+      seedUsers.admin.id,
+      "ConferenceService/GetConference",
+      { conferenceId },
+    );
+    const mail = await waitForMail(
+      seedUsers.admin.email,
+      new RegExp(`^Assignment run completed for ${conference.name}$`),
+    );
+    expect(mail.text).toContain(`/conferences/${conferenceId}/assignments`);
+    await showMail(page, mail);
+  });
+
   let pinned = "";
   await step("approve one assignment", async () => {
+    await page.goto(`/conferences/${conferenceId}/assignments`);
     const row = assignmentRow(page, names[0]);
     pinned = (await row.getByRole("cell").nth(2).textContent()) ?? "";
     await row.getByRole("button", { name: "Approve" }).click();
@@ -346,6 +364,21 @@ test("admin filters, edits, swaps and approves all", async ({
     for (const name of all) {
       await expect(assignmentRow(page, name)).toContainText("Approved");
     }
+  });
+
+  await step("unapprove a selection", async () => {
+    for (const name of all.slice(0, 2)) {
+      await assignmentRow(page, name)
+        .getByRole("checkbox", { name: "Select assignment" })
+        .check();
+    }
+    await page
+      .getByRole("button", { name: "Unapprove selected", exact: true })
+      .click();
+    for (const name of all.slice(0, 2)) {
+      await expect(assignmentRow(page, name)).toContainText("Proposed");
+    }
+    await expect(assignmentRow(page, all[2])).toContainText("Approved");
   });
 
   await step("run history lists the run", async () => {

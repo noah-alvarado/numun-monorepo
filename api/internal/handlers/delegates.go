@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net/http"
 	"strings"
+	"sync"
 
 	"connectrpc.com/connect"
 
@@ -27,6 +28,9 @@ type DelegateService struct {
 	// SheetsHTTPClient fetches Google Sheets; nil means the SSRF-hardened
 	// httpclient.New(). Local dev swaps in a fake-server proxy.
 	SheetsHTTPClient *http.Client
+	// DevFailBatch, when set (DEV_MODE only), is asked about each bulk-import
+	// batch with the last names it creates; returning true fails that batch.
+	DevFailBatch func(createdLastNames []string) bool
 }
 
 // ListDelegates within a delegation. Scope: any role with scope on the
@@ -88,6 +92,52 @@ func (s *DelegateService) ListAllDelegates(ctx context.Context, req *connect.Req
 	out := &v1.ListAllDelegatesResponse{Items: make([]*v1.Delegate, 0, len(rows))}
 	for _, d := range rows {
 		out.Items = append(out.Items, delegateToProto(d))
+	}
+	return connect.NewResponse(out), nil
+}
+
+func (s *DelegateService) ListConferenceDelegates(ctx context.Context, req *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error) {
+	caller, ok := auth.FromContext(ctx)
+	if !ok {
+		return nil, connect.NewError(connect.CodeUnauthenticated, errors.New("no caller"))
+	}
+	confID := strings.TrimSpace(req.Msg.GetConferenceId())
+	if confID == "" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("conference_id required"))
+	}
+	if err := s.Scoper.MustHaveScopeOnConference(ctx, confID); err != nil {
+		return nil, mapScopeErr(err)
+	}
+	delegations, err := scopedDelegations(ctx, s.Store, caller, confID)
+	if err != nil {
+		s.log().Error("ListConferenceDelegates: delegations", "err", err)
+		return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+	}
+
+	// One query per delegation; run a few at a time.
+	rosters := make([][]domain.Delegate, len(delegations))
+	errs := make([]error, len(delegations))
+	sem := make(chan struct{}, 8)
+	var wg sync.WaitGroup
+	for i, d := range delegations {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func() {
+			defer func() { <-sem; wg.Done() }()
+			rosters[i], errs[i] = s.Store.ListAllDelegatesByDelegation(ctx, d.ID)
+		}()
+	}
+	wg.Wait()
+
+	out := &v1.ListConferenceDelegatesResponse{}
+	for i, rows := range rosters {
+		if errs[i] != nil {
+			s.log().Error("ListConferenceDelegates: delegates", "delegationId", delegations[i].ID, "err", errs[i])
+			return nil, connect.NewError(connect.CodeUnavailable, errors.New("store unavailable"))
+		}
+		for _, d := range rows {
+			out.Items = append(out.Items, delegateToProto(d))
+		}
 	}
 	return connect.NewResponse(out), nil
 }
@@ -482,7 +532,7 @@ func (s *DelegateService) audit(ctx context.Context, e domain.AuthAuditEvent) {
 
 // notifyBulkImportCommitted sends T4 to the advisor who committed the import.
 // Best-effort.
-func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisorUserID, delegationID string, mode domain.UpsertMode, creates, updates, softDeletes int) {
+func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisorUserID, delegationID string, mode domain.UpsertMode, creates, updates, unchanged, softDeletes int) {
 	if s.Email == nil {
 		return
 	}
@@ -500,14 +550,23 @@ func (s *DelegateService) notifyBulkImportCommitted(ctx context.Context, advisor
 		Kind: domain.EmailKindBulkImportCommitted,
 		Vars: map[string]any{
 			"delegationName":  delegationName,
+			"delegationId":    delegationID,
 			"createCount":     creates,
 			"updateCount":     updates,
+			"unchangedCount":  unchanged,
 			"softDeleteCount": softDeletes,
-			"mode":            string(mode),
+			"mode":            importModeLabel(mode),
 		},
 	}); err != nil {
 		s.log().Warn("bulk import notify: send", "err", err)
 	}
+}
+
+func importModeLabel(m domain.UpsertMode) string {
+	if m == domain.UpsertModeFullSync {
+		return "full sync"
+	}
+	return "additive"
 }
 
 func (s *DelegateService) log() *slog.Logger {

@@ -3,7 +3,7 @@ import { createSignal } from "solid-js";
 import Modal from "@/components/Modal";
 
 // Confirms rejecting a delegation and collects an optional reason, which is
-// kept in the audit log only (the advisor sees a generic message).
+// emailed to the advisors (EMAIL.md T2) and kept in the audit log.
 export default function RejectDelegationDialog(props: {
   school: string;
   busy: boolean;
@@ -14,12 +14,12 @@ export default function RejectDelegationDialog(props: {
   return (
     <Modal title={`Reject ${props.school}?`} onClose={props.onCancel}>
       <p class="mt-2 text-sm text-nu-purple-700">
-        The advisor will see their registration as rejected. This can't be
-        undone.
+        The advisors are emailed that their registration wasn't approved. This
+        can't be undone.
       </p>
       <label class="mt-3 block text-sm">
         <span class="text-xs font-semibold uppercase tracking-wide text-nu-purple-700">
-          Reason (optional, kept in the audit log)
+          Reason (optional, included in the email to the advisors)
         </span>
         <textarea
           value={reason()}

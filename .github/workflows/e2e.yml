@@ -32,10 +32,10 @@ jobs:
         env:
           BASE: ${{ github.event.pull_request.base.sha }}
         run: |
-          if git diff --name-only "$BASE"...HEAD | grep -Eq '^(portal/|api/|e2e/|packages/|docker-compose\.yml$|scripts/localstack-init\.sh$|package\.json$|pnpm-lock\.yaml$|\.nvmrc$|Makefile$|\.github/workflows/e2e\.yml$)'; then
+          if git diff --name-only "$BASE"...HEAD | grep -Eq '^(portal/|api/|e2e/|site/|cms/|packages/|docker-compose\.yml$|scripts/localstack-init\.sh$|package\.json$|pnpm-lock\.yaml$|\.nvmrc$|Makefile$|\.github/workflows/e2e\.yml$)'; then
             echo "run=true" >> "$GITHUB_OUTPUT"
           else
-            echo "No portal/API/e2e changes; skipping the Playwright run."
+            echo "No portal/API/site/CMS/e2e changes; skipping the Playwright run."
             echo "run=false" >> "$GITHUB_OUTPUT"
           fi
       - uses: actions/setup-go@v5

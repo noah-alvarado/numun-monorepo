@@ -7,8 +7,7 @@
 // render expanded inline on mobile.
 import { portalUrl } from "../lib/site-urls";
 
-if (!Astro.site) throw new Error("Astro.site is required (set SITE_BASE)");
-const registerUrl = portalUrl(Astro.site, "/sign-up");
+const registerUrl = portalUrl("/sign-up");
 
 interface NavChild {
   label: string;

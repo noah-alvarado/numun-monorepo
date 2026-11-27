@@ -9,6 +9,7 @@
 // — sign-in just calls Exchange with synthetic dev-* token values so the
 // portal works against `make dev` with no real Cognito.
 
+import { ConnectError } from "@connectrpc/connect";
 import {
   CognitoUser,
   CognitoUserAttribute,
@@ -16,6 +17,8 @@ import {
   CognitoUserSession,
   AuthenticationDetails,
 } from "amazon-cognito-identity-js";
+
+import { connectMessage } from "@/lib/errors";
 
 const userPoolId = import.meta.env.VITE_COGNITO_USER_POOL_ID as
   | string
@@ -198,6 +201,8 @@ export function cognitoErrorCode(err: unknown): string | undefined {
 // Wrong-password and unknown-user errors share one message so the screens
 // don't reveal which emails have accounts (AUTH.md §3.1).
 export function cognitoMessage(err: unknown, fallback: string): string {
+  // API errors (e.g. AuthService.Exchange being rate limited) aren't Cognito's.
+  if (err instanceof ConnectError) return connectMessage(err) ?? fallback;
   const message = (err as Error | null)?.message ?? "";
   switch (cognitoErrorCode(err)) {
     case "NotAuthorizedException":

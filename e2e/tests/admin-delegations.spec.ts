@@ -11,7 +11,7 @@ test("admin opens a pending delegation from the list", async ({
   const item = page.getByRole("listitem").filter({ hasText: e2eSchool });
 
   await step("open pending delegations", async () => {
-    await page.getByRole("button", { name: /Pending Delegations/ }).click();
+    await page.getByRole("button", { name: /^Delegations/ }).click();
     await expect(page).toHaveURL(/\/admin\/delegations$/);
     await expect(item).toBeVisible();
   });

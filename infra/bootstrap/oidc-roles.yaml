@@ -64,6 +64,27 @@ Resources:
           - ServerSideEncryptionByDefault:
               SSEAlgorithm: AES256
 
+  # ── Preview 404 Lambda permissions boundary ──────────────────────────────────
+  # Caps the one role deploy-infra can create (base-cdn's preview-404 Lambda,
+  # which serves each PR preview's own 404 page): read the previews bucket and
+  # write its own logs, nothing else.
+  PreviewNotFoundBoundary:
+    Type: AWS::IAM::ManagedPolicy
+    Properties:
+      ManagedPolicyName: !Sub "numun-${Env}-preview-404-boundary"
+      Description: Permissions boundary for base-cdn's preview-404 Lambda role.
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Action: s3:GetObject
+            Resource: !Sub "arn:aws:s3:::numun-${Env}-previews/*"
+          - Effect: Allow
+            Action:
+              - logs:CreateLogStream
+              - logs:PutLogEvents
+            Resource: !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-preview-404:*"
+
   # ── Lambda execution-role permissions boundary ─────────────────────────────────
   # Caps every role deploy-api can create, so it cannot mint an admin role.
   # Lives here (not in the api stack) so deploy-api cannot edit it. See
@@ -444,6 +465,8 @@ Resources:
               - Effect: Allow
                 Action:
                   - cloudfront:CreateInvalidation
+                  # site.yml waits for it before smoke-testing the deploy.
+                  - cloudfront:GetInvalidation
                   - cloudfront:GetDistribution
                   - cloudfront:ListDistributions
                 Resource: "*"
@@ -765,6 +788,63 @@ Resources:
                   - cloudfront:DeleteResponseHeadersPolicy
                   - cloudfront:GetResponseHeadersPolicy
                 Resource: "*"
+              # base-cdn's preview-404 Lambda (PR preview 404 pages), its
+              # function URL, log group and role. Only that one function and
+              # role, and the role must carry PreviewNotFoundBoundary.
+              - Effect: Allow
+                Action:
+                  - lambda:CreateFunction
+                  - lambda:DeleteFunction
+                  - lambda:GetFunction
+                  - lambda:GetFunctionConfiguration
+                  - lambda:UpdateFunctionCode
+                  - lambda:UpdateFunctionConfiguration
+                  - lambda:TagResource
+                  - lambda:UntagResource
+                  - lambda:ListTags
+                  - lambda:AddPermission
+                  - lambda:RemovePermission
+                  - lambda:GetPolicy
+                  - lambda:CreateFunctionUrlConfig
+                  - lambda:UpdateFunctionUrlConfig
+                  - lambda:DeleteFunctionUrlConfig
+                  - lambda:GetFunctionUrlConfig
+                Resource:
+                  - !Sub "arn:aws:lambda:*:${AWS::AccountId}:function:numun-${Env}-preview-404"
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:DeleteLogGroup
+                  - logs:DescribeLogGroups
+                  - logs:PutRetentionPolicy
+                  - logs:DeleteRetentionPolicy
+                  - logs:TagResource
+                  - logs:UntagResource
+                  - logs:ListTagsForResource
+                Resource:
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-preview-404"
+                  - !Sub "arn:aws:logs:*:${AWS::AccountId}:log-group:/aws/lambda/numun-${Env}-preview-404:*"
+              - Effect: Allow
+                Action:
+                  - iam:GetRole
+                  - iam:DeleteRole
+                  - iam:GetRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-preview-404"
+              - Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:PutRolePolicy
+                  - iam:PutRolePermissionsBoundary
+                Resource:
+                  - !Sub "arn:aws:iam::${AWS::AccountId}:role/numun-${Env}-preview-404"
+                Condition:
+                  StringEquals:
+                    iam:PermissionsBoundary: !Ref PreviewNotFoundBoundary
               # Route53 record sets in the numun.org hosted zone.
               - Effect: Allow
                 Action:
@@ -794,6 +874,9 @@ Outputs:
   SamArtifactsBucketName:
     Description: SAM artifacts bucket — pass to `sam deploy --s3-bucket`.
     Value: !Ref SamArtifactsBucket
+  PreviewNotFoundBoundaryArn:
+    Description: Permissions boundary base-cdn's preview-404 Lambda role must carry.
+    Value: !Ref PreviewNotFoundBoundary
   LambdaExecutionBoundaryArn:
     Description: Permissions boundary required on api-stack Lambda roles.
     Value: !Ref LambdaExecutionBoundary

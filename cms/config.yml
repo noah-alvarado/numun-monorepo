@@ -894,7 +894,9 @@ collections:
       - {
           name: pdfFile,
           label: PDF,
+          hint: "Leave empty until the guide is published; the page says guides are coming.",
           widget: file,
+          required: false,
           media_library: { config: { max_file_size: 26214400 } },
         }
       - { name: summary, label: Summary, widget: markdown, required: false }

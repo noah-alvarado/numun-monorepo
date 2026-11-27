@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"regexp"
 	"strings"
 
 	"connectrpc.com/connect"
@@ -85,12 +86,16 @@ func (s *CommitteeService) CreateCommittee(ctx context.Context, req *connect.Req
 	if !ok {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("size required"))
 	}
+	guide, err := backgroundGuideRef(req.Msg.GetBackgroundGuideRef())
+	if err != nil {
+		return nil, err
+	}
 	c := domain.Committee{
 		ConferenceID:       conferenceID,
 		Name:               strings.TrimSpace(req.Msg.GetName()),
 		Type:               ct,
 		Size:               cs,
-		BackgroundGuideRef: strings.TrimSpace(req.Msg.GetBackgroundGuideRef()),
+		BackgroundGuideRef: guide,
 		CreatedBy:          caller.UserID,
 		UpdatedBy:          caller.UserID,
 	}
@@ -144,7 +149,10 @@ func (s *CommitteeService) UpdateCommittee(ctx context.Context, req *connect.Req
 		}
 	}
 	if v := req.Msg.BackgroundGuideRef; v != nil {
-		val := strings.TrimSpace(*v)
+		val, err := backgroundGuideRef(*v)
+		if err != nil {
+			return nil, err
+		}
 		patch.BackgroundGuideRef = &val
 	}
 	updated, err := s.Store.UpdateCommittee(ctx, existing.ConferenceID, id, int(req.Msg.GetExpectedVersion()), patch)
@@ -431,4 +439,17 @@ func (s *PositionService) log() *slog.Logger {
 		return s.Logger
 	}
 	return slog.Default()
+}
+
+// guideRefPattern matches a CMS background-guide entry
+// (content/background-guides/<conference>/<committee>.md), which the site
+// publishes at /committees/<conference>/<committee>.
+var guideRefPattern = regexp.MustCompile(`^/content/background-guides/[a-z0-9][a-z0-9-]*/[a-z0-9][a-z0-9-]*\.md$`)
+
+func backgroundGuideRef(raw string) (string, error) {
+	ref := strings.TrimSpace(raw)
+	if ref != "" && !guideRefPattern.MatchString(ref) {
+		return "", connect.NewError(connect.CodeInvalidArgument, errors.New("background guide must be a path like /content/background-guides/numun-xxiv/unclos.md"))
+	}
+	return ref, nil
 }

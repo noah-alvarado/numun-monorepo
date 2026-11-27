@@ -151,6 +151,8 @@ func (s *UserService) InviteStaff(ctx context.Context, req *connect.Request[user
 		Email:     email,
 		Name:      req.Msg.GetName(),
 		CreatedBy: c.UserID,
+		// DATA_MODEL.md: announcements are opt-out.
+		AnnouncementsOptIn: true,
 	})
 	if err != nil {
 		// Cognito has already been written to; treat duplicate-mirror as a

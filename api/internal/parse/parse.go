@@ -88,7 +88,7 @@ func buildResult(rawRows [][]string) (ParseResult, error) {
 	}
 	dataRows := rawRows[1:]
 	if len(dataRows) > MaxRows {
-		return ParseResult{}, fmt.Errorf("%w: row count %d exceeds maximum of %d", ErrInvalidArgument, len(dataRows), MaxRows)
+		return ParseResult{}, fmt.Errorf("%w: the file has more than 2,000 rows; split it into smaller imports", ErrInvalidArgument)
 	}
 
 	hdr, ignored, err := mapHeaders(rawRows[0])

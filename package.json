@@ -10,7 +10,8 @@
   "scripts": {
     "lint": "pnpm -r --if-present run lint",
     "typecheck": "pnpm -r --if-present run typecheck",
-    "test": "pnpm -r --if-present run test",
+    "test": "pnpm -r --if-present run test && pnpm run test:infra",
+    "test:infra": "node --test infra/*.test.mjs",
     "build": "pnpm -r --if-present run build",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\"",
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,astro,md,yml,yaml,json}\"",

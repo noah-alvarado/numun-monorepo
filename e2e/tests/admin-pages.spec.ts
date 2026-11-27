@@ -6,6 +6,7 @@ import {
   uniqueSchool,
 } from "../support/api";
 import { getCognitoUser } from "../support/fakes";
+import { showMail, waitForMail } from "../support/mail";
 import { seedConferenceName } from "../support/seed";
 
 test("admin creates a conference and can't open a second one", async ({
@@ -115,7 +116,7 @@ test("admin invites a staffer, who signs in with the emailed password", async ({
   });
 });
 
-test("an advisor opts in to announcements and an admin sends one", async ({
+test("an admin sends an announcement and an advisor unsubscribes", async ({
   page,
   signInAs,
   step,
@@ -136,9 +137,9 @@ test("an advisor opts in to announcements and an admin sends one", async ({
     await expect(page.locator("#phone-error")).toBeVisible();
   });
 
-  await step("save a phone and opt in", async () => {
+  await step("save a phone; announcements are on by default", async () => {
     await page.getByLabel("Phone").fill("847 246 2882");
-    await page.getByLabel(/Email me NUMUN announcements/).check();
+    await expect(page.getByLabel(/Email me NUMUN announcements/)).toBeChecked();
     await page.getByRole("button", { name: "Save profile" }).click();
     await expect(page.getByText("Profile saved.")).toBeVisible();
     await page.reload();
@@ -181,5 +182,81 @@ test("an advisor opts in to announcements and an admin sends one", async ({
     await expect(
       page.getByRole("listitem").filter({ hasText: subject }),
     ).toContainText("Advisors of approved delegations");
+  });
+
+  let unsubscribeUrl = "";
+  await step("the advisor receives it, with an unsubscribe link", async () => {
+    const mail = await waitForMail(advisor.email!, new RegExp(`^${subject}$`));
+    await showMail(page, mail);
+    expect(mail.from).toBe("NUMUN <announcements@mail.test.numun.org>");
+    expect(mail.text).toContain("Position papers are due Friday.");
+    expect(mail.html).toMatch(
+      /white-space:pre-wrap;">Position papers are due Friday.(\r?\n){2}See you in Evanston!</,
+    );
+    expect(mail.headers["List-Unsubscribe-Post"]).toEqual([
+      "List-Unsubscribe=One-Click",
+    ]);
+    unsubscribeUrl = /href="([^"]+)"[^>]*>Unsubscribe from announcements/
+      .exec(mail.html)![1]
+      .replace(/&amp;/g, "&");
+    expect(mail.headers["List-Unsubscribe"]).toEqual([`<${unsubscribeUrl}>`]);
+  });
+
+  await step("the link asks before unsubscribing", async () => {
+    await page.goto(unsubscribeUrl);
+    await expect(
+      page.getByRole("heading", {
+        name: "Unsubscribe from NUMUN announcements?",
+      }),
+    ).toBeVisible();
+    await expect(page.getByText(advisor.email!)).toBeVisible();
+  });
+
+  await step("confirming unsubscribes them", async () => {
+    await page.getByRole("button", { name: "Unsubscribe" }).click();
+    await expect(
+      page.getByRole("heading", { name: "You've been unsubscribed" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Open your profile" }),
+    ).toHaveAttribute("href", "http://localhost:4173/profile");
+  });
+
+  await signInAs(advisor);
+  await step("their profile shows announcements off", async () => {
+    await page.goto("/profile");
+    await expect(
+      page.getByLabel(/Email me NUMUN announcements/),
+    ).not.toBeChecked();
+  });
+});
+
+test("an announcement with no one to receive it can't be sent", async ({
+  page,
+  signInAs,
+  step,
+}) => {
+  // The shared table always has advisors to send to, so stand in for an
+  // audience that resolves to nobody (e.g. before any delegation is
+  // approved).
+  await page.route("**/numun.v1.AnnouncementService/PreviewSendAudience", (r) =>
+    r.fulfill({ contentType: "application/json", body: "{}" }),
+  );
+  await signInAs("admin");
+
+  await step("the review explains why", async () => {
+    await page.goto("/admin/announcements");
+    const form = page.getByRole("form", { name: "New announcement" });
+    await form.getByLabel("Subject").fill("Nobody home");
+    await form.getByLabel(/Message/).fill("Hello?");
+    await form.getByRole("button", { name: "Review and send" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toContainText("No one to send to");
+    await expect(dialog).toContainText(
+      "None of the advisors of approved delegations",
+    );
+    await expect(dialog.getByRole("button", { name: "Send" })).toHaveCount(0);
+    await dialog.getByRole("button", { name: "Close" }).click();
+    await expect(dialog).toBeHidden();
   });
 });

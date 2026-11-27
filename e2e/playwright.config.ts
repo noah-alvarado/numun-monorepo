@@ -11,6 +11,7 @@ import { defineConfig, devices } from "@playwright/test";
 
 const isCI = !!process.env.CI;
 const PORTAL_URL = "http://localhost:4173";
+const SITE_URL = "http://127.0.0.1:4322";
 const API_URL = "http://localhost:3000";
 // Fake Google Sheets + Cognito (fakes/server.ts).
 export const FAKES_URL = "http://127.0.0.1:4599";
@@ -42,16 +43,31 @@ const apiEnv = {
   AWS_ENDPOINT_URL_COGNITO_IDENTITY_PROVIDER: FAKES_URL,
   COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
   COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
+  // ID tokens from the fake are verified against its JWKS.
+  COGNITO_ISSUER_URL: `${FAKES_URL}/${COGNITO_POOL_ID}`,
+  // Mail goes to Mailpit (docker compose) instead of SES; tests read it back
+  // through its API (support/mail.ts).
+  DEV_SMTP_ADDR: "localhost:1025",
+  DEV_REGISTRATION_SUMMARY_DELAY: "1s",
+  // A bulk-import batch creating a "Zfail…" delegate fails once (Resume).
+  DEV_BULK_IMPORT_FAIL_SURNAME: "Zfail",
+  // Award syncs commit to the fake's in-memory GitHub repo.
+  DEV_CMS_GITHUB_API_URL: `${FAKES_URL}/github`,
+  // Lets /cms-oauth/auth hand off to GitHub (the CMS test stops there).
+  CMS_OAUTH_CLIENT_ID: "e2e-cms-client",
+  CMS_OAUTH_CLIENT_SECRET: "e2e-cms-secret",
+  CMS_OAUTH_STATE_SECRET: "e2e-cms-state-secret",
 };
 
-// The portal talks to the fake Cognito like it would to the real one; the
-// API's dev-bypass Exchange accepts the fake's unsigned tokens.
+// The portal talks to the fake Cognito like it would to the real one, and
+// the API verifies the fake's signed tokens.
 const portalEnv = {
   VITE_DEV_BYPASS: "false",
   VITE_API_BASE_URL: PORTAL_URL,
   VITE_COGNITO_USER_POOL_ID: COGNITO_POOL_ID,
   VITE_COGNITO_CLIENT_ID: COGNITO_CLIENT_ID,
   VITE_COGNITO_ENDPOINT: FAKES_URL,
+  VITE_SITE_BASE_URL: SITE_URL,
 };
 
 export default defineConfig({
@@ -74,14 +90,29 @@ export default defineConfig({
     video: "off",
     viewport: { width: 1280, height: 900 },
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // The static landing site and the CMS bundle (site/), served like
+    // CloudFront serves them.
+    {
+      name: "site",
+      testDir: "./site",
+      use: { ...devices["Desktop Chrome"], baseURL: SITE_URL },
+    },
+  ],
   webServer: [
     {
       name: "fakes",
-      command: "node fakes/server.ts",
+      // The fake Cognito runs the real post-confirmation trigger binary.
+      command:
+        "go build -C ../api -o ../e2e/.bin/cognito-post-confirmation ./cmd/cognito-post-confirmation && node fakes/server.ts",
+      env: {
+        ...apiEnv,
+        POST_CONFIRMATION_BIN: ".bin/cognito-post-confirmation",
+      },
       url: `${FAKES_URL}/__control/health`,
       reuseExistingServer: !isCI,
-      timeout: 30_000,
+      timeout: 180_000,
       stdout: "ignore",
       stderr: "pipe",
     },
@@ -91,6 +122,28 @@ export default defineConfig({
       cwd: "../api",
       env: apiEnv,
       url: `${API_URL}/v1/health`,
+      reuseExistingServer: !isCI,
+      timeout: 180_000,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      // Drains the LocalStack email queue like the SQS-triggered Lambda.
+      // No readiness URL: it has no HTTP surface, and a second copy polling
+      // the same queue is harmless.
+      name: "email-worker",
+      command: "go run ./cmd/email-worker -local",
+      cwd: "../api",
+      env: apiEnv,
+      stdout: "ignore",
+      stderr: "pipe",
+    },
+    {
+      name: "site",
+      command:
+        "pnpm --filter @numun/site build >/dev/null && node e2e/fakes/static-site.ts",
+      cwd: "..",
+      url: SITE_URL,
       reuseExistingServer: !isCI,
       timeout: 180_000,
       stdout: "ignore",

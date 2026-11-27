@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "../fixtures";
-import { rpc } from "../support/api";
+import { createCommittee, createDraftConference, rpc } from "../support/api";
 import {
   seedConferenceId,
   seedConferenceName,
@@ -157,5 +157,51 @@ test("committees are admin-only", async ({ page, signInAs, step }) => {
     for (const name of ["Create committee", "Reload"]) {
       await expect(page.getByRole("button", { name })).toHaveCount(0);
     }
+  });
+});
+
+test("a committee links to its background guide on the site", async ({
+  page,
+  signInAs,
+  step,
+}) => {
+  const conferenceId = await createDraftConference("Guides");
+  await createCommittee(conferenceId, "Security Council", "NON_CRISIS", []);
+
+  await signInAs("admin");
+  await page.goto(`/conferences/${conferenceId}/committees`);
+
+  await step("a path that isn't a CMS guide is refused", async () => {
+    await committeeRow(page, "Security Council")
+      .getByRole("button", { name: "Edit" })
+      .click();
+    await modal(page).getByLabel("Background guide").fill("unsc.pdf");
+    await modal(page).getByRole("button", { name: "Save" }).click();
+    await expect(
+      page.getByText(/Background guide must be a path like/),
+    ).toBeVisible();
+  });
+
+  await step("the guide's CMS path becomes a link", async () => {
+    await modal(page)
+      .getByLabel("Background guide")
+      .fill("/content/background-guides/numun-xxiv/unclos.md");
+    await modal(page).getByRole("button", { name: "Save" }).click();
+    await expect(modal(page)).toBeHidden();
+    await expect(
+      committeeRow(page, "Security Council").getByRole("link", {
+        name: "View guide",
+      }),
+    ).toBeVisible();
+  });
+
+  await step("the link opens the committee's public page", async () => {
+    const popup = page.waitForEvent("popup");
+    await committeeRow(page, "Security Council")
+      .getByRole("link", { name: "View guide" })
+      .click();
+    const site = await popup;
+    await expect(site).toHaveURL(/\/committees\/numun-xxiv\/unclos$/);
+    await expect(site.getByRole("heading", { level: 1 })).toBeVisible();
   });
 });

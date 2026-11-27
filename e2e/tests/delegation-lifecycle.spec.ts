@@ -64,7 +64,7 @@ test("advisor registers a delegation and an admin approves it", async ({
   await signInAs("admin");
 
   await step("admin sees it pending and approves", async () => {
-    await page.getByRole("button", { name: /Pending Delegations/ }).click();
+    await page.getByRole("button", { name: /^Delegations/ }).click();
     const item = pendingItem(page, school);
     await expect(item).toContainText("Chicago, IL US");
     await expect(item).toContainText("Est. 20 delegates");

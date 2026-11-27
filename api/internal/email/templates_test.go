@@ -4,6 +4,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 // fixtures gives at least one representative Vars map per kind so we can
@@ -25,15 +26,18 @@ var fixtures = map[string]map[string]any{
 		"delegationName":      "Westside HS",
 		"amountFormatted":     "$120.00",
 		"kind":                "payment",
+		"entry":               "A payment of $120.00",
 		"newBalanceFormatted": "$380.00",
 		"notes":               "Check #1234",
 	},
 	"bulk_import_committed": {
 		"delegationName":  "Westside HS",
+		"delegationId":    "del-1",
 		"createCount":     12,
 		"updateCount":     3,
+		"unchangedCount":  5,
 		"softDeleteCount": 0,
-		"mode":            "full_sync",
+		"mode":            "full sync",
 	},
 	"assignment_run_completed": {
 		"conferenceName":  "NUMUN 2026",
@@ -48,13 +52,12 @@ var fixtures = map[string]map[string]any{
 	"new_registration_summary": {
 		"conferenceName": "NUMUN 2026",
 		"delegations": []map[string]any{
-			{"name": "Westside HS", "school": "Westside HS", "advisorEmail": "a@example.com", "createdAt": "Feb 15, 2026 at 9:42 AM CT"},
+			{"school": "Westside HS", "advisorEmail": "a@example.com", "createdAt": "Feb 15, 2026 at 9:42 AM CT"},
 		},
 		"additionalCount": 3,
 	},
 	"announcement": {
 		"subject":  "Day-of logistics",
-		"bodyHTML": "<p>See you at registration.</p>",
 		"bodyText": "See you at registration.",
 	},
 }
@@ -119,5 +122,29 @@ func TestUnsubscribeURLRoundTrip(t *testing.T) {
 	}
 	if _, err := VerifyUnsubscribeToken("wrong-secret", tok); err == nil {
 		t.Fatalf("expected signature mismatch")
+	}
+}
+
+func TestFormatCentralUsesChicagoTime(t *testing.T) {
+	got := FormatCentral(time.Date(2026, 11, 25, 14, 37, 0, 0, time.UTC))
+	if got != "Nov 25, 2026 at 8:37 AM CT" {
+		t.Fatalf("got %q", got)
+	}
+}
+
+func TestAnnouncementBodyIsEscapedPlainText(t *testing.T) {
+	tpl, err := LoadTemplates()
+	if err != nil {
+		t.Fatalf("load templates: %v", err)
+	}
+	out, err := tpl.Render("announcement", TemplateData{Vars: map[string]any{
+		"subject":  "Logistics",
+		"bodyText": "Line one\n\n<b>not bold</b>",
+	}})
+	if err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	if !strings.Contains(out.HTML, "&lt;b&gt;not bold&lt;/b&gt;") || !strings.Contains(out.HTML, "white-space:pre-wrap") {
+		t.Fatalf("announcement HTML must escape the plain-text body:\n%s", out.HTML)
 	}
 }

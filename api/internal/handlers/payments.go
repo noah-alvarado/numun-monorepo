@@ -126,9 +126,17 @@ func (s *PaymentService) RecordPayment(ctx context.Context, req *connect.Request
 	if amt == nil {
 		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("amount required"))
 	}
-	currency := strings.TrimSpace(amt.GetCurrency())
+	currency := strings.ToUpper(strings.TrimSpace(amt.GetCurrency()))
 	if currency == "" {
 		currency = "USD"
+	}
+	// Balances are a single USD sum (Money: "Always USD for v1"); another
+	// currency would be added to them as if it were dollars.
+	if currency != "USD" {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("only USD amounts are supported"))
+	}
+	if amt.GetUnits() == 0 && amt.GetCents() == 0 {
+		return nil, connect.NewError(connect.CodeInvalidArgument, errors.New("amount must not be zero"))
 	}
 
 	// Caller provides absolute magnitude (units, cents). The handler applies
@@ -214,6 +222,7 @@ func (s *PaymentService) notifyAdvisorsPaymentRecorded(ctx context.Context, pare
 		"delegationName":      refreshed.School,
 		"amountFormatted":     formatMoney(absInt64(p.AmountUnits), absInt32(p.AmountCents), p.AmountCurrency),
 		"kind":                string(p.Kind),
+		"entry":               ledgerEntryPhrase(p),
 		"newBalanceFormatted": formatMoney(refreshed.BalanceDueUnits, refreshed.BalanceDueCents, p.AmountCurrency),
 		"notes":               p.Notes,
 	}
@@ -229,6 +238,24 @@ func (s *PaymentService) notifyAdvisorsPaymentRecorded(ctx context.Context, pare
 		}); err != nil {
 			s.log().Warn("payment notify: send", "userId", user.ID, "err", err)
 		}
+	}
+}
+
+// ledgerEntryPhrase describes a ledger entry for the advisor email, e.g.
+// "A payment of $120.00". Stored amounts are credits when positive, so an
+// adjustment's direction comes from its sign.
+func ledgerEntryPhrase(p domain.PaymentRecord) string {
+	amount := formatMoney(absInt64(p.AmountUnits), absInt32(p.AmountCents), p.AmountCurrency)
+	switch p.Kind {
+	case domain.PaymentKindCharge:
+		return "A charge of " + amount
+	case domain.PaymentKindAdjustment:
+		if p.AmountUnits < 0 || p.AmountCents < 0 {
+			return "An additional charge of " + amount
+		}
+		return "A credit of " + amount
+	default:
+		return "A payment of " + amount
 	}
 }
 

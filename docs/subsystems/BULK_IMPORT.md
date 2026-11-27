@@ -270,11 +270,11 @@ If two rows in the upload match each other (e.g., both have `jane@x.com`), the p
 
 API.md §11 says bulk endpoints are all-or-nothing. In practice:
 
-- **Small imports** (creates + updates + soft-deletes ≤ 100 ops): a single `TransactWriteItems` call. True atomicity.
-- **Large imports** (> 100 ops): the operation is split into sequential `TransactWriteItems` batches of 100 ops each. A top-level `BulkImportJob` cache row tracks `{ uploadId, totalBatches, completedBatches, status: applying|complete|failed }`. If a batch fails:
+- **Small imports** (creates + updates + soft-deletes ≤ 25 ops): a single `TransactWriteItems` call. True atomicity.
+- **Large imports** (> 25 ops): the operation is split into sequential `TransactWriteItems` batches of 25 ops each. A top-level `BulkImportJob` cache row tracks `{ uploadId, totalBatches, completedBatches, status: applying|complete|failed }`, and the rows being committed (including fixes made in the preview) replace the cached upload rows. If a batch fails:
   - Status flips to `failed`.
-  - The handler returns `aborted` with the batch index.
-  - Already-applied changes remain in DDB (partial state). The portal surfaces this and offers a "resume" affordance that re-runs the remaining batches with the same `uploadId`.
+  - The handler returns a normal response whose `CommitSummary` has `status: "failed"`, the job id and `completedBatches` (not an error: Connect drops the body of a failed call, and the portal needs the job id).
+  - Already-applied changes remain in DDB (partial state). The result screen explains this and offers Resume, which re-matches the cached rows against the current roster and applies the resulting plan. Rows the earlier batches wrote now match with no diff, so nothing is created twice or, in full sync, soft-deleted. Resume needs the preview cache, so it works for 30 minutes.
   - True rollback of already-applied changes is **not implemented in v1** — it would require a compensating-write log and is out of scope.
 
 At NUMUN scale (typical delegation: ≤ 50 delegates → ≤ 150 ops max for full sync), large-import path is unlikely to be exercised. Documented for honesty.
@@ -404,7 +404,7 @@ This entity:
 - Is **not** `version`-locked (single writer; the same advisor edits between preview and commit).
 - Authorization is verified at read time by comparing the row's `userId` to the caller; no GSI needed.
 
-### 11.2 BulkImportJob (only for > 100-op imports)
+### 11.2 BulkImportJob (only for > 25-op imports)
 
 When a commit splits into multiple TransactWrite batches, a tracking row is created so a partial failure can be resumed.
 
@@ -448,7 +448,7 @@ Optional GSI lookup (not in v1): by `userId` to list a user's recent imports.
 | Dedupe key | Email if present; else first+last normalized | Pragmatic |
 | Same-upload conflicts | Error | Forces human resolution |
 | Modes | Additive default, Full sync opt-in destructive | Don't surprise users |
-| Atomicity | TransactWriteItems; chunked beyond 100 ops with a `BulkImportJob` recovery row | Honest about DDB limits |
+| Atomicity | TransactWriteItems; chunked beyond 25 ops with a `BulkImportJob` recovery row | Honest about DDB limits |
 | Soft delete on Full sync | Yes | Matches global soft-delete rule |
 | Audit | `bulk_import_previewed` + `bulk_import_committed` | Anti-abuse + forensics |
 | Rate limit | 10 previews + 10 commits per hour per advisor | Modest cap |
@@ -461,7 +461,6 @@ Optional GSI lookup (not in v1): by `userId` to list a user's recent imports.
 ## 13. Open items
 
 - **Library choice for XLSX parsing** — `github.com/xuri/excelize/v2` is the leading Go library; final pick deferred to implementation.
-- **`BulkImportJob` resume UX in the portal** — the data model supports resume, but the portal screen for "your last import partially failed — resume?" is unspecified.
 - **Compensating rollback for partial large-import failures** — not in v1. If real failure rates make this a problem, add a write-log + reverse-apply pass.
 - **Future formats** — Numbers (Apple), ODS (LibreOffice) — out of scope.
 - **Future "Sheets via OAuth"** — would unlock private sheets and avoid the "make it public" friction. Adds Google Cloud project + OAuth consent. Future enhancement.

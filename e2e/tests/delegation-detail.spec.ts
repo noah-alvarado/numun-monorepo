@@ -300,3 +300,66 @@ test("admin approves, rejects and staffs from the delegation page", async ({
     ).toHaveCount(0);
   });
 });
+
+test("an advisor of two delegations switches between them", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const first = await createDelegation(newAdvisor.id, uniqueSchool("First"));
+  const second = await createDelegation(newAdvisor.id, uniqueSchool("Second"));
+  await signInAs(newAdvisor);
+  const picker = page.getByLabel("Delegation", { exact: true });
+
+  await step("the page says there are two", async () => {
+    await page.goto("/delegation");
+    await expect(page.getByText("You advise 2 delegations:")).toBeVisible();
+    await expect(page.getByLabel("School name")).toHaveValue(first.school);
+  });
+
+  await step("pick the other one", async () => {
+    await page.getByRole("button", { name: "Delegates", exact: true }).click();
+    await picker.selectOption({ label: second.school });
+    await expect(page.getByLabel("School name")).toHaveValue(second.school);
+  });
+
+  await step("the choice survives a reload", async () => {
+    await page.reload();
+    await expect(picker.locator("option:checked")).toHaveText(second.school);
+    await expect(page.getByLabel("School name")).toHaveValue(second.school);
+  });
+});
+
+test("a delegation always keeps a lead", async ({
+  page,
+  signInAs,
+  newAdvisor,
+  step,
+}) => {
+  const delegation = await createDelegation(
+    newAdvisor.id,
+    uniqueSchool("OnlyLead"),
+  );
+  const coAdvisor = await createAdvisor("NextLead", { withEmail: true });
+  await signInAs("admin");
+
+  await step("the only lead can't be demoted or removed", async () => {
+    await page.goto(`/delegations/${delegation.id}?tab=advisors`);
+    await expect(row(page, newAdvisor.name)).toContainText("Only lead");
+    await expect(row(page, newAdvisor.name).getByRole("button")).toHaveCount(0);
+  });
+
+  await step("once someone else leads, they can", async () => {
+    const form = page.getByRole("form", { name: "Add an advisor" });
+    await form.getByLabel(/Co-advisor's email/).fill(coAdvisor.email!);
+    await form.getByLabel("Role").selectOption({ label: "Lead" });
+    await form.getByRole("button", { name: "Add advisor" }).click();
+    await expect(row(page, coAdvisor.name)).toContainText("Lead");
+    await row(page, newAdvisor.name)
+      .getByRole("button", { name: "Make co-advisor" })
+      .click();
+    await expect(row(page, newAdvisor.name)).toContainText("Co-advisor");
+    await expect(row(page, coAdvisor.name)).toContainText("Only lead");
+  });
+});

@@ -239,8 +239,24 @@ func (c *Client) FindInFlightRun(ctx context.Context, conferenceID string) (doma
 	if it.IsDeleted {
 		return domain.AssignmentRun{}, ErrNotFound
 	}
-	return assignmentRunFromItem(it), nil
+	run := assignmentRunFromItem(it)
+	// A run executes inside one API request (29s Lambda timeout). One still
+	// "running" long after that died with its Lambda and would otherwise
+	// block every future run for the conference, so it's marked failed.
+	if time.Since(run.TriggeredAt) > StaleRunAfter {
+		_, err := c.UpdateAssignmentRunStatus(ctx, run.ID, domain.AssignmentRunStatusFailed, 0, 0,
+			"The run stopped before finishing (the server timed out). Run it again.", time.Now().UTC())
+		if err != nil && !errors.Is(err, ErrVersionMismatch) {
+			return domain.AssignmentRun{}, fmt.Errorf("expire stale run: %w", err)
+		}
+		return domain.AssignmentRun{}, ErrNotFound
+	}
+	return run, nil
 }
+
+// StaleRunAfter is how long a run may stay "running" before it's treated as
+// abandoned. Well past the API Lambda's 29s timeout.
+const StaleRunAfter = 2 * time.Minute
 
 // UpdateAssignmentRunStatus transitions a run to done/failed with completion
 // stats. Updates the GSI2PK in the same call so the in-flight query stops

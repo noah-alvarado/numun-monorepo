@@ -3,7 +3,7 @@
 /* eslint-disable */
 // @ts-nocheck
 
-import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, RestoreDelegateRequest, RestoreDelegateResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, SearchDelegatesRequest, SearchDelegatesResponse, UndoCheckInRequest, UndoCheckInResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
+import { CheckInRequest, CheckInResponse, CreateDelegateRequest, CreateDelegateResponse, DeleteBulkImportPreviewRequest, DeleteBulkImportPreviewResponse, DeleteDelegateRequest, DeleteDelegateResponse, GetDelegateRequest, GetDelegateResponse, ListAllDelegatesRequest, ListAllDelegatesResponse, ListConferenceDelegatesRequest, ListConferenceDelegatesResponse, ListDelegatesRequest, ListDelegatesResponse, PreviewUpsertDelegatesBulkRequest, PreviewUpsertDelegatesBulkResponse, RestoreDelegateRequest, RestoreDelegateResponse, ResumeBulkImportRequest, ResumeBulkImportResponse, SearchDelegatesRequest, SearchDelegatesResponse, UndoCheckInRequest, UndoCheckInResponse, UpdateDelegateRequest, UpdateDelegateResponse, UpsertDelegatesBulkRequest, UpsertDelegatesBulkResponse } from "./delegates_pb.js";
 import { MethodKind } from "@bufbuild/protobuf";
 
 /**
@@ -30,6 +30,19 @@ export const DelegateService = {
       name: "ListAllDelegates",
       I: ListAllDelegatesRequest,
       O: ListAllDelegatesResponse,
+      kind: MethodKind.Unary,
+    },
+    /**
+     * Every delegate in the conference's delegations the caller can see (all
+     * for admins, overseen ones for staffers, their own for advisors), in one
+     * call instead of one ListAllDelegates per delegation.
+     *
+     * @generated from rpc numun.v1.DelegateService.ListConferenceDelegates
+     */
+    listConferenceDelegates: {
+      name: "ListConferenceDelegates",
+      I: ListConferenceDelegatesRequest,
+      O: ListConferenceDelegatesResponse,
       kind: MethodKind.Unary,
     },
     /**

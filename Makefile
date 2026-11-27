@@ -33,6 +33,16 @@ dev-down: ## Tear down the local containers.
 dev-api: ## Start SAM Local API Gateway against the Go Lambdalith.
 	cd api && sam local start-api --template ../infra/template.yaml --port 3000 --env-vars ../scripts/sam-env-vars.json
 
+dev-worker: ## Run the email worker against LocalStack SQS, delivering to Mailpit (:8025).
+	cd api && DEV_MODE=true AWS_REGION=us-east-2 AWS_ACCESS_KEY_ID=local AWS_SECRET_ACCESS_KEY=local \
+		AWS_ENDPOINT_URL=http://localhost:4566 AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 \
+		DDB_TABLE_NAME=numun-test DEV_SMTP_ADDR=localhost:1025 \
+		EMAIL_QUEUE_URL=http://localhost:4566/000000000000/numun-test-email-send \
+		EMAIL_SENDER_TRANSACTIONAL=noreply@mail.test.numun.org EMAIL_SENDER_ANNOUNCEMENTS=announcements@mail.test.numun.org \
+		EMAIL_UNSUBSCRIBE_BASE_URL=http://localhost:3000/v1/email/unsubscribe EMAIL_UNSUBSCRIBE_SECRET=dev-unsubscribe-secret-not-for-prod \
+		PORTAL_BASE_URL=http://localhost:5173 ASSETS_BASE_URL=http://localhost:4566/numun-test-assets \
+		go run ./cmd/email-worker -local
+
 dev-portal: ## Start the portal Vite dev server.
 	cd portal && pnpm dev
 
@@ -103,7 +113,7 @@ typecheck: ## Typecheck TS packages and `go build` the API.
 
 test: ## Run unit tests across all packages.
 	cd api && go test ./...
-	pnpm -r --if-present run test
+	pnpm run test
 
 integration-tests: ## Run Go integration tests against LocalStack + DDB Local (requires `make dev`).
 	cd api && AWS_ENDPOINT_URL_DYNAMODB=http://localhost:8000 AWS_ENDPOINT_URL_S3=http://localhost:4566 \

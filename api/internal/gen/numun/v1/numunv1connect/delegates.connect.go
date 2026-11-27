@@ -39,6 +39,9 @@ const (
 	// DelegateServiceListAllDelegatesProcedure is the fully-qualified name of the DelegateService's
 	// ListAllDelegates RPC.
 	DelegateServiceListAllDelegatesProcedure = "/numun.v1.DelegateService/ListAllDelegates"
+	// DelegateServiceListConferenceDelegatesProcedure is the fully-qualified name of the
+	// DelegateService's ListConferenceDelegates RPC.
+	DelegateServiceListConferenceDelegatesProcedure = "/numun.v1.DelegateService/ListConferenceDelegates"
 	// DelegateServiceGetDelegateProcedure is the fully-qualified name of the DelegateService's
 	// GetDelegate RPC.
 	DelegateServiceGetDelegateProcedure = "/numun.v1.DelegateService/GetDelegate"
@@ -80,6 +83,10 @@ const (
 type DelegateServiceClient interface {
 	ListDelegates(context.Context, *connect.Request[v1.ListDelegatesRequest]) (*connect.Response[v1.ListDelegatesResponse], error)
 	ListAllDelegates(context.Context, *connect.Request[v1.ListAllDelegatesRequest]) (*connect.Response[v1.ListAllDelegatesResponse], error)
+	// Every delegate in the conference's delegations the caller can see (all
+	// for admins, overseen ones for staffers, their own for advisors), in one
+	// call instead of one ListAllDelegates per delegation.
+	ListConferenceDelegates(context.Context, *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error)
 	GetDelegate(context.Context, *connect.Request[v1.GetDelegateRequest]) (*connect.Response[v1.GetDelegateResponse], error)
 	CreateDelegate(context.Context, *connect.Request[v1.CreateDelegateRequest]) (*connect.Response[v1.CreateDelegateResponse], error)
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
@@ -124,6 +131,12 @@ func NewDelegateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			httpClient,
 			baseURL+DelegateServiceListAllDelegatesProcedure,
 			connect.WithSchema(delegateServiceMethods.ByName("ListAllDelegates")),
+			connect.WithClientOptions(opts...),
+		),
+		listConferenceDelegates: connect.NewClient[v1.ListConferenceDelegatesRequest, v1.ListConferenceDelegatesResponse](
+			httpClient,
+			baseURL+DelegateServiceListConferenceDelegatesProcedure,
+			connect.WithSchema(delegateServiceMethods.ByName("ListConferenceDelegates")),
 			connect.WithClientOptions(opts...),
 		),
 		getDelegate: connect.NewClient[v1.GetDelegateRequest, v1.GetDelegateResponse](
@@ -205,6 +218,7 @@ func NewDelegateServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 type delegateServiceClient struct {
 	listDelegates              *connect.Client[v1.ListDelegatesRequest, v1.ListDelegatesResponse]
 	listAllDelegates           *connect.Client[v1.ListAllDelegatesRequest, v1.ListAllDelegatesResponse]
+	listConferenceDelegates    *connect.Client[v1.ListConferenceDelegatesRequest, v1.ListConferenceDelegatesResponse]
 	getDelegate                *connect.Client[v1.GetDelegateRequest, v1.GetDelegateResponse]
 	createDelegate             *connect.Client[v1.CreateDelegateRequest, v1.CreateDelegateResponse]
 	updateDelegate             *connect.Client[v1.UpdateDelegateRequest, v1.UpdateDelegateResponse]
@@ -227,6 +241,11 @@ func (c *delegateServiceClient) ListDelegates(ctx context.Context, req *connect.
 // ListAllDelegates calls numun.v1.DelegateService.ListAllDelegates.
 func (c *delegateServiceClient) ListAllDelegates(ctx context.Context, req *connect.Request[v1.ListAllDelegatesRequest]) (*connect.Response[v1.ListAllDelegatesResponse], error) {
 	return c.listAllDelegates.CallUnary(ctx, req)
+}
+
+// ListConferenceDelegates calls numun.v1.DelegateService.ListConferenceDelegates.
+func (c *delegateServiceClient) ListConferenceDelegates(ctx context.Context, req *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error) {
+	return c.listConferenceDelegates.CallUnary(ctx, req)
 }
 
 // GetDelegate calls numun.v1.DelegateService.GetDelegate.
@@ -293,6 +312,10 @@ func (c *delegateServiceClient) ResumeBulkImport(ctx context.Context, req *conne
 type DelegateServiceHandler interface {
 	ListDelegates(context.Context, *connect.Request[v1.ListDelegatesRequest]) (*connect.Response[v1.ListDelegatesResponse], error)
 	ListAllDelegates(context.Context, *connect.Request[v1.ListAllDelegatesRequest]) (*connect.Response[v1.ListAllDelegatesResponse], error)
+	// Every delegate in the conference's delegations the caller can see (all
+	// for admins, overseen ones for staffers, their own for advisors), in one
+	// call instead of one ListAllDelegates per delegation.
+	ListConferenceDelegates(context.Context, *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error)
 	GetDelegate(context.Context, *connect.Request[v1.GetDelegateRequest]) (*connect.Response[v1.GetDelegateResponse], error)
 	CreateDelegate(context.Context, *connect.Request[v1.CreateDelegateRequest]) (*connect.Response[v1.CreateDelegateResponse], error)
 	UpdateDelegate(context.Context, *connect.Request[v1.UpdateDelegateRequest]) (*connect.Response[v1.UpdateDelegateResponse], error)
@@ -333,6 +356,12 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 		DelegateServiceListAllDelegatesProcedure,
 		svc.ListAllDelegates,
 		connect.WithSchema(delegateServiceMethods.ByName("ListAllDelegates")),
+		connect.WithHandlerOptions(opts...),
+	)
+	delegateServiceListConferenceDelegatesHandler := connect.NewUnaryHandler(
+		DelegateServiceListConferenceDelegatesProcedure,
+		svc.ListConferenceDelegates,
+		connect.WithSchema(delegateServiceMethods.ByName("ListConferenceDelegates")),
 		connect.WithHandlerOptions(opts...),
 	)
 	delegateServiceGetDelegateHandler := connect.NewUnaryHandler(
@@ -413,6 +442,8 @@ func NewDelegateServiceHandler(svc DelegateServiceHandler, opts ...connect.Handl
 			delegateServiceListDelegatesHandler.ServeHTTP(w, r)
 		case DelegateServiceListAllDelegatesProcedure:
 			delegateServiceListAllDelegatesHandler.ServeHTTP(w, r)
+		case DelegateServiceListConferenceDelegatesProcedure:
+			delegateServiceListConferenceDelegatesHandler.ServeHTTP(w, r)
 		case DelegateServiceGetDelegateProcedure:
 			delegateServiceGetDelegateHandler.ServeHTTP(w, r)
 		case DelegateServiceCreateDelegateProcedure:
@@ -452,6 +483,10 @@ func (UnimplementedDelegateServiceHandler) ListDelegates(context.Context, *conne
 
 func (UnimplementedDelegateServiceHandler) ListAllDelegates(context.Context, *connect.Request[v1.ListAllDelegatesRequest]) (*connect.Response[v1.ListAllDelegatesResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.ListAllDelegates is not implemented"))
+}
+
+func (UnimplementedDelegateServiceHandler) ListConferenceDelegates(context.Context, *connect.Request[v1.ListConferenceDelegatesRequest]) (*connect.Response[v1.ListConferenceDelegatesResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("numun.v1.DelegateService.ListConferenceDelegates is not implemented"))
 }
 
 func (UnimplementedDelegateServiceHandler) GetDelegate(context.Context, *connect.Request[v1.GetDelegateRequest]) (*connect.Response[v1.GetDelegateResponse], error) {

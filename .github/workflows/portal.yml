@@ -104,6 +104,7 @@ jobs:
       - name: build portal
         env:
           VITE_API_BASE_URL: https://api.${{ env.APEX_DOMAIN }}
+          VITE_SITE_BASE_URL: https://${{ env.APEX_DOMAIN }}
           VITE_COGNITO_USER_POOL_ID: ${{ env.CognitoUserPoolId }}
           VITE_COGNITO_CLIENT_ID: ${{ env.CognitoClientId }}
           VITE_VERSION: ${{ steps.version.outputs.version }}

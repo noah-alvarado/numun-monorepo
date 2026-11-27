@@ -1,7 +1,8 @@
 // Announcements — staff-admin emails the advisors of a conference's
 // delegations. Preview shows who would receive it (advisors who opted in and
 // whose email isn't suppressed) before anything is sent. The body is plain
-// text; paragraphs and line breaks carry over to the HTML version.
+// text (SECURITY.md §2.2); the server escapes it into the HTML email and
+// keeps its line breaks.
 
 import { createResource, createSignal, For, Show } from "solid-js";
 import { timestampDate } from "@bufbuild/protobuf/wkt";
@@ -29,23 +30,6 @@ const audienceLabel = (raw: string) => {
     return "Advisors";
   }
 };
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
-}
-
-// Blank lines separate paragraphs; single newlines become <br>.
-function textToHtml(text: string): string {
-  return text
-    .trim()
-    .split(/\n\s*\n/)
-    .map((p) => `<p>${escapeHtml(p.trim()).replace(/\n/g, "<br>")}</p>`)
-    .join("\n");
-}
 
 export default function AdminAnnouncements() {
   const [user] = userSignal;
@@ -98,7 +82,9 @@ export default function AdminAnnouncements() {
       const resp = await announcementClient.send({
         subject: subject().trim(),
         bodyText: body().trim(),
-        bodyHtml: textToHtml(body()),
+        // Required by the API but unused for rendering: announcements are
+        // plain text.
+        bodyHtml: body().trim(),
         audience: filter(),
       });
       const n = resp.announcement?.recipientCount ?? preview()?.count ?? 0;
@@ -165,7 +151,7 @@ export default function AdminAnnouncements() {
             </label>
             <label class="block">
               <span class="text-xs text-nu-purple-700">
-                Message (blank lines start new paragraphs)
+                Message (plain text; line breaks are kept)
               </span>
               <textarea
                 required
@@ -244,14 +230,30 @@ export default function AdminAnnouncements() {
       <Show when={preview()}>
         {(p) => (
           <Modal
-            title={`Send to ${p().count} advisor${p().count === 1 ? "" : "s"}?`}
+            title={
+              p().count === 0
+                ? "No one to send to"
+                : `Send to ${p().count} advisor${p().count === 1 ? "" : "s"}?`
+            }
             onClose={() => setPreview(null)}
           >
-            <p class="mt-2 text-sm text-nu-purple-700">
-              "{subject().trim()}" goes to{" "}
-              {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()} in{" "}
-              {conference()?.name}.
-            </p>
+            <Show
+              when={p().count > 0}
+              fallback={
+                <p class="mt-2 text-sm text-nu-purple-700">
+                  None of the{" "}
+                  {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()}{" "}
+                  in {conference()?.name} can get announcements: there are none
+                  yet, or they've opted out or their email bounced.
+                </p>
+              }
+            >
+              <p class="mt-2 text-sm text-nu-purple-700">
+                "{subject().trim()}" goes to{" "}
+                {AUDIENCES.find(([v]) => v === audience())?.[1].toLowerCase()}{" "}
+                in {conference()?.name}.
+              </p>
+            </Show>
             <Show when={p().sample.length > 0}>
               <p class="mt-2 text-xs text-nu-purple-700">
                 Including {p().sample.join(", ")}
@@ -264,16 +266,18 @@ export default function AdminAnnouncements() {
                 onClick={() => setPreview(null)}
                 class="rounded border border-nu-purple-300 px-3 py-1 text-nu-purple-700"
               >
-                Cancel
+                {p().count === 0 ? "Close" : "Cancel"}
               </button>
-              <button
-                type="button"
-                disabled={busy() || p().count === 0}
-                onClick={send}
-                class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
-              >
-                {busy() ? "Sending…" : "Send"}
-              </button>
+              <Show when={p().count > 0}>
+                <button
+                  type="button"
+                  disabled={busy()}
+                  onClick={send}
+                  class="rounded bg-nu-purple px-3 py-1 text-white disabled:opacity-50"
+                >
+                  {busy() ? "Sending…" : "Send"}
+                </button>
+              </Show>
             </div>
           </Modal>
         )}

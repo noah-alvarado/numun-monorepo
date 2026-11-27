@@ -21,7 +21,8 @@ import {
   type Position,
 } from "@/gen/numun/v1/committees_pb";
 import { User_Role } from "@/gen/numun/v1/users_pb";
-import { connectMessage } from "@/lib/errors";
+import { conflictMessage, connectMessage, isConflict } from "@/lib/errors";
+import { guideUrl } from "@/lib/site";
 
 type CommitteeFormState = {
   name: string;
@@ -200,6 +201,12 @@ export default function Committees() {
                 setEditTarget(null);
                 await refetch();
               } catch (err) {
+                if (isConflict(err)) {
+                  setEditTarget(null);
+                  await refetch();
+                  setError(conflictMessage("this committee"));
+                  return;
+                }
                 setError(handleMutationError(err));
               }
             }}
@@ -223,6 +230,12 @@ export default function Committees() {
                 setDeleteTarget(null);
                 await refetch();
               } catch (err) {
+                if (isConflict(err)) {
+                  setDeleteTarget(null);
+                  await refetch();
+                  setError(conflictMessage("this committee"));
+                  return;
+                }
                 setError(handleMutationError(err));
               }
             }}
@@ -279,7 +292,21 @@ function CommitteeRow(props: {
             when={props.committee.backgroundGuideRef}
             fallback={<span class="text-nu-purple-300">—</span>}
           >
-            {props.committee.backgroundGuideRef}
+            {(ref) => (
+              <Show when={guideUrl(ref())} fallback={ref()}>
+                {(url) => (
+                  <a
+                    href={url()}
+                    target="_blank"
+                    rel="noopener"
+                    class="underline"
+                    title={ref()}
+                  >
+                    View guide
+                  </a>
+                )}
+              </Show>
+            )}
           </Show>
         </td>
         <td class="px-2 py-2 align-top text-right">
@@ -468,6 +495,12 @@ function PositionsPanel(props: {
                 setEditTarget(null);
                 props.refetch();
               } catch (err) {
+                if (isConflict(err)) {
+                  setEditTarget(null);
+                  props.refetch();
+                  setError(conflictMessage("this position"));
+                  return;
+                }
                 setError(handleMutationError(err));
               }
             }}
@@ -491,6 +524,12 @@ function PositionsPanel(props: {
                 setDeleteTarget(null);
                 props.refetch();
               } catch (err) {
+                if (isConflict(err)) {
+                  setDeleteTarget(null);
+                  props.refetch();
+                  setError(conflictMessage("this position"));
+                  return;
+                }
                 setError(handleMutationError(err));
               }
             }}
@@ -576,15 +615,20 @@ function CommitteeModal(props: {
         </label>
         <label class="block">
           <span class="text-xs font-semibold uppercase tracking-wide text-nu-purple-700">
-            Background guide ref
+            Background guide
           </span>
           <input
             type="text"
             value={guide()}
             onInput={(e) => setGuide(e.currentTarget.value)}
-            placeholder="/content/background-guides/…"
+            placeholder="/content/background-guides/numun-xxiv/unclos.md"
+            aria-describedby="guide-hint"
             class="mt-1 w-full rounded border border-nu-purple-300 px-2 py-1"
           />
+          <span id="guide-hint" class="mt-1 block text-xs text-nu-purple-700">
+            Path of the guide's entry in the CMS. Leave blank if it isn't
+            published yet.
+          </span>
         </label>
         <div class="flex justify-end gap-2 pt-2">
           <button
@@ -846,9 +890,6 @@ function committeeSizeLabel(s: CommitteeSize): string {
 }
 
 function handleMutationError(err: unknown): string {
-  if (err instanceof ConnectError && err.code === Code.Aborted) {
-    return "Another change happened first. Reload to fetch the latest state.";
-  }
   if (err instanceof ConnectError && err.code === Code.FailedPrecondition) {
     return err.rawMessage;
   }

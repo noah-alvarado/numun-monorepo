@@ -88,7 +88,7 @@ const typeLabel = d.committeeType === "crisis" ? "Crisis" : "General assembly";
     </div>
 
     {
-      d.pdfFile && (
+      d.pdfFile ? (
         <p class="mt-8">
           <a
             href={d.pdfFile}
@@ -98,6 +98,11 @@ const typeLabel = d.committeeType === "crisis" ? "Crisis" : "General assembly";
           >
             Download background guide (PDF)
           </a>
+        </p>
+      ) : (
+        <p class="mt-8 max-w-3xl text-nu-black-700">
+          Background guides and committee emails will become available as the
+          conference approaches.
         </p>
       )
     }

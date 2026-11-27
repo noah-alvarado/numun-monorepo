@@ -19,14 +19,18 @@ sections:
       through directives and individual action. Review the crisis explainer and
       tech guide so you can hit the ground running.
 documentLinks:
-  - label: Delegate Guide
-    href: /uploads/documents/DelegateGuide.pdf
-  - label: Example Position Paper
-    href: /uploads/documents/ExamplePositionPaper.pdf
+  - label: Delegate & Advisor Guide
+    href: /uploads/documents/ConferenceGuide.pdf
+  - label: Example Position Paper (General Assembly)
+    href: /uploads/documents/ExamplePositionPaperGA.pdf
+  - label: Example Position Paper (Crisis)
+    href: /uploads/documents/ExamplePositionPaperCrisis.pdf
   - label: Awards (Delegates)
     href: /uploads/documents/AwardsDelegates.pdf
   - label: Awards (Position Papers)
     href: /uploads/documents/AwardsPositionPapers.pdf
+  - label: Crisis Guide
+    href: /uploads/documents/CrisisGuide.pdf
   - label: Crisis Explanation
     href: /uploads/documents/CrisisExplanation.pdf
   - label: Tech & Crisis Guide
