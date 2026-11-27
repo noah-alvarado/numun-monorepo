@@ -11,10 +11,6 @@ import { extname, join, normalize } from "node:path";
 
 const ROOT = new URL("../../site/dist/", import.meta.url).pathname;
 const CMS = new URL("../../cms/", import.meta.url).pathname;
-// Stand-ins for uploads that content references but the repo doesn't hold
-// (e.g. stub background guides), served only when site/dist lacks them.
-const UPLOAD_STUBS = new URL("../files/site-uploads/", import.meta.url)
-  .pathname;
 const API_ORIGIN = process.env.CMS_API_ORIGIN ?? "http://localhost:3000";
 const PORT = Number(process.env.SITE_PORT ?? 4322);
 // The site's build-time apex (SITE_APEX, defaulting to SITE_BASE's host).
@@ -86,15 +82,8 @@ createServer((req, res) => {
     res.end();
     return;
   }
-  let file = resolve(req.url ?? "/");
-  if (!isFile(file) && path.startsWith("/uploads/")) {
-    const stub = normalize(
-      join(UPLOAD_STUBS, decodeURIComponent(path.slice(9))),
-    );
-    if (stub.startsWith(UPLOAD_STUBS) && isFile(stub)) file = stub;
-  }
-  const allowed = file.startsWith(ROOT) || file.startsWith(UPLOAD_STUBS);
-  if (!allowed || !isFile(file)) {
+  const file = resolve(req.url ?? "/");
+  if (!file.startsWith(ROOT) || !isFile(file)) {
     const notFound = join(ROOT, "404.html");
     res.writeHead(404, { "Content-Type": "text/html; charset=utf-8" });
     if (existsSync(notFound)) createReadStream(notFound).pipe(res);
