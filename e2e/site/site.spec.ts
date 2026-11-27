@@ -148,7 +148,7 @@ test("responses carry the site's headers, types and redirects", async ({
   expect(missing.headers()["content-type"]).toBe("text/html; charset=utf-8");
   expect(missing.headers()["x-frame-options"]).toBe("DENY");
 
-  const pdf = await request.get("/uploads/documents/DelegateGuide.pdf");
+  const pdf = await request.get("/uploads/documents/ConferenceGuide.pdf");
   expect(pdf.status()).toBe(200);
   expect(pdf.headers()["content-type"]).toBe("application/pdf");
 

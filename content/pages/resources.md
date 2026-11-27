@@ -4,11 +4,13 @@ intro: Guides, examples, and references for delegates and advisers.
 linkGroups:
   - groupTitle: For delegates
     links:
-      - label: Delegate Guide
-        href: /uploads/documents/DelegateGuide.pdf
+      - label: Delegate & Advisor Guide
+        href: /uploads/documents/ConferenceGuide.pdf
         description: How to prepare for and succeed at NUMUN.
-      - label: Example Position Paper
-        href: /uploads/documents/ExamplePositionPaper.pdf
+      - label: Example Position Paper (General Assembly)
+        href: /uploads/documents/ExamplePositionPaperGA.pdf
+      - label: Example Position Paper (Crisis)
+        href: /uploads/documents/ExamplePositionPaperCrisis.pdf
       - label: Parliamentary Procedure
         href: /uploads/documents/ParliPro.pdf
       - label: MUN 101
@@ -17,6 +19,8 @@ linkGroups:
         href: /uploads/documents/crisis_101.pdf
   - groupTitle: Crisis & awards
     links:
+      - label: Crisis Guide
+        href: /uploads/documents/CrisisGuide.pdf
       - label: Crisis Explanation
         href: /uploads/documents/CrisisExplanation.pdf
       - label: Tech & Crisis Guide
@@ -27,6 +31,8 @@ linkGroups:
         href: /uploads/documents/AwardsPositionPapers.pdf
   - groupTitle: For advisers
     links:
+      - label: Delegate & Advisor Guide
+        href: /uploads/documents/ConferenceGuide.pdf
       - label: Adviser Guide
         href: /uploads/documents/AdviserGuide.pdf
       - label: Liability Waiver

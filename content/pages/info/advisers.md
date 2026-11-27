@@ -22,6 +22,8 @@ sections:
       registration. Payment is handled off-platform; the portal tracks your
       balance and paid status.
 documentLinks:
+  - label: Delegate & Advisor Guide
+    href: /uploads/documents/ConferenceGuide.pdf
   - label: Adviser Guide
     href: /uploads/documents/AdviserGuide.pdf
   - label: Liability Waiver

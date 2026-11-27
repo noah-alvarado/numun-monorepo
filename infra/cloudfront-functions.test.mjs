@@ -149,7 +149,7 @@ describe("PreviewRouterFunction", () => {
       "/news/2026/award-winners",
       "/favicon.svg",
       "/_astro/app.1a2b.js",
-      "/uploads/documents/DelegateGuide.pdf",
+      "/uploads/documents/ConferenceGuide.pdf",
       "/portal",
       "/portal/delegation",
       "/portals",
